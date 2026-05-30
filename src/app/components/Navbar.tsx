@@ -73,13 +73,13 @@ export function Navbar({ transparent = false }: NavbarProps) {
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden lg:flex items-center gap-8">
           {items.map((item) =>
             item.type === "route" ? (
               <Link
                 key={item.label}
                 to={item.target}
-                className={`transition-colors ${
+                className={`transition-colors cursor-pointer ${
                   location.pathname === item.target
                     ? "text-[#ffc300]"
                     : "text-white/90 hover:text-[#ffc300]"
@@ -96,7 +96,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
               <button
                 key={item.label}
                 onClick={() => handleScrollTo(item.target)}
-                className="text-white/90 hover:text-[#ffc300] transition-colors"
+                className="text-white/90 cursor-pointer hover:text-[#ffc300] transition-colors"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 500,
@@ -109,7 +109,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
           )}
           <button
             onClick={() => handleScrollTo("contato")}
-            className="bg-white text-[#001856] px-6 py-2 rounded-full hover:bg-[#ffc300] transition-colors"
+            className="bg-white cursor-pointer text-[#001856] px-6 py-2 rounded-full hover:bg-[#ffc300] transition-colors"
             style={{
               fontFamily: "'Inter', sans-serif",
               fontWeight: 600,
@@ -122,7 +122,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden text-white"
+          className="lg:hidden text-white"
           onClick={() => setMobileOpen((o) => !o)}
         >
           {mobileOpen ? <X size={26} /> : <Menu size={26} />}
@@ -131,7 +131,7 @@ export function Navbar({ transparent = false }: NavbarProps) {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-[#001856] px-6 pb-6 flex flex-col gap-4 border-t border-white/10">
+        <div className="lg:hidden bg-[#001856] px-6 pb-6 flex flex-col gap-4 border-t border-white/10">
           {items.map((item) =>
             item.type === "route" ? (
               <Link

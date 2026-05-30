@@ -22,6 +22,7 @@ export function EventsPage() {
       {/* Header */}
       <section className="bg-[#001856] pt-32 pb-16">
         <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col">
           <Link
             to="/"
             className="inline-flex items-center gap-2 text-white/70 hover:text-[#ffc300] transition-colors mb-6"
@@ -35,6 +36,8 @@ export function EventsPage() {
           >
             Programação Completa
           </span>
+          </div>
+        
           <h1
             className="text-white mt-3"
             style={{

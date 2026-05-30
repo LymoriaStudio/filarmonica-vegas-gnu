@@ -112,7 +112,7 @@ export function Hero() {
                     .getElementById("contato")
                     ?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="bg-[#ffc300] text-[#001856] px-8 py-4 rounded-full hover:bg-yellow-400 transition-colors"
+                className="bg-[#ffc300] cursor-pointer text-[#001856] px-8 py-4 rounded-full hover:bg-yellow-400 transition-colors"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 700,
@@ -127,7 +127,7 @@ export function Hero() {
                     .getElementById("sobre")
                     ?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="border-2 border-white text-white px-8 py-4 rounded-full hover:bg-white hover:text-[#001856] transition-colors"
+                className="border-2 cursor-pointer border-white text-white px-8 py-4 rounded-full hover:bg-white hover:text-[#001856] transition-colors"
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 600,

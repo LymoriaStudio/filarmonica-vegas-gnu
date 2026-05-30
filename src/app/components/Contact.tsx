@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft } from "lucide-react";
+import { QrCodePix } from "qrcode-pix";
 const interesseImage = "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
 const apoioImage = "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
 

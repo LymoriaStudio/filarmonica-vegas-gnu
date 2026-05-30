@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 
@@ -40,15 +40,87 @@ const instruments = [
   },
 ];
 
+const GAP = 24; // gap-6 = 24px
+
+/** Calcula quantos cards cabem na largura do container */
+function getVisibleCount(containerWidth: number): number {
+  if (containerWidth >= 1024) return 3; // lg
+  if (containerWidth >= 640) return 2;  // sm/md
+  return 1;                              // mobile
+}
+
 export function Instruments() {
   const [current, setCurrent] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(3);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const visibleCount = 3;
-  const maxIndex = instruments.length - visibleCount;
+  // Atualiza visibleCount quando o container muda de tamanho
+  const updateVisible = useCallback(() => {
+    if (!containerRef.current) return;
+    const w = containerRef.current.offsetWidth;
+    const newVisible = getVisibleCount(w);
+    setVisibleCount((prev) => {
+      if (prev !== newVisible) {
+        setCurrent(0); // reset ao trocar breakpoint
+        return newVisible;
+      }
+      return prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    updateVisible();
+    const ro = new ResizeObserver(updateVisible);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [updateVisible]);
+
+  const maxIndex = Math.max(0, instruments.length - visibleCount);
 
   const prev = () => setCurrent((c) => Math.max(0, c - 1));
   const next = () => setCurrent((c) => Math.min(maxIndex, c + 1));
+
+  /**
+   * Largura de cada card = (containerWidth - GAP * (visibleCount - 1)) / visibleCount
+   * Offset por step = cardWidth + GAP
+   * Em percentual do container: ((cardWidth + GAP) / containerWidth) * 100
+   *
+   * Simplificando:
+   *   cardWidth = (100% - GAP*(vc-1)) / vc
+   *   step%     = cardWidth + GAP   →  (100 + GAP*(vc-1)/containerWidth*100 ... )
+   *
+   * Mais simples: usar pixels via CSS custom property injetada no style.
+   * Mas como não temos containerWidth em pixels facilmente no CSS,
+   * calculamos o translateX em px com base no offsetWidth atual.
+   */
+  const cardWidthPx = containerRef.current
+    ? (containerRef.current.offsetWidth - GAP * (visibleCount - 1)) / visibleCount
+    : 0;
+
+  const translateX = current * (cardWidthPx + GAP);
+
+  const trackRef = useRef<HTMLDivElement>(null);
+const dragStart = useRef<number | null>(null);
+const isDragging = useRef(false);
+
+const handleDragStart = (clientX: number) => {
+  dragStart.current = clientX;
+  isDragging.current = false;
+};
+
+const handleDragEnd = (clientX: number) => {
+  if (dragStart.current === null) return;
+  const delta = dragStart.current - clientX;
+  if (Math.abs(delta) > 50) {
+    delta > 0 ? next() : prev();
+  }
+  dragStart.current = null;
+};
+
+const handleMouseMove = (clientX: number) => {
+  if (dragStart.current === null) return;
+  if (Math.abs(clientX - dragStart.current) > 5) isDragging.current = true;
+};
 
   return (
     <section id="instrumentos" className="bg-white py-20 overflow-hidden">
@@ -92,68 +164,87 @@ export function Instruments() {
           </div>
         </div>
 
-        {/* Carousel */}
+        {/* Carousel track */}
         <div className="overflow-hidden" ref={containerRef}>
           <div
-            className="flex gap-6 transition-transform duration-500"
-            style={{ transform: `translateX(calc(-${current} * (100% / ${visibleCount} + 8px)))` }}
+            className="flex transition-transform duration-500"
+            style={{
+              gap: `${GAP}px`,
+              transform: `translateX(-${translateX}px)`,
+            }}
+
+             // Touch (mobile)
+    onTouchStart={(e) => handleDragStart(e.touches[0].clientX)}
+    onTouchEnd={(e) => handleDragEnd(e.changedTouches[0].clientX)}
+    // Mouse (desktop)
+    onMouseDown={(e) => handleDragStart(e.clientX)}
+    onMouseMove={(e) => handleMouseMove(e.clientX)}
+    onMouseUp={(e) => handleDragEnd(e.clientX)}
+    onMouseLeave={(e) => {
+      if (dragStart.current !== null) handleDragEnd(e.clientX);
+    }}
           >
             {instruments.map((inst, i) => (
-              <Link
-                to="/instrumentos"
-                key={i}
-                className="flex-none w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] rounded-2xl overflow-hidden shadow-lg group block transition-transform duration-300 hover:-translate-y-1"
-              >
-                {/* Image */}
-                <div className="relative h-64 overflow-hidden">
-                  <img
-                    src={inst.image}
-                    alt={inst.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div
-                    className="absolute bottom-0 left-0 right-0 h-1"
-                    style={{ backgroundColor: inst.color }}
-                  />
-                </div>
-                {/* Info */}
-                <div className="p-6 bg-white">
-                  <h3
-                    className="text-[#001856] mb-3"
-                    style={{
-                      fontFamily: "'Instrument Sans', sans-serif",
-                      fontWeight: 700,
-                      fontSize: "1.4rem",
-                    }}
-                  >
-                    {inst.name}
-                  </h3>
-                  <p
-                    className="text-gray-500 mb-4 leading-relaxed"
-                    style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
-                  >
-                    {inst.description}
-                  </p>
-                  <div className="flex items-center justify-end">
-                    <span
-                      className="px-4 py-2 rounded-full text-sm transition-colors"
-                      style={{
-                        backgroundColor: inst.color,
-                        color: inst.color === "#ffc300" ? "#001856" : "white",
-                        fontFamily: "'Inter', sans-serif",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Ver detalhes →
-                    </span>
-                  </div>
-                </div>
-              </Link>
+           <Link
+  to="/instrumentos"
+  key={i}
+  className="flex-none flex flex-col rounded-2xl overflow-hidden shadow-lg group transition-transform duration-300 hover:-translate-y-1"
+  style={{
+    width: cardWidthPx > 0 ? `${cardWidthPx}px` : `calc((100% - ${GAP * (visibleCount - 1)}px) / ${visibleCount})`,
+  }}
+   draggable={false} 
+>
+  {/* Image */}
+  <div className="relative h-64 overflow-hidden flex-none">
+    <img
+      src={inst.image}
+      alt={inst.name}
+      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+    />
+    <div
+      className="absolute bottom-0 left-0 right-0 h-1"
+      style={{ backgroundColor: inst.color }}
+    />
+  </div>
+
+  {/* Info — ocupa todo o espaço restante */}
+  <div className="p-6 bg-white flex flex-col flex-1">
+    <h3
+      className="text-[#001856] mb-3"
+      style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.4rem" }}
+    >
+      {inst.name}
+    </h3>
+
+    {/* Descrição empurra o botão para baixo */}
+    <p
+      className="text-gray-500 leading-relaxed flex-1"
+      style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
+    >
+      {inst.description}
+    </p>
+
+    {/* Botão sempre no fundo */}
+    <div className="flex items-center justify-end mt-4">
+      <span
+        className="px-4 py-2 rounded-full text-sm"
+        style={{
+          backgroundColor: inst.color,
+          color: inst.color === "#ffc300" ? "#001856" : "white",
+          fontFamily: "'Inter', sans-serif",
+          fontWeight: 700,
+        }}
+      >
+        Ver detalhes →
+      </span>
+    </div>
+  </div>
+</Link>
             ))}
           </div>
         </div>
 
-        {/* Dots */}
+        {/* Dots — quantidade dinâmica baseada em maxIndex */}
         <div className="flex justify-center gap-2 mt-8">
           {Array.from({ length: maxIndex + 1 }).map((_, i) => (
             <button
