@@ -39,10 +39,45 @@ export function Contact() {
     mensagem: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSent(true);
-  };
+  const WHATSAPP_NUMBER = "5519998453478";
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const WHATSAPP_NUMBER = "5519998453478";
+  let mensagem = "";
+
+  if (tab === "interesse") {
+    mensagem = [
+      "🎺 *Olá tenho interesse na Filarmônica de Metais*",
+      "",
+      `*Nome:* ${interesseForm.nome}`,
+      `*E-mail:* ${interesseForm.email}`,
+      `*Telefone:* ${interesseForm.telefone || "Não informado"}`,
+      `*Instrumento:* ${interesseForm.instrumento || "Não informado"}`,
+      `*Mensagem:* ${interesseForm.mensagem || "Nenhuma mensagem"}`,
+    ].join("\n");
+  } else {
+    mensagem = [
+      "🏢 *Nova proposta de apoio — Filarmônica de Metais*",
+      "",
+      `*Empresa:* ${apoioForm.empresa}`,
+      `*Responsável:* ${apoioForm.responsavel}`,
+      `*E-mail:* ${apoioForm.email}`,
+      `*Telefone:* ${apoioForm.telefone || "Não informado"}`,
+      `*Tipo de apoio:* ${apoioForm.tipo || "Não informado"}`,
+      `*Mensagem:* ${apoioForm.mensagem || "Nenhuma mensagem"}`,
+    ].join("\n");
+  }
+
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(mensagem)}`;
+  
+  // Abre antes de qualquer setState para não ser bloqueado como popup
+  window.open(url, "_blank", "noopener,noreferrer");
+  
+  setSent(true);
+};
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
