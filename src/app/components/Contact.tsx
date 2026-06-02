@@ -1,22 +1,19 @@
-import { useState } from "react";
+import { Buffer } from "buffer";
+window.Buffer = Buffer;
+import { useState, useMemo } from "react";
 import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft } from "lucide-react";
 import { QrCodePix } from "qrcode-pix";
-const interesseImage = "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
-const apoioImage = "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
+import { QRCodeSVG } from "qrcode.react";
+
 
 type Tab = "interesse" | "apoio" | "doacao";
 
-const donationOptions = [
-  { value: 100, label: "R$ 100" },
-  { value: 500, label: "R$ 500" },
-  { value: 1000, label: "R$ 1.000" },
-  { value: 0, label: "A definir" },
-];
 
-const buildPixPayload = (amount: number) => {
-  const base = `Doacao Filarmonica de Metais${amount ? ` - R$ ${amount.toFixed(2)}` : " - Valor a combinar"}`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(base)}`;
-};
+
+
+const interesseImage = "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
+const apoioImage = "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
+
 
 export function Contact() {
   const [tab, setTab] = useState<Tab>("interesse");
@@ -39,7 +36,34 @@ export function Contact() {
     mensagem: "",
   });
 
-  const WHATSAPP_NUMBER = "5519998453478";
+  const donationOptions = [
+  { value: 100, label: "R$ 100" },
+  { value: 500, label: "R$ 500" },
+  { value: 1000, label: "R$ 1.000" },
+  { value: 0, label: "A definir" },
+];
+  const pixPayload = useMemo(() => {
+  if (donationAmount === null) return "";
+
+  try {
+    const pix = QrCodePix({
+      version: "01",
+      key: "45431497855",
+      name: "Filarmonica de Metais",
+      city: "Americana",
+      // value omitido quando for 0 → Pix com valor em aberto
+      ...(donationAmount > 0 ? { value: donationAmount } : {}),
+      message: "Doacao",
+    });
+    return pix.payload();
+  } catch (e) {
+    console.error("Erro ao gerar Pix:", e);
+    return "";
+  }
+}, [donationAmount]);
+
+
+
 
 const handleSubmit = (e: React.FormEvent) => {
   e.preventDefault();
@@ -284,24 +308,24 @@ const handleSubmit = (e: React.FormEvent) => {
                       Escolha o valor da sua doação:
                     </p>
                     <div className="grid grid-cols-2 gap-3 mb-5">
-                      {donationOptions.map((opt) => {
-                        const active = donationAmount === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setDonationAmount(opt.value)}
-                            className={`py-4 rounded-xl border-2 transition-all ${
-                              active
-                                ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
-                                : "border-white/20 text-white hover:border-[#ffc300]/60"
-                            }`}
-                            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
-                          >
-                            {opt.label}
-                          </button>
-                        );
-                      })}
+                {donationOptions.map((opt) => {
+  const active = donationAmount === opt.value;
+  return (
+    <button
+      key={opt.value}
+      type="button"
+      onClick={() => setDonationAmount(opt.value)} // ← dispara o useMemo
+      className={`py-4 rounded-xl border-2 transition-all ${
+        active
+          ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
+          : "border-white/20 text-white hover:border-[#ffc300]/60"
+      }`}
+      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
+    >
+      {opt.label}
+    </button>
+  );
+})}
                     </div>
                     <button
                       type="button"
@@ -342,13 +366,15 @@ const handleSubmit = (e: React.FormEvent) => {
                         ? "Valor a combinar"
                         : `R$ ${donationAmount?.toLocaleString("pt-BR")},00`}
                     </p>
-                    <div className="bg-white p-3 rounded-xl mb-4">
-                      <img
-                        src={buildPixPayload(donationAmount ?? 0)}
-                        alt={`QR Code para doação de R$ ${donationAmount}`}
-                        className="w-52 h-52 block"
-                      />
-                    </div>
+                 <div className="bg-white p-3 rounded-xl mb-4">
+  {pixPayload ? (
+    <QRCodeSVG value={pixPayload} size={208} />
+  ) : (
+    <p className="text-gray-400 text-sm w-52 h-52 flex items-center justify-center">
+      QR Code indisponível
+    </p>
+  )}
+</div>
                     <p
                       className="text-white/60 max-w-xs"
                       style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.85rem", lineHeight: 1.6 }}
