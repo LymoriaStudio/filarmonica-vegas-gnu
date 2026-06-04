@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft } from "lucide-react";
 import { QrCodePix } from "qrcode-pix";
 import { QRCodeSVG } from "qrcode.react";
+import { schemaInteresse } from "../validations/contactRules";
 
 
 type Tab = "interesse" | "apoio" | "doacao";
@@ -35,6 +36,15 @@ export function Contact() {
     tipo: "",
     mensagem: "",
   });
+  const [copied, setCopied] = useState(false);
+  const [erros, setErrors] = useState()
+
+const handleCopy = () => {
+  navigator.clipboard.writeText(pixPayload).then(() => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  });
+};
 
   const donationOptions = [
   { value: 100, label: "R$ 100" },
@@ -65,7 +75,7 @@ export function Contact() {
 
 
 
-const handleSubmit = (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   e.stopPropagation();
 
@@ -73,6 +83,18 @@ const handleSubmit = (e: React.FormEvent) => {
   let mensagem = "";
 
   if (tab === "interesse") {
+    try {
+  console.log("VALIDANDO...");
+  
+  const result = await schemaInteresse.validate(interesseForm, {
+    abortEarly: false,
+  });
+
+  console.log("VALIDOU", result);
+} catch (error) {
+ console.log(error.inner)
+  return;
+}
     mensagem = [
       "🎺 *Olá tenho interesse na Filarmônica de Metais*",
       "",
@@ -103,12 +125,28 @@ const handleSubmit = (e: React.FormEvent) => {
   setSent(true);
 };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const setter = tab === "interesse" ? setInteresseForm : setApoioForm;
-    setter((f: any) => ({ ...f, [e.target.name]: e.target.value }));
-  };
+const handleChange = (
+  e: React.ChangeEvent<
+    HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+  >
+) => {
+  const setter = tab === "interesse" ? setInteresseForm : setApoioForm;
+
+  let value = e.target.value;
+
+  if (e.target.name === "telefone") {
+    value = value
+      .replace(/\D/g, "")
+      .slice(0, 11)
+      .replace(/^(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2");
+  }
+
+  setter((f: any) => ({
+    ...f,
+    [e.target.name]: value,
+  }));
+};
 
   const switchTab = (newTab: Tab) => {
     setTab(newTab);
@@ -190,7 +228,7 @@ const handleSubmit = (e: React.FormEvent) => {
               ].map((info, i) => (
                 <div
                   key={i}
-                  className="bg-gray-50 rounded-xl p-4 flex flex-col gap-2"
+                  className="bg-gray-50 rounded-xl p-4 flex flex-col break-all gap-2"
                 >
                   <div className="text-[#ffc300]">{info.icon}</div>
                   <span
@@ -331,7 +369,7 @@ const handleSubmit = (e: React.FormEvent) => {
                       type="button"
                       disabled={donationAmount === null}
                       onClick={() => setShowQr(true)}
-                      className="w-full bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full cursor-pointer bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                     >
                       <QrCode size={18} />
@@ -374,7 +412,33 @@ const handleSubmit = (e: React.FormEvent) => {
       QR Code indisponível
     </p>
   )}
+
 </div>
+ {/* Botão copiar código Pix */}
+{pixPayload && (
+  <button
+    type="button"
+    onClick={handleCopy}
+    className={`flex items-center gap-2 cursor-pointer px-5 py-2.5 rounded-xl border-2 transition-all mb-4 ${
+      copied
+        ? "border-green-400 text-green-400 bg-green-400/10"
+        : "border-white/20 text-white/70 hover:border-[#ffc300] hover:text-[#ffc300]"
+    }`}
+    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.85rem" }}
+  >
+    {copied ? (
+      <>
+        <CheckCircle size={15} />
+        Código copiado!
+      </>
+    ) : (
+      <>
+        <QrCode size={15} />
+        Copiar código Pix
+      </>
+    )}
+  </button>
+)}
                     <p
                       className="text-white/60 max-w-xs"
                       style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.85rem", lineHeight: 1.6 }}
@@ -405,7 +469,7 @@ const handleSubmit = (e: React.FormEvent) => {
                   Para pais que querem inscrever seus filhos ou músicos interessados em participar.
                 </p>
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <form onSubmit={handleSubmit} noValidate={true} className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label
@@ -418,7 +482,7 @@ const handleSubmit = (e: React.FormEvent) => {
                         name="nome"
                         value={interesseForm.nome}
                         onChange={handleChange}
-                        required
+                       
                         placeholder="Seu nome"
                         className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
                         style={{ fontFamily: "'Inter', sans-serif" }}
@@ -438,6 +502,7 @@ const handleSubmit = (e: React.FormEvent) => {
                         placeholder="(XX) XXXXX-XXXX"
                         className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
                         style={{ fontFamily: "'Inter', sans-serif" }}
+                        type="phone"
                       />
                     </div>
                   </div>
@@ -454,7 +519,7 @@ const handleSubmit = (e: React.FormEvent) => {
                       type="email"
                       value={interesseForm.email}
                       onChange={handleChange}
-                      required
+                      
                       placeholder="seu@email.com"
                       className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
                       style={{ fontFamily: "'Inter', sans-serif" }}

@@ -55,9 +55,9 @@ export function Footer() {
             </p>
             <div className="flex gap-4">
               {[
-                { icon: <Instagram size={18} />, href: "#" },
+                { icon: <Instagram size={18} />, href: "https://www.instagram.com/filarmonicademetais?igsh=MWQ0MmszbWhic2g4eg==" },
                 { icon: <Facebook size={18} />, href: "#" },
-                { icon: <Youtube size={18} />, href: "#" },
+                { icon: <Youtube size={18} />, href: "https://youtube.com/@filarmonicademetais1215?si=dbFW-IkjdOfZzzAt" },
               ].map((social, i) => (
                 <a
                   key={i}

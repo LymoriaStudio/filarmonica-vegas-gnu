@@ -33,12 +33,12 @@ export function InstrumentsPage() {
           >
             <ArrowLeft size={16} /> Voltar para a página inicial
           </Link>
-          <span
+          <p
             className="text-[#ffc300] uppercase tracking-widest"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "13px" }}
           >
             Galeria de Instrumentos
-          </span>
+          </p>
           <h1
             className="text-white mt-3"
             style={{
