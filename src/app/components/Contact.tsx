@@ -92,7 +92,16 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   console.log("VALIDOU", result);
 } catch (error) {
- console.log(error.inner)
+  const validationErros = {}
+  if(error instanceof yup.ValidationError){
+    error.inner.forEach((e) => {
+      if(e.path){
+        validationErros[e.path] = e.message
+      }
+  })
+
+  setErrors(validationErros)
+  }
   return;
 }
     mensagem = [
@@ -524,6 +533,7 @@ const handleChange = (
                       className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
                       style={{ fontFamily: "'Inter', sans-serif" }}
                     />
+                    {erros && <p className="text-red-600">{erros}</p>}
                   </div>
 
                   <div>
