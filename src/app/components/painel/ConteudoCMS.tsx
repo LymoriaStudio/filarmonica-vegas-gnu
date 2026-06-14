@@ -1,11 +1,11 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FolderLock, Presentation, Calendar, Newspaper, Film, Plus, Trash2, Edit, 
   Copy, Star, Eye, Globe, Sparkles, Image, Play, Check, Clock, CloudUpload, X
 } from 'lucide-react';
 import { InstrumentEvent, NewsArticle, MusicCourse, GalleryPhoto, GalleryVideo, Professor } from '../../validations/types';
-import { RichTextEditor, ImageUploader, Toast } from './MiniWidgets';
+import { RichTextEditor, ImageUploader, Toast, uploadFileToSupabase } from './MiniWidgets';
+import { supabase } from '../../../lib/supabase';
 
 interface ConteudoCMSProps {
   events: InstrumentEvent[];
@@ -21,6 +21,44 @@ interface ConteudoCMSProps {
   professors: Professor[];
   addAuditLog: (action: string, module: string, details: string) => void;
 }
+
+// ==========================================
+// MAPPERS: eventos (snake_case <-> camelCase)
+// ==========================================
+const mapEventFromDb = (row: any): InstrumentEvent => ({
+  id: row.id,
+  cover: row.cover_image,
+  title: row.title,
+  description: row.description,
+  date: row.date,
+  time: row.time,
+  location: row.venue,
+  address: row.address,
+  mapsUrl: row.google_maps_url,
+  category: row.category,
+  status: row.status,
+  featured: row.highlighted ?? false,
+  link: row.link,
+  isPaid: row.is_paid ?? false,
+  ticket: row.ticket,
+});
+
+const mapEventToDb = (e: Partial<InstrumentEvent>) => ({
+  cover_image: e.cover || null,
+  title: e.title,
+  description: e.description,
+  date: e.date,
+  time: e.time,
+  venue: e.location,
+  address: e.address,
+  google_maps_url: e.mapsUrl || null,
+  category: e.category,
+  status: e.status || 'rascunho',
+  highlighted: e.featured ?? false,
+  link: e.link || null,
+  is_paid: e.isPaid ?? false,
+  ticket: e.isPaid ? (e.ticket ?? null) : null,
+});
 
 export default function ConteudoCMS({
   events,
@@ -44,6 +82,11 @@ export default function ConteudoCMS({
   // Modals state
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [activeEvent, setActiveEvent] = useState<Partial<InstrumentEvent> | null>(null);
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
+  // Arquivo de capa pendente (upload diferido até confirmar/salvar)
+  const [pendingEventCoverFile, setPendingEventCoverFile] = useState<File | null>(null);
 
   const [newsModalOpen, setNewsModalOpen] = useState(false);
   const [activeNews, setActiveNews] = useState<Partial<NewsArticle> | null>(null);
@@ -59,60 +102,176 @@ export default function ConteudoCMS({
 
 
   // ==========================================
-  // EVENTS CORE (CRUD, DUPLICATE, FEATURED)
+  // LOAD EVENTS FROM SUPABASE
+  // ==========================================
+  useEffect(() => {
+    const fetchEvents = async () => {
+      setEventsLoading(true);
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setEventsLoading(false);
+        return;
+      }
+
+      setEvents((data || []).map(mapEventFromDb));
+      setEventsLoading(false);
+    };
+
+    fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
+  // ==========================================
+  // EVENTS CORE (CRUD via Supabase, DUPLICATE, FEATURED)
   // ==========================================
   const handleOpenEventModal = (item: Partial<InstrumentEvent> | null) => {
+    setPendingEventCoverFile(null);
     setActiveEvent(item || {
       id: '',
-      cover: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=600&h=300&q=80',
+      cover: '',
       title: '',
       description: '',
       date: '2026-06-15',
       time: '20:00',
       location: 'Theatro Municipal',
       address: 'Pça Ramos de Azevedo, Centro',
-      mapsUrl: 'https://maps.google.com',
+      mapsUrl: '',
       category: 'Concerto Especial',
-      status: 'published',
-      featured: false
+      status: 'rascunho',
+      featured: false,
+      link: '',
+      isPaid: false,
+      ticket: undefined,
     });
     setEventModalOpen(true);
   };
 
-  const handleSaveEvent = (e: React.FormEvent) => {
+  const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeEvent) return;
 
-    if (activeEvent.id) {
-      setEvents(prev => prev.map(ev => ev.id === activeEvent.id ? (activeEvent as InstrumentEvent) : ev));
-      addAuditLog('Alterou Evento', 'Conteúdo', `Atualizou cronograma: ${activeEvent.title}`);
-    } else {
-      const newEv = { ...activeEvent, id: `evt-${Date.now()}` } as InstrumentEvent;
-      setEvents(prev => [newEv, ...prev]);
-      addAuditLog('Criou Evento', 'Conteúdo', `Criou novo evento na agenda: ${newEv.title}`);
+    setEventSaving(true);
+
+    try {
+      let finalCover = activeEvent.cover;
+
+      // Faz o upload da capa somente agora, ao confirmar/salvar
+      if (pendingEventCoverFile) {
+        finalCover = await uploadFileToSupabase(pendingEventCoverFile, 'eventos');
+      }
+
+      const payload = mapEventToDb({
+        ...activeEvent,
+        cover: finalCover,
+      });
+
+      if (activeEvent.id) {
+        // PUT (update)
+        const { data, error } = await supabase
+          .from('events')
+          .update(payload)
+          .eq('id', activeEvent.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error(error);
+          alert('Erro ao atualizar evento: ' + error.message);
+          return;
+        }
+
+        const updated = mapEventFromDb(data);
+        setEvents(prev => prev.map(ev => ev.id === updated.id ? updated : ev));
+        addAuditLog('Alterou Evento', 'Conteúdo', `Atualizou cronograma: ${updated.title}`);
+      } else {
+        // POST (insert)
+        const { data, error } = await supabase
+          .from('events')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error(error);
+          alert('Erro ao criar evento: ' + error.message);
+          return;
+        }
+
+        const newEv = mapEventFromDb(data);
+        setEvents(prev => [newEv, ...prev]);
+        addAuditLog('Criou Evento', 'Conteúdo', `Criou novo evento na agenda: ${newEv.title}`);
+      }
+
+      setEventModalOpen(false);
+      setActiveEvent(null);
+      setPendingEventCoverFile(null);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao enviar imagem de capa: ' + err.message);
+    } finally {
+      setEventSaving(false);
     }
-    setEventModalOpen(false);
   };
 
-  const handleDuplicateEvent = (evt: InstrumentEvent) => {
-    const duplicated: InstrumentEvent = {
+  const handleDuplicateEvent = async (evt: InstrumentEvent) => {
+    const payload = mapEventToDb({
       ...evt,
-      id: `evt-dup-${Date.now()}`,
       title: `${evt.title} (Cópia)`,
       featured: false,
-      status: 'draft'
-    };
+      status: 'rascunho',
+    });
+
+    const { data, error } = await supabase
+      .from('events')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(error);
+      alert('Erro ao duplicar evento: ' + error.message);
+      return;
+    }
+
+    const duplicated = mapEventFromDb(data);
     setEvents(prev => [duplicated, ...prev]);
     addAuditLog('Duplicou Evento', 'Conteúdo', `Duplicou programação: ${evt.title}`);
     alert('Programação duplicada com sucesso! Ajuste a nova data no rascunho.');
   };
 
-  const handleDeleteEvent = (id: string, title: string) => {
+  const handleDeleteEvent = async (id: string, title: string) => {
+    if (!confirm(`Remover o evento "${title}"? Esta ação não pode ser desfeita.`)) return;
+
+    const { error } = await supabase.from('events').delete().eq('id', id);
+
+    if (error) {
+      console.error(error);
+      alert('Erro ao remover evento: ' + error.message);
+      return;
+    }
+
     setEvents(prev => prev.filter(e => e.id !== id));
     addAuditLog('Deletou Evento', 'Conteúdo', `Removeu evento da agenda ID: ${id} (${title})`);
   };
 
-  const handleToggleFeatureEvent = (id: string, title: string, active: boolean) => {
+  const handleToggleFeatureEvent = async (id: string, title: string, active: boolean) => {
+    const { error } = await supabase
+      .from('events')
+      .update({ highlighted: active })
+      .eq('id', id);
+
+    if (error) {
+      console.error(error);
+      alert('Erro ao atualizar destaque: ' + error.message);
+      return;
+    }
+
     setEvents(prev => prev.map(e => e.id === id ? { ...e, featured: active } : e));
     addAuditLog('Destacou Evento', 'Conteúdo', `${active ? 'Destacou' : 'Removeu destaque'} do evento: ${title}`);
   };
@@ -321,95 +480,108 @@ export default function ConteudoCMS({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xxl:grid-cols-3 gap-6">
-            {events.map((evt) => (
-              <div 
-                key={evt.id} 
-                className="rounded-xl overflow-hidden bg-neutral-900 border border-neutral-850 flex flex-col justify-between hover:border-neutral-700 transition"
-              >
-                <div className="relative">
-                  <img 
-                    src={evt.cover} 
-                    alt={evt.title} 
-                    referrerPolicy="no-referrer"
-                    className="w-full h-36 object-cover" 
-                  />
-                  {/* Category badging */}
-                  <span className="absolute top-2 left-2 bg-black/75 backdrop-blur-sm text-amber-500 text-[9px] font-mono font-bold uppercase p-1 px-2.5 rounded-full border border-neutral-800">
-                    {evt.category}
-                  </span>
-                  
-                  {/* Featured badge */}
-                  {evt.featured && (
-                    <span className="absolute top-2 right-2 bg-[#F2C94C]/95 text-black text-[9px] font-extrabold uppercase p-1 px-2.5 rounded-full flex items-center">
-                      <Star size={10} className="mr-1 fill-black" /> Destaque
+          {eventsLoading ? (
+            <div className="text-center py-12 text-xs text-neutral-500 font-mono">Carregando eventos...</div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-12 text-xs text-neutral-500 font-mono border border-dashed border-neutral-800 rounded-xl">
+              Nenhum evento cadastrado ainda.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xxl:grid-cols-3 gap-6">
+              {events.map((evt) => (
+                <div 
+                  key={evt.id} 
+                  className="rounded-xl overflow-hidden bg-neutral-900 border border-neutral-850 flex flex-col justify-between hover:border-neutral-700 transition"
+                >
+                  <div className="relative">
+                    <img 
+                      src={evt.cover} 
+                      alt={evt.title} 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-36 object-cover bg-neutral-950" 
+                    />
+                    {/* Category badging */}
+                    <span className="absolute top-2 left-2 bg-black/75 backdrop-blur-sm text-amber-500 text-[9px] font-mono font-bold uppercase p-1 px-2.5 rounded-full border border-neutral-800">
+                      {evt.category}
                     </span>
-                  )}
-                </div>
-
-                <div className="p-4 flex-1 space-y-2">
-                  <span className="text-[9.5px] font-mono text-neutral-550 flex items-center">
-                    <Clock size={11} className="mr-1 inline text-[#0B4DA2]" />
-                    {evt.date} • {evt.time}
-                  </span>
-                  <h4 className="text-xs font-bold text-neutral-100 font-sans tracking-tight leading-snug">{evt.title}</h4>
-                  <p className="text-[11px] text-neutral-400 line-clamp-3">{evt.description}</p>
-                </div>
-
-                {/* Additional event lines */}
-                <div className="p-3.5 bg-neutral-950 font-mono text-[9.5px] text-neutral-500 border-t border-neutral-900 flex justify-between select-none">
-                  <span className="truncate max-w-56">Local: {evt.location}</span>
-                  <span className={`p-0.5 px-2 rounded text-[8px] uppercase font-bold tracking-widest ${
-                    evt.status === 'published' ? 'bg-emerald-950 text-emerald-400' :
-                    evt.status === 'draft' ? 'bg-neutral-800 text-neutral-400' :
-                    'bg-rose-955 text-rose-500'
-                  }`}>
-                    {evt.status === 'published' ? 'Publicado' : evt.status === 'draft' ? 'Rascunho' : 'Cancelado'}
-                  </span>
-                </div>
-
-                {/* Event Actions Footer */}
-                <div className="p-2.5 bg-neutral-955 border-t border-neutral-900 flex items-center justify-between text-xs">
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleFeatureEvent(evt.id, evt.title, !evt.featured)}
-                      className={`text-[9px] font-mono font-bold p-1 px-2 rounded cursor-pointer transition-all ${
-                        evt.featured ? 'bg-[#F2C94C]/10 text-[#F2C94C]' : 'bg-neutral-900 text-neutral-500'
-                      }`}
-                    >
-                      Destaque {evt.featured ? 'Sim' : 'Não'}
-                    </button>
-                    <button
-                      type="button"
-                      title="Duplicar Evento"
-                      onClick={() => handleDuplicateEvent(evt)}
-                      className="p-1.5 bg-neutral-900 hover:bg-neutral-850 rounded text-neutral-400 hover:text-white"
-                    >
-                      <Copy size={11} />
-                    </button>
+                    
+                    {/* Featured badge */}
+                    {evt.featured && (
+                      <span className="absolute top-2 right-2 bg-[#F2C94C]/95 text-black text-[9px] font-extrabold uppercase p-1 px-2.5 rounded-full flex items-center">
+                        <Star size={10} className="mr-1 fill-black" /> Destaque
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex space-x-1">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEventModal(evt)}
-                      className="p-1 bg-neutral-900 text-amber-500 rounded cursor-pointer px-2 text-[10.5px] font-mono font-bold"
-                    >
-                      EDITAR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteEvent(evt.id, evt.title)}
-                      className="p-1 bg-neutral-900 text-rose-500 rounded cursor-pointer px-2 text-[10.5px] font-mono font-bold"
-                    >
-                      EXCLUIR
-                    </button>
+                  <div className="p-4 flex-1 space-y-2">
+                    <span className="text-[9.5px] font-mono text-neutral-550 flex items-center">
+                      <Clock size={11} className="mr-1 inline text-[#0B4DA2]" />
+                      {evt.date} • {evt.time}
+                    </span>
+                    <h4 className="text-xs font-bold text-neutral-100 font-sans tracking-tight leading-snug">{evt.title}</h4>
+                    <p className="text-[11px] text-neutral-400 line-clamp-3">{evt.description}</p>
+                    {evt.isPaid && evt.ticket != null && (
+                      <span className="inline-block text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/50 p-0.5 px-2 rounded">
+                        Ingresso: R$ {Number(evt.ticket).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Additional event lines */}
+                  <div className="p-3.5 bg-neutral-950 font-mono text-[9.5px] text-neutral-500 border-t border-neutral-900 flex justify-between select-none">
+                    <span className="truncate max-w-56">Local: {evt.location}</span>
+                    <span className={`p-0.5 px-2 rounded text-[8px] uppercase font-bold tracking-widest ${
+                      evt.status === 'published' ? 'bg-emerald-950 text-emerald-400' :
+                      evt.status === 'rascunho' ? 'bg-neutral-800 text-neutral-400' :
+                      'bg-rose-955 text-rose-500'
+                    }`}>
+                      {evt.status === 'published' ? 'Publicado' : evt.status === 'rascunho' ? 'Rascunho' : 'Arquivado'}
+                    </span>
+                  </div>
+
+                  {/* Event Actions Footer */}
+                  <div className="p-2.5 bg-neutral-955 border-t border-neutral-900 flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFeatureEvent(evt.id, evt.title, !evt.featured)}
+                        className={`text-[9px] font-mono font-bold p-1 px-2 rounded cursor-pointer transition-all ${
+                          evt.featured ? 'bg-[#F2C94C]/10 text-[#F2C94C]' : 'bg-neutral-900 text-neutral-500'
+                        }`}
+                      >
+                        Destaque {evt.featured ? 'Sim' : 'Não'}
+                      </button>
+                      <button
+                        type="button"
+                        title="Duplicar Evento"
+                        onClick={() => handleDuplicateEvent(evt)}
+                        className="p-1.5 bg-neutral-900 hover:bg-neutral-850 rounded text-neutral-400 hover:text-white"
+                      >
+                        <Copy size={11} />
+                      </button>
+                    </div>
+
+                    <div className="flex space-x-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEventModal(evt)}
+                        className="p-1 bg-neutral-900 text-amber-500 rounded cursor-pointer px-2 text-[10.5px] font-mono font-bold"
+                      >
+                        EDITAR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEvent(evt.id, evt.title)}
+                        className="p-1 bg-neutral-900 text-rose-500 rounded cursor-pointer px-2 text-[10.5px] font-mono font-bold"
+                      >
+                        EXCLUIR
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -610,7 +782,9 @@ export default function ConteudoCMS({
             className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl space-y-4"
           >
             <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">Ajuste da Programação da Agenda</span>
+              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">
+                {activeEvent.id ? 'Ajuste da Programação da Agenda' : 'Novo Evento na Agenda'}
+              </span>
               <button type="button" onClick={() => setEventModalOpen(false)} className="text-neutral-400">Fechar</button>
             </div>
 
@@ -630,6 +804,7 @@ export default function ConteudoCMS({
               <div>
                 <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Breve Descrição para o Card</label>
                 <textarea 
+                  required
                   value={activeEvent.description || ''}
                   onChange={(e) => setActiveEvent({ ...activeEvent, description: e.target.value })}
                   rows={2}
@@ -666,6 +841,7 @@ export default function ConteudoCMS({
                   <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Local / Palco Principal</label>
                   <input 
                     type="text" 
+                    required
                     value={activeEvent.location || ''}
                     onChange={(e) => setActiveEvent({ ...activeEvent, location: e.target.value })}
                     className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
@@ -676,6 +852,7 @@ export default function ConteudoCMS({
                   <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Categoria de Entrada</label>
                   <input 
                     type="text" 
+                    required
                     value={activeEvent.category || ''}
                     onChange={(e) => setActiveEvent({ ...activeEvent, category: e.target.value })}
                     className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
@@ -683,23 +860,109 @@ export default function ConteudoCMS({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Endereço Completo</label>
+                <input 
+                  type="text" 
+                  required
+                  value={activeEvent.address || ''}
+                  onChange={(e) => setActiveEvent({ ...activeEvent, address: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
+                  placeholder="Ex: Pça Ramos de Azevedo, Centro - São Paulo, SP"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Link Google Maps (opcional)</label>
+                  <input 
+                    type="text" 
+                    value={activeEvent.mapsUrl || ''}
+                    onChange={(e) => setActiveEvent({ ...activeEvent, mapsUrl: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded font-mono"
+                    placeholder="https://maps.google.com/..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Link Externo (inscrição/ingresso)</label>
+                  <input 
+                    type="text" 
+                    value={activeEvent.link || ''}
+                    onChange={(e) => setActiveEvent({ ...activeEvent, link: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded font-mono"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
+              {/* É pago? */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">É Pago?</label>
+                  <select
+                    value={activeEvent.isPaid ? 'sim' : 'nao'}
+                    onChange={(e) => {
+                      const isPaid = e.target.value === 'sim';
+                      setActiveEvent(prev => prev ? {
+                        ...prev,
+                        isPaid,
+                        ticket: isPaid ? prev.ticket : undefined,
+                      } : prev);
+                    }}
+                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded"
+                  >
+                    <option value="nao">Não (Entrada Gratuita)</option>
+                    <option value="sim">Sim (Evento Pago)</option>
+                  </select>
+                </div>
+
+                {/* Campo de valor só aparece se for pago */}
+                {activeEvent.isPaid && (
+                  <div>
+                    <label className="block text-[10px] font-mono uppercase text-emerald-500 mb-1">Valor do Ingresso (R$)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      required
+                      value={activeEvent.ticket ?? ''}
+                      onChange={(e) => setActiveEvent({ ...activeEvent, ticket: e.target.value === '' ? undefined : Number(e.target.value) })}
+                      className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded font-mono"
+                      placeholder="Ex: 25.00"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Status Publicação</label>
                   <select
-                    value={activeEvent.status || 'published'}
+                    value={activeEvent.status || 'rascunho'}
                     onChange={(e) => setActiveEvent({ ...activeEvent, status: e.target.value as any })}
                     className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded"
                   >
                     <option value="published">Liberado ao Público (Ativo)</option>
-                    <option value="draft">Rascunho Interno</option>
-                    <option value="cancelled">Cancelado / Adiado</option>
+                    <option value="rascunho">Rascunho Interno</option>
+                    <option value="arquivado">Arquivado</option>
                   </select>
                 </div>
                 <div className="flex flex-col justify-end">
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Upload Imagem de Capagem</label>
+                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Upload Imagem de Capa</label>
+                  {activeEvent.cover && (
+                    <img
+                      src={activeEvent.cover}
+                      alt="Pré-visualização capa"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-20 object-cover rounded border border-neutral-800 mb-2"
+                    />
+                  )}
                   <ImageUploader 
-                    onUploadSuccess={(url) => setActiveEvent({ ...activeEvent, cover: url })} 
+                    allowedTypes="Imagens (.jpg, .png, .webp)"
+                    onFileSelected={(file, previewUrl) => {
+                      setPendingEventCoverFile(file);
+                      setActiveEvent(prev => prev ? { ...prev, cover: previewUrl } : prev);
+                    }}
                   />
                 </div>
               </div>
@@ -708,7 +971,13 @@ export default function ConteudoCMS({
 
             <div className="bg-neutral-950 p-3 border-t border-neutral-800 flex justify-end space-x-2">
               <button type="button" onClick={() => setEventModalOpen(false)} className="text-xs text-neutral-400 px-3 py-1 bg-neutral-900 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#0B4DA2] rounded">Aportar na Agenda</button>
+              <button 
+                type="submit" 
+                disabled={eventSaving}
+                className="text-xs text-white px-5 py-1 bg-[#0B4DA2] rounded disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {eventSaving ? 'Salvando...' : 'Aportar na Agenda'}
+              </button>
             </div>
           </form>
         </div>
@@ -785,7 +1054,7 @@ export default function ConteudoCMS({
                 <div className="flex flex-col justify-end">
                   <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Upload Imagem de Capagem</label>
                   <ImageUploader 
-                    onUploadSuccess={(url) => setActiveNews({ ...activeNews, coverImage: url })} 
+                    onFileSelected={(file, previewUrl) => setActiveNews({ ...activeNews, coverImage: previewUrl })} 
                   />
                 </div>
               </div>
@@ -872,7 +1141,7 @@ export default function ConteudoCMS({
                 </div>
                 <div className="flex flex-col justify-end">
                   <ImageUploader 
-                    onUploadSuccess={(url) => setActiveCourse({ ...activeCourse, photo: url })} 
+                    onFileSelected={(file, previewUrl) => setActiveCourse({ ...activeCourse, photo: previewUrl })} 
                   />
                 </div>
               </div>
@@ -928,7 +1197,7 @@ export default function ConteudoCMS({
               <div>
                 <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Upload de arquivo</label>
                 <ImageUploader 
-                  onUploadSuccess={(url) => setActivePhoto({ ...activePhoto, url })} 
+                  onFileSelected={(file, previewUrl) => setActivePhoto({ ...activePhoto, url: previewUrl })} 
                 />
               </div>
             </div>

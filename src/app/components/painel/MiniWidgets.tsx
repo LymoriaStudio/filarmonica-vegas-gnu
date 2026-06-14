@@ -1,8 +1,6 @@
-
-
 import React, { useState, useRef } from 'react';
 import { Upload, X, Bold, Italic, Heading1, Heading2, List, Eye, Code, CheckCircle, AlertCircle, FileText } from 'lucide-react';
-import { BRASS_IMAGES } from '../../data/initialData';
+import { supabase } from '../../../lib/supabase';
 
 // Chart 1: Area Chart (Crescimento de Alunos / Doações)
 interface AreaChartProps {
@@ -421,135 +419,162 @@ export function RichTextEditor({ value, onChange, placeholder = 'Escreva o miolo
 
 
 // ==========================================
-// 3. SECURE HTML5 DRAG & DROP MULTI-FILE UPLOAD
+// 3. SUPABASE STORAGE BUCKET CONFIG + HELPER
+// ==========================================
+export const BUCKET_NAME = 'filarmonica-media';
+
+/**
+ * Faz o upload efetivo de um arquivo para o Supabase Storage.
+ * Deve ser chamado apenas no momento de "Confirmar e Salvar" (submit do form),
+ * e não no momento da seleção do arquivo no ImageUploader.
+ *
+ * Retorna a URL pública do arquivo enviado.
+ */
+export async function uploadFileToSupabase(file: File, folder: string = 'uploads'): Promise<string> {
+  const safeName = file.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[^a-zA-Z0-9.\-_]/g, '_');
+
+  const path = `${folder}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const { data: publicData } = supabase.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(path);
+
+  return publicData.publicUrl;
+}
+
+export const getFileTypeFromExt = (ext: string): 'image' | 'pdf' | 'video' | 'doc' => {
+  const extLower = ext.toLowerCase();
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(extLower)) return 'image';
+  if (extLower === 'pdf') return 'pdf';
+  if (['mp4', 'mov', 'webm'].includes(extLower)) return 'video';
+  return 'doc';
+};
+
+
+// ==========================================
+// 3b. IMAGE/FILE SELECTOR (UPLOAD DIFERIDO)
 // ==========================================
 interface ImageUploaderProps {
-  onUploadSuccess: (fileUrl: string, fileName: string, fileType: 'image' | 'pdf' | 'video' | 'doc', size: string) => void;
+  /**
+   * Chamado imediatamente ao selecionar/arrastar um arquivo.
+   * NÃO faz upload para o Supabase aqui - apenas devolve o File
+   * selecionado e uma URL de preview local (blob:) para exibição.
+   * O upload real deve ocorrer somente ao confirmar/salvar o formulário,
+   * usando `uploadFileToSupabase`.
+   */
+  onFileSelected: (file: File, previewUrl: string) => void;
   allowedTypes?: string;
   maxSizeMB?: number;
 }
-export function ImageUploader({ 
-  onUploadSuccess, 
-  allowedTypes = 'Imagens (.jpg, .png), PDFs, Vídeo e Doc', 
-  maxSizeMB = 10 
+
+export function ImageUploader({
+  onFileSelected,
+  allowedTypes = 'Imagens (.jpg, .png), PDFs, Vídeo e Doc',
+  maxSizeMB = 10,
 }: ImageUploaderProps) {
   const [isDrag, setIsDrag] = useState(false);
-  const [prog, setProg] = useState<number | null>(null);
-  const [simFilename, setSimFilename] = useState<string>('');
+  const [selectedFilename, setSelectedFilename] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const simulateUpload = (name: string, ext: string) => {
-    setSimFilename(name);
-    setProg(15);
-    
-    const interval = setInterval(() => {
-      setProg((prev) => {
-        if (prev === null) return 15;
-        if (prev >= 100) {
-          clearInterval(interval);
-          
-          let fileType: 'image' | 'pdf' | 'video' | 'doc' = 'doc';
-          let finalUrl = BRASS_IMAGES.trumpet; // default fallback
+  const handleFile = (file: File) => {
+    setErrorMsg(null);
 
-          const extLower = ext.toLowerCase();
-          if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(extLower)) {
-            fileType = 'image';
-            // Pick a deterministic Unsplash URL for realistic premium view
-            if (name.includes('trompete') || name.includes('bocal')) finalUrl = BRASS_IMAGES.trumpet;
-            else if (name.includes('trombone') || name.includes('vara')) finalUrl = BRASS_IMAGES.trombone;
-            else if (name.includes('trompa')) finalUrl = BRASS_IMAGES.frenchHorn;
-            else if (name.includes('tuba') || name.includes('grave')) finalUrl = BRASS_IMAGES.tuba;
-            else finalUrl = BRASS_IMAGES.heroBanner1;
-          } else if (extLower === 'pdf') {
-            fileType = 'pdf';
-            finalUrl = '#pdf-doc';
-          } else if (['mp4', 'mov', 'webm'].includes(extLower)) {
-            fileType = 'video';
-            finalUrl = '#video-clip';
-          }
+    // Validate size
+    const sizeMB = file.size / (1024 * 1024);
+    if (sizeMB > maxSizeMB) {
+      setErrorMsg(`Arquivo muito grande (${sizeMB.toFixed(1)}MB). Máximo: ${maxSizeMB}MB.`);
+      return;
+    }
 
-          const sizeStr = `${(1 + Math.random() * maxSizeMB).toFixed(1)} MB`;
-          onUploadSuccess(finalUrl, name, fileType, sizeStr);
-          
-          setTimeout(() => {
-            setProg(null);
-            setSimFilename('');
-          }, 800);
+    setSelectedFilename(file.name);
 
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 200);
+    // Gera um preview local (não envia nada ao Supabase ainda)
+    const previewUrl = URL.createObjectURL(file);
+    onFileSelected(file, previewUrl);
   };
 
   const handDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDrag(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      const parts = file.name.split('.');
-      const ext = parts.pop() || '';
-      simulateUpload(file.name, ext);
+      handleFile(e.dataTransfer.files[0]);
     }
   };
 
   const handSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const parts = file.name.split('.');
-      const ext = parts.pop() || '';
-      simulateUpload(file.name, ext);
+      handleFile(e.target.files[0]);
     }
+    // reset input so the same file can be selected again later
+    e.target.value = '';
   };
 
   return (
-    <div 
-      className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
-        isDrag 
-          ? 'border-[#F2C94C] bg-amber-500/5' 
-          : 'border-neutral-700 hover:border-[#0B4DA2] bg-neutral-900/50 hover:bg-neutral-900'
-      }`}
-      onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }}
-      onDragLeave={() => setIsDrag(false)}
-      onDrop={handDrop}
-      onClick={() => fileInputRef.current?.click()}
-    >
-      <input 
-        ref={fileInputRef}
-        type="file" 
-        className="hidden" 
-        onChange={handSelect} 
-      />
+    <div className="space-y-2">
+      <div
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
+          isDrag
+            ? 'border-[#F2C94C] bg-amber-500/5'
+            : 'border-neutral-700 hover:border-[#0B4DA2] bg-neutral-900/50 hover:bg-neutral-900'
+        }`}
+        onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }}
+        onDragLeave={() => setIsDrag(false)}
+        onDrop={handDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handSelect}
+        />
 
-      {prog === null ? (
-        <div className="flex flex-col items-center justify-center space-y-2">
-          <div className="p-3 bg-neutral-800 rounded-full text-amber-500 hover:scale-105 transition-all">
-            <Upload size={24} />
+        {!selectedFilename ? (
+          <div className="flex flex-col items-center justify-center space-y-2">
+            <div className="p-3 bg-neutral-800 rounded-full text-amber-500 hover:scale-105 transition-all">
+              <Upload size={24} />
+            </div>
+            <div className="text-sm font-medium text-neutral-200">
+              Arraste arquivos de mídia para cá ou <span className="text-amber-400 font-bold underline">navegue</span>
+            </div>
+            <p className="text-[11px] text-neutral-500 font-mono">
+              Formatos suportados: {allowedTypes} • Max {maxSizeMB}MB por arquivo
+            </p>
           </div>
-          <div className="text-sm font-medium text-neutral-200">
-            Arraste arquivos de mídia para cá ou <span className="text-amber-400 font-bold underline">navegue</span>
+        ) : (
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <FileText size={28} className="text-[#0B4DA2]" />
+            <div className="text-xs font-mono text-neutral-300">
+              Selecionado: <span className="text-amber-400 font-bold">{selectedFilename}</span>
+            </div>
+            <span className="text-[10px] font-mono text-emerald-400 flex items-center">
+              <CheckCircle size={11} className="mr-1" /> Pronto • será enviado ao confirmar
+            </span>
           </div>
-          <p className="text-[11px] text-neutral-500 font-mono">
-            Formatos suportados: {allowedTypes} • Max {maxSizeMB}MB por arquivo
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center space-y-3">
-          <FileText size={28} className="text-[#0B4DA2] animate-bounce" />
-          <div className="text-xs font-mono text-neutral-300">
-            Fazendo upload de <span className="text-amber-400 font-bold">{simFilename}</span>
-          </div>
-          {/* Progress bar */}
-          <div className="w-48 bg-neutral-800 rounded-full h-1.5 overflow-hidden">
-            <div 
-              className="bg-[#F2C94C] h-full transition-all duration-150" 
-              style={{ width: `${prog}%` }}
-            />
-          </div>
-          <span className="text-[10px] font-mono text-neutral-500">{prog}% concluído</span>
-        </div>
+        )}
+      </div>
+
+      {errorMsg && (
+        <p className="text-[11px] text-rose-400 font-mono flex items-center">
+          <AlertCircle size={12} className="mr-1.5 flex-shrink-0" /> {errorMsg}
+        </p>
       )}
     </div>
   );

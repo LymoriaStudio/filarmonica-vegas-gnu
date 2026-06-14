@@ -13,7 +13,6 @@ import {
   initialBanners,
   initialStatistics,
   initialValues,
-  initialTimeline,
   initialProfessors,
   initialStudents,
   initialOrganizers,
@@ -21,7 +20,6 @@ import {
   initialCourses,
   initialEvents,
   initialGallery,
-  initialNews,
   initialInterestForm,
   initialSupportForm,
   initialDonations,
@@ -77,8 +75,6 @@ export default function Painel() {
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [statistics, setStatistics] = useState<SiteStatistics>(initialStatistics);
   const [values, setValues] = useState<ValueItem[]>(initialValues);
-  const [timeline, setTimeline] = useState<TimelineEvent[]>(initialTimeline);
-  
   const [professors, setProfessors] = useState<Professor[]>(initialProfessors);
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [organizers, setOrganizers] = useState<Organizer[]>(initialOrganizers);
@@ -146,8 +142,7 @@ export default function Painel() {
     }));
   const [videos, setVideos] = useState<GalleryVideo[]>(initialMappedVideos);
 
-  // Mapped News/Blog
-  const [news, setNews] = useState<NewsArticle[]>(initialNews);
+
 
   // Mapped File library
   const [libraryFiles, setLibraryFiles] = useState<LibraryFile[]>(initialFiles);
@@ -270,10 +265,6 @@ export default function Painel() {
         setActiveTab('conteudo-eventos');
         setSelectedEntityForEdit({ addNewEventTrigger: true });
         break;
-      case 'new-news':
-        setActiveTab('conteudo-noticias');
-        setSelectedEntityForEdit({ addNewNewsTrigger: true });
-        break;
       case 'new-organizer':
         setActiveTab('pessoas-organizadores');
         setSelectedEntityForEdit({ addNewOrganizerTrigger: true });
@@ -313,7 +304,6 @@ export default function Painel() {
           students={students}
           professors={professors}
           events={orchestraEventsForSearch}
-          news={news}
           setActiveTab={setActiveTab}
           setSelectedEntityForEdit={setSelectedEntityForEdit}
         />
@@ -329,8 +319,7 @@ export default function Painel() {
               organizers={organizers}
               supporters={supporters}
               donations={donations}
-              events={orchestraEventsForSearch}
-              news={news}
+              events={orchestraEventsForSearch}   
               interests={interests}
               contacts={contacts}
               auditLogs={auditLogs}
@@ -348,8 +337,7 @@ export default function Painel() {
               setStatistics={setStatistics}
               values={values}
               setValues={setValues}
-              timeline={timeline}
-              setTimeline={setTimeline}
+
               addAuditLog={addAuditLog}
               selectedEntityForEdit={selectedEntityForEdit}
               setSelectedEntityForEdit={setSelectedEntityForEdit}
@@ -403,9 +391,7 @@ export default function Painel() {
           {(activeTab === 'conteudo-eventos' || activeTab === 'conteudo-noticias' || activeTab === 'conteudo-cursos' || activeTab === 'conteudo-galeria') && (
             <ConteudoCMS 
               events={events}
-              setEvents={setEvents}
-              news={news}
-              setNews={setNews}
+              setEvents={setEvents}         
               courses={courses}
               setCourses={setCourses}
               photos={photos}

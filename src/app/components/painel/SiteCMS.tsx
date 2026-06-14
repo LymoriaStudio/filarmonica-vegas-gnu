@@ -1,15 +1,11 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, ArrowUp, ArrowDown, Copy, Calendar, Eye, Image, 
   HelpCircle, AlignLeft, BarChart3, Star, Sparkles, Check, CheckSquare, Globe
 } from 'lucide-react';
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
-import { ImageUploader } from './MiniWidgets';
+import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
+import { supabase } from '../../../lib/supabase';
 
 interface SiteCMSProps {
   banners: Banner[];
@@ -18,12 +14,44 @@ interface SiteCMSProps {
   setStatistics: React.Dispatch<React.SetStateAction<SiteStatistics>>;
   values: ValueItem[];
   setValues: React.Dispatch<React.SetStateAction<ValueItem[]>>;
-  timeline: TimelineEvent[];
-  setTimeline: React.Dispatch<React.SetStateAction<TimelineEvent[]>>;
+
   addAuditLog: (action: string, module: string, details: string) => void;
   selectedEntityForEdit: any;
   setSelectedEntityForEdit: (entity: any) => void;
 }
+
+// Map a row from the `banners` table (snake_case) to the app's Banner type (camelCase)
+const mapBannerFromDb = (row: any): Banner => ({
+  id: row.id,
+  imageDesktop: row.image_desktop,
+  imageMobile: row.image_mobile,
+  tag: row.tag,
+  title: row.title,
+  subtitle: row.subtitle,
+  text: row.text,
+  primaryBtnText: row.primary_btn_text,
+  primaryBtnLink: row.primary_btn_link,
+  secondaryBtnText: row.secondary_btn_text,
+  secondaryBtnLink: row.secondary_btn_link,
+  order: row.order,
+  status: row.status,
+});
+
+// Map a Banner (camelCase) into the snake_case payload the `banners` table expects
+const mapBannerToDb = (b: Partial<Banner>) => ({
+  image_desktop: b.imageDesktop,
+  image_mobile: b.imageMobile,
+  tag: b.tag || null,
+  title: b.title,
+  subtitle: b.subtitle || null,
+  text: b.text || null,
+  primary_btn_text: b.primaryBtnText || null,
+  primary_btn_link: b.primaryBtnLink || null,
+  secondary_btn_text: b.secondaryBtnText || null,
+  secondary_btn_link: b.secondaryBtnLink || null,
+  order: b.order ?? 0,
+  status: b.status || 'rascunho',
+});
 
 export default function SiteCMS({
   banners,
@@ -32,99 +60,230 @@ export default function SiteCMS({
   setStatistics,
   values,
   setValues,
-  timeline,
-  setTimeline,
   addAuditLog,
   selectedEntityForEdit,
   setSelectedEntityForEdit
 }: SiteCMSProps) {
-  const [subTab, setSubTab] = useState<'banners' | 'stats' | 'sobre' | 'timeline'>('banners');
+  const [subTab, setSubTab] = useState<'banners' | 'stats' | 'sobre' >('banners');
 
   // Modal triggers
   const [bannerModalOpen, setBannerModalOpen] = useState(false);
   const [activeBanner, setActiveBanner] = useState<Partial<Banner> | null>(null);
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const [bannersLoading, setBannersLoading] = useState(true);
+
+  // Arquivos pendentes selecionados no modal de banner, cujo upload
+  // para o Supabase só ocorre ao clicar em "Confirmar e Salvar"
+  const [pendingDesktopFile, setPendingDesktopFile] = useState<File | null>(null);
+  const [pendingMobileFile, setPendingMobileFile] = useState<File | null>(null);
 
   const [valueModalOpen, setValueModalOpen] = useState(false);
   const [activeValue, setActiveValue] = useState<Partial<ValueItem> | null>(null);
 
   const [timelineModalOpen, setTimelineModalOpen] = useState(false);
   const [activeTimeline, setActiveTimeline] = useState<Partial<TimelineEvent> | null>(null);
+  const [pendingTimelineFile, setPendingTimelineFile] = useState<File | null>(null);
+
+  // ==========================================
+  // LOAD BANNERS FROM SUPABASE
+  // ==========================================
+  useEffect(() => {
+    const fetchBanners = async () => {
+      setBannersLoading(true);
+      const { data, error } = await supabase
+        .from('banners')
+        .select('*')
+        .order('order', { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setBannersLoading(false);
+        return;
+      }
+
+      setBanners((data || []).map(mapBannerFromDb));
+      setBannersLoading(false);
+    };
+
+    fetchBanners();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ==========================================
   // BANNERS HANDLERS
   // ==========================================
   const handleOpenBannerModal = (banner: Partial<Banner> | null) => {
+    // Limpa quaisquer arquivos pendentes de uma edição anterior
+    setPendingDesktopFile(null);
+    setPendingMobileFile(null);
+
     setActiveBanner(banner || {
       id: '',
       title: '',
       subtitle: '',
       text: '',
-      imageDesktop: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=800&q=80',
-      imageMobile: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=800&q=80',
+      imageDesktop: '',
+      imageMobile: '',
       primaryBtnText: 'Inscreva-se',
       primaryBtnLink: '#inscricao',
       secondaryBtnText: 'Saiba Mais',
       secondaryBtnLink: '#valores',
       order: BannersSorted().length + 1,
-      status: 'active'
+      status: 'rascunho'
     });
     setBannerModalOpen(true);
   };
 
-  const handleSaveBanner = (e: React.FormEvent) => {
+  const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeBanner) return;
 
-    if (activeBanner.id) {
-      // Edit
-      setBanners(prev => prev.map(b => b.id === activeBanner.id ? (activeBanner as Banner) : b));
-      addAuditLog('Editou Banner', 'Site Banners', `Alterou banner: ${activeBanner.title}`);
-    } else {
-      // Add
-      const newBanner = {
-        ...activeBanner,
-        id: `banner-${Date.now()}`
-      } as Banner;
-      setBanners(prev => [...prev, newBanner]);
-      addAuditLog('Criou Banner', 'Site Banners', `Inseriu banner: ${newBanner.title}`);
+    // Precisa ter ou uma imagem já existente (edição), ou um arquivo pendente selecionado
+    const hasDesktopImage = !!activeBanner.imageDesktop || !!pendingDesktopFile;
+    const hasMobileImage = !!activeBanner.imageMobile || !!pendingMobileFile;
+
+    if (!hasDesktopImage || !hasMobileImage) {
+      alert('Envie as imagens desktop e mobile antes de salvar.');
+      return;
     }
-    setBannerModalOpen(false);
-    setActiveBanner(null);
+
+    setBannerSaving(true);
+
+    try {
+      let finalImageDesktop = activeBanner.imageDesktop;
+      let finalImageMobile = activeBanner.imageMobile;
+
+      // Faz o upload real para o Supabase Storage somente agora,
+      // no momento de confirmar e salvar.
+      if (pendingDesktopFile) {
+        finalImageDesktop = await uploadFileToSupabase(pendingDesktopFile, 'banners');
+      }
+      if (pendingMobileFile) {
+        finalImageMobile = await uploadFileToSupabase(pendingMobileFile, 'banners');
+      }
+
+      const payload = mapBannerToDb({
+        ...activeBanner,
+        imageDesktop: finalImageDesktop,
+        imageMobile: finalImageMobile,
+      });
+
+      if (activeBanner.id) {
+        // Edit
+        const { data, error } = await supabase
+          .from('banners')
+          .update(payload)
+          .eq('id', activeBanner.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error(error);
+          alert('Erro ao atualizar banner: ' + error.message);
+          return;
+        }
+
+        const updated = mapBannerFromDb(data);
+        setBanners(prev => prev.map(b => b.id === updated.id ? updated : b));
+        addAuditLog('Editou Banner', 'Site Banners', `Alterou banner: ${updated.title}`);
+      } else {
+        // Add
+        const { data, error } = await supabase
+          .from('banners')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error(error);
+          alert('Erro ao criar banner: ' + error.message);
+          return;
+        }
+
+        const newBanner = mapBannerFromDb(data);
+        setBanners(prev => [...prev, newBanner]);
+        addAuditLog('Criou Banner', 'Site Banners', `Inseriu banner: ${newBanner.title}`);
+      }
+
+      setBannerModalOpen(false);
+      setActiveBanner(null);
+      setPendingDesktopFile(null);
+      setPendingMobileFile(null);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao enviar imagens: ' + err.message);
+    } finally {
+      setBannerSaving(false);
+    }
   };
 
-  const handleDeleteBanner = (id: string, name: string) => {
+  const handleDeleteBanner = async (id: string, name: string) => {
+    if (!confirm(`Remover o banner "${name}"? Esta ação não pode ser desfeita.`)) return;
+
+    const { error } = await supabase.from('banners').delete().eq('id', id);
+
+    if (error) {
+      console.error(error);
+      alert('Erro ao remover banner: ' + error.message);
+      return;
+    }
+
     setBanners(prev => prev.filter(b => b.id !== id));
     addAuditLog('Deletou Banner', 'Site Banners', `Removeu banner de ID: ${id} (${name})`);
   };
 
-  const handleDuplicateBanner = (b: Banner) => {
-    const dup = {
+  const handleDuplicateBanner = async (b: Banner) => {
+    const payload = mapBannerToDb({
       ...b,
-      id: `banner-dup-${Date.now()}`,
       title: `${b.title} (Cópia)`,
-      order: BannersSorted().length + 1
-    };
+      order: BannersSorted().length + 1,
+      status: 'rascunho',
+    });
+
+    const { data, error } = await supabase
+      .from('banners')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(error);
+      alert('Erro ao duplicar banner: ' + error.message);
+      return;
+    }
+
+    const dup = mapBannerFromDb(data);
     setBanners(prev => [...prev, dup]);
     addAuditLog('Duplicou Banner', 'Site Banners', `Duplicou banner: ${b.title}`);
   };
 
-  const handleMoveBanner = (index: number, direction: 'up' | 'down') => {
+  const handleMoveBanner = async (index: number, direction: 'up' | 'down') => {
     const sorted = BannersSorted();
     const newIdx = direction === 'up' ? index - 1 : index + 1;
     if (newIdx < 0 || newIdx >= sorted.length) return;
 
-    // Swap orders
-    const copy = [...sorted];
-    const temp = copy[index].order;
-    copy[index].order = copy[newIdx].order;
-    copy[newIdx].order = temp;
+    const a = sorted[index];
+    const b = sorted[newIdx];
+    const aOrder = a.order;
+    const bOrder = b.order;
 
-    setBanners(prev => {
-      return prev.map(b => {
-        const found = copy.find(x => x.id === b.id);
-        return found ? found : b;
-      });
-    });
+    const [{ error: err1 }, { error: err2 }] = await Promise.all([
+      supabase.from('banners').update({ order: bOrder }).eq('id', a.id),
+      supabase.from('banners').update({ order: aOrder }).eq('id', b.id),
+    ]);
+
+    if (err1 || err2) {
+      console.error(err1, err2);
+      alert('Erro ao reordenar banners.');
+      return;
+    }
+
+    setBanners(prev => prev.map(banner => {
+      if (banner.id === a.id) return { ...banner, order: bOrder };
+      if (banner.id === b.id) return { ...banner, order: aOrder };
+      return banner;
+    }));
+
     addAuditLog('Reordenou Banners', 'Site Banners', 'Alterou a disposição dos banners no carrossel institucional');
   };
 
@@ -166,34 +325,26 @@ export default function SiteCMS({
     addAuditLog('Deletou Valor', 'Valores', `Deletou valor: ${name}`);
   };
 
-
   // ==========================================
-  // TIMELINE HANDLERS
+  // TIMELINE HANDLERS (local-only, not yet persisted)
   // ==========================================
-  const handleOpenTimelineModal = (time: Partial<TimelineEvent> | null) => {
-    setActiveTimeline(time || {
-      id: '',
-      year: '',
-      title: '',
-      description: '',
-      image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=800&q=80',
-      order: timeline.length + 1
-    });
-    setTimelineModalOpen(true);
-  };
-
-  const handleSaveTimeline = (e: React.FormEvent) => {
+  const handleSaveTimeline = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTimeline) return;
 
-    if (activeTimeline.id) {
-      setTimeline(prev => prev.map(t => t.id === activeTimeline.id ? (activeTimeline as TimelineEvent) : t));
-      addAuditLog('Editou Linha do Tempo', 'Timeline', `Editou marco ${activeTimeline.year}: ${activeTimeline.title}`);
-    } else {
-      const newTime = { ...activeTimeline, id: `time-${Date.now()}` } as TimelineEvent;
-      setTimeline(prev => [...prev, newTime].sort((a,b) => Number(a.year) - Number(b.year)));
-      addAuditLog('Criou Linha do Tempo', 'Timeline', `Criou marco ${newTime.year}: ${newTime.title}`);
+    // Faz o upload da imagem do marco somente ao confirmar/salvar
+    if (pendingTimelineFile) {
+      try {
+        const url = await uploadFileToSupabase(pendingTimelineFile, 'timeline');
+        setActiveTimeline(prev => prev ? { ...prev, image: url } : prev);
+      } catch (err: any) {
+        console.error(err);
+        alert('Erro ao enviar imagem do marco: ' + err.message);
+        return;
+      }
     }
+
+    setPendingTimelineFile(null);
     setTimelineModalOpen(false);
   };
 
@@ -235,78 +386,86 @@ export default function SiteCMS({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {BannersSorted().map((b, idx) => (
-              <div 
-                key={b.id} 
-                className="rounded-xl overflow-hidden bg-neutral-900 border border-neutral-800 flex flex-col justify-between"
-              >
-                {/* Visual Banner Preview Container */}
-                <div className="h-40 relative bg-neutral-950 flex items-center justify-center">
-                  <img 
-                    src={b.imageDesktop} 
-                    alt={b.title} 
-                    referrerPolicy="no-referrer"
-                    className="absolute inset-0 w-full h-full object-cover opacity-35" 
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent" />
-                  <div className="relative p-4 text-center z-10 max-w-sm">
-                    <span className="text-[8px] font-mono p-0.5 px-1.5 rounded-full bg-neutral-900 text-amber-400 uppercase tracking-widest font-bold">
-                      Slide {b.order} • {b.status}
-                    </span>
-                    <h4 className="text-sm font-bold text-neutral-100 font-sans tracking-tight mt-1.5 line-clamp-1">{b.title}</h4>
-                    <p className="text-[10px] text-neutral-300 mt-1 line-clamp-2">{b.subtitle}</p>
-                  </div>
-                </div>
-
-                {/* Info and Actions */}
-                <div className="p-4 bg-neutral-950 border-t border-neutral-850 flex items-center justify-between">
-                  <div className="flex items-center space-x-1">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => handleMoveBanner(idx, 'up')}
-                      className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      <ArrowUp size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === BannersSorted().length - 1}
-                      onClick={() => handleMoveBanner(idx, 'down')}
-                      className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      <ArrowDown size={12} />
-                    </button>
+          {bannersLoading ? (
+            <div className="text-center py-12 text-xs text-neutral-500 font-mono">Carregando banners...</div>
+          ) : BannersSorted().length === 0 ? (
+            <div className="text-center py-12 text-xs text-neutral-500 font-mono border border-dashed border-neutral-800 rounded-xl">
+              Nenhum banner cadastrado ainda.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {BannersSorted().map((b, idx) => (
+                <div 
+                  key={b.id} 
+                  className="rounded-xl overflow-hidden bg-neutral-900 border border-neutral-800 flex flex-col justify-between"
+                >
+                  {/* Visual Banner Preview Container */}
+                  <div className="h-40 relative bg-neutral-950 flex items-center justify-center">
+                    <img 
+                      src={b.imageDesktop} 
+                      alt={b.title} 
+                      referrerPolicy="no-referrer"
+                      className="absolute inset-0 w-full h-full object-cover opacity-35" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent" />
+                    <div className="relative p-4 text-center z-10 max-w-sm">
+                      <span className="text-[8px] font-mono p-0.5 px-1.5 rounded-full bg-neutral-900 text-amber-400 uppercase tracking-widest font-bold">
+                        Slide {b.order} • {b.status}
+                      </span>
+                      <h4 className="text-sm font-bold text-neutral-100 font-sans tracking-tight mt-1.5 line-clamp-1">{b.title}</h4>
+                      <p className="text-[10px] text-neutral-300 mt-1 line-clamp-2">{b.subtitle}</p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDuplicateBanner(b)}
-                      className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white flex items-center text-[10px] uppercase font-bold tracking-wider font-mono cursor-pointer"
-                    >
-                      <Copy size={11} className="mr-1" /> Copiar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenBannerModal(b)}
-                      className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-[#F2C94C] hover:text-amber-300 transition-all cursor-pointer"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteBanner(b.id, b.title)}
-                      className="p-1.5 bg-neutral-900 hover:bg-rose-950 rounded text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                  {/* Info and Actions */}
+                  <div className="p-4 bg-neutral-950 border-t border-neutral-850 flex items-center justify-between">
+                    <div className="flex items-center space-x-1">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveBanner(idx, 'up')}
+                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                      >
+                        <ArrowUp size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === BannersSorted().length - 1}
+                        onClick={() => handleMoveBanner(idx, 'down')}
+                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                      >
+                        <ArrowDown size={12} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateBanner(b)}
+                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white flex items-center text-[10px] uppercase font-bold tracking-wider font-mono cursor-pointer"
+                      >
+                        <Copy size={11} className="mr-1" /> Copiar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBannerModal(b)}
+                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-[#F2C94C] hover:text-amber-300 transition-all cursor-pointer"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBanner(b.id, b.title)}
+                        className="p-1.5 bg-neutral-900 hover:bg-rose-950 rounded text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -353,6 +512,19 @@ export default function SiteCMS({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Tag (opcional)</label>
+                  <input 
+                    type="text" 
+                    value={activeBanner.tag || ''} 
+                    onChange={(e) => setActiveBanner({ ...activeBanner, tag: e.target.value })}
+                    placeholder="ex: projeto social musical"
+                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Corpo do Texto Principal (Breve Resumo)</label>
                 <textarea 
@@ -363,33 +535,43 @@ export default function SiteCMS({
                 />
               </div>
 
-              {/* Image desktop and mobile inputs */}
+              {/* Image desktop and mobile uploads */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Upload Imagem Desk / Mobile</label>
-                  <ImageUploader 
-                    onUploadSuccess={(url) => setActiveBanner({ ...activeBanner, imageDesktop: url, imageMobile: url })} 
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Imagem Desktop</label>
+                  {activeBanner.imageDesktop && (
+                    <img
+                      src={activeBanner.imageDesktop}
+                      alt="Pré-visualização desktop"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-24 object-cover rounded border border-neutral-800"
+                    />
+                  )}
+                  <ImageUploader
+                    allowedTypes="Imagens (.jpg, .png, .webp)"
+                    onFileSelected={(file, previewUrl) => {
+                      setPendingDesktopFile(file);
+                      setActiveBanner(prev => prev ? { ...prev, imageDesktop: previewUrl } : prev);
+                    }}
                   />
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Link URL da Imagem Desktop</label>
-                    <input 
-                      type="text" 
-                      value={activeBanner.imageDesktop || ''} 
-                      onChange={(e) => setActiveBanner({ ...activeBanner, imageDesktop: e.target.value })}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none font-mono"
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Imagem Mobile</label>
+                  {activeBanner.imageMobile && (
+                    <img
+                      src={activeBanner.imageMobile}
+                      alt="Pré-visualização mobile"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-24 object-cover rounded border border-neutral-800"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Link URL da Imagem Mobile</label>
-                    <input 
-                      type="text" 
-                      value={activeBanner.imageMobile || ''} 
-                      onChange={(e) => setActiveBanner({ ...activeBanner, imageMobile: e.target.value })}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none font-mono"
-                    />
-                  </div>
+                  )}
+                  <ImageUploader
+                    allowedTypes="Imagens (.jpg, .png, .webp)"
+                    onFileSelected={(file, previewUrl) => {
+                      setPendingMobileFile(file);
+                      setActiveBanner(prev => prev ? { ...prev, imageMobile: previewUrl } : prev);
+                    }}
+                  />
                 </div>
               </div>
 
@@ -446,13 +628,12 @@ export default function SiteCMS({
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Status de Publicação</label>
                   <select
-                    value={activeBanner.status || 'draft'}
+                    value={activeBanner.status || 'rascunho'}
                     onChange={(e) => setActiveBanner({ ...activeBanner, status: e.target.value as any })}
                     className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 p-2 text-xs rounded focus:outline-none"
                   >
-                    <option value="active">Ativo (Publicado)</option>
-                    <option value="draft">Rascunho</option>
-                    <option value="scheduled">Agendado</option>
+                    <option value="ativo">Ativo</option>
+                    <option value="rascunho">Rascunho</option>
                   </select>
                 </div>
               </div>
@@ -469,9 +650,10 @@ export default function SiteCMS({
               </button>
               <button 
                 type="submit" 
-                className="p-1.5 px-6 bg-[#0B4DA2] text-xs font-semibold text-white rounded hover:bg-blue-750 cursor-pointer"
+                disabled={bannerSaving}
+                className="p-1.5 px-6 bg-[#0B4DA2] text-xs font-semibold text-white rounded hover:bg-blue-750 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Confirmar e Salvar
+                {bannerSaving ? 'Salvando...' : 'Confirmar e Salvar'}
               </button>
             </div>
           </form>
@@ -595,7 +777,10 @@ export default function SiteCMS({
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Upload Expresso</label>
                   <ImageUploader 
-                    onUploadSuccess={(url) => setActiveTimeline({ ...activeTimeline, image: url })} 
+                    onFileSelected={(file, previewUrl) => {
+                      setPendingTimelineFile(file);
+                      setActiveTimeline(prev => prev ? { ...prev, image: previewUrl } : prev);
+                    }}
                   />
                 </div>
               </div>

@@ -1,20 +1,17 @@
 import { Buffer } from "buffer";
 window.Buffer = Buffer;
 import { useState, useMemo } from "react";
+import * as yup from "yup";
 import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft } from "lucide-react";
 import { QrCodePix } from "qrcode-pix";
 import { QRCodeSVG } from "qrcode.react";
 import { schemaInteresse } from "../validations/contactRules";
-
+import { createInteressado } from "../services/interessadosService";
 
 type Tab = "interesse" | "apoio" | "doacao";
 
-
-
-
 const interesseImage = "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
 const apoioImage = "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
-
 
 export function Contact() {
   const [tab, setTab] = useState<Tab>("interesse");
@@ -37,133 +34,143 @@ export function Contact() {
     mensagem: "",
   });
   const [copied, setCopied] = useState(false);
-  const [erros, setErrors] = useState()
+  const [erros, setErros] = useState<Record<string, string>>({});
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
 
-const handleCopy = () => {
-  navigator.clipboard.writeText(pixPayload).then(() => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  });
-};
+  const handleCopy = () => {
+    navigator.clipboard.writeText(pixPayload).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const donationOptions = [
-  { value: 100, label: "R$ 100" },
-  { value: 500, label: "R$ 500" },
-  { value: 1000, label: "R$ 1.000" },
-  { value: 0, label: "A definir" },
-];
+    { value: 100, label: "R$ 100" },
+    { value: 500, label: "R$ 500" },
+    { value: 1000, label: "R$ 1.000" },
+    { value: 0, label: "A definir" },
+  ];
+
   const pixPayload = useMemo(() => {
-  if (donationAmount === null) return "";
-
-  try {
-    const pix = QrCodePix({
-      version: "01",
-      key: "45431497855",
-      name: "Filarmonica de Metais",
-      city: "Americana",
-      // value omitido quando for 0 → Pix com valor em aberto
-      ...(donationAmount > 0 ? { value: donationAmount } : {}),
-      message: "Doacao",
-    });
-    return pix.payload();
-  } catch (e) {
-    console.error("Erro ao gerar Pix:", e);
-    return "";
-  }
-}, [donationAmount]);
-
-
-
-
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const WHATSAPP_NUMBER = "5519998453478";
-  let mensagem = "";
-
-  if (tab === "interesse") {
+    if (donationAmount === null) return "";
     try {
-  console.log("VALIDANDO...");
-  
-  const result = await schemaInteresse.validate(interesseForm, {
-    abortEarly: false,
-  });
+      const pix = QrCodePix({
+        version: "01",
+        key: "45431497855",
+        name: "Filarmonica de Metais",
+        city: "Americana",
+        ...(donationAmount > 0 ? { value: donationAmount } : {}),
+        message: "Doacao",
+      });
+      return pix.payload();
+    } catch (e) {
+      console.error("Erro ao gerar Pix:", e);
+      return "";
+    }
+  }, [donationAmount]);
 
-  console.log("VALIDOU", result);
-} catch (error) {
-  const validationErros = {}
-  if(error instanceof yup.ValidationError){
-    error.inner.forEach((e) => {
-      if(e.path){
-        validationErros[e.path] = e.message
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const WHATSAPP_NUMBER = "5519998453478";
+    let mensagem = "";
+
+    if (tab === "interesse") {
+      // ── Validação ──────────────────────────────────
+      try {
+        await schemaInteresse.validate(interesseForm, { abortEarly: false });
+        setErros({});
+      } catch (error) {
+        if (error instanceof yup.ValidationError) {
+          const validationErrors: Record<string, string> = {};
+          error.inner.forEach((e) => {
+            if (e.path) validationErrors[e.path] = e.message;
+          });
+          setErros(validationErrors);
+        }
+        return;
       }
-  })
 
-  setErrors(validationErros)
-  }
-  return;
-}
-    mensagem = [
-      "🎺 *Olá tenho interesse na Filarmônica de Metais*",
-      "",
-      `*Nome:* ${interesseForm.nome}`,
-      `*E-mail:* ${interesseForm.email}`,
-      `*Telefone:* ${interesseForm.telefone || "Não informado"}`,
-      `*Instrumento:* ${interesseForm.instrumento || "Não informado"}`,
-      `*Mensagem:* ${interesseForm.mensagem || "Nenhuma mensagem"}`,
-    ].join("\n");
-  } else {
-    mensagem = [
-      "🏢 *Nova proposta de apoio — Filarmônica de Metais*",
-      "",
-      `*Empresa:* ${apoioForm.empresa}`,
-      `*Responsável:* ${apoioForm.responsavel}`,
-      `*E-mail:* ${apoioForm.email}`,
-      `*Telefone:* ${apoioForm.telefone || "Não informado"}`,
-      `*Tipo de apoio:* ${apoioForm.tipo || "Não informado"}`,
-      `*Mensagem:* ${apoioForm.mensagem || "Nenhuma mensagem"}`,
-    ].join("\n");
-  }
+      // ── POST no Supabase ───────────────────────────
+      setLoadingSubmit(true);
+      try {
+        await createInteressado({
+          name: interesseForm.nome,
+          email: interesseForm.email,
+          phone: interesseForm.telefone || "",
+          age: null,
+          instrument_of_interest: interesseForm.instrumento || "Não informado",
+          message: interesseForm.mensagem || null,
+        });
+      } catch (err) {
+        console.error("Erro ao salvar no Supabase:", err);
+        // Não bloqueia o fluxo — abre WhatsApp mesmo assim
+      } finally {
+        setLoadingSubmit(false);
+      }
 
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(mensagem)}`;
-  
-  // Abre antes de qualquer setState para não ser bloqueado como popup
-  window.open(url, "_blank", "noopener,noreferrer");
-  
-  setSent(true);
-};
+      // ── Mensagem WhatsApp ──────────────────────────
+      mensagem = [
+        "🎺 *Olá tenho interesse na Filarmônica de Metais*",
+        "",
+        `*Nome:* ${interesseForm.nome}`,
+        `*E-mail:* ${interesseForm.email}`,
+        `*Telefone:* ${interesseForm.telefone || "Não informado"}`,
+        `*Instrumento:* ${interesseForm.instrumento || "Não informado"}`,
+        `*Mensagem:* ${interesseForm.mensagem || "Nenhuma mensagem"}`,
+      ].join("\n");
+    } else {
+      mensagem = [
+        "🏢 *Nova proposta de apoio — Filarmônica de Metais*",
+        "",
+        `*Empresa:* ${apoioForm.empresa}`,
+        `*Responsável:* ${apoioForm.responsavel}`,
+        `*E-mail:* ${apoioForm.email}`,
+        `*Telefone:* ${apoioForm.telefone || "Não informado"}`,
+        `*Tipo de apoio:* ${apoioForm.tipo || "Não informado"}`,
+        `*Mensagem:* ${apoioForm.mensagem || "Nenhuma mensagem"}`,
+      ].join("\n");
+    }
 
-const handleChange = (
-  e: React.ChangeEvent<
-    HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-  >
-) => {
-  const setter = tab === "interesse" ? setInteresseForm : setApoioForm;
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setSent(true);
+  };
 
-  let value = e.target.value;
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const setter = tab === "interesse" ? setInteresseForm : setApoioForm;
+    let value = e.target.value;
 
-  if (e.target.name === "telefone") {
-    value = value
-      .replace(/\D/g, "")
-      .slice(0, 11)
-      .replace(/^(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{5})(\d)/, "$1-$2");
-  }
+    if (e.target.name === "telefone") {
+      value = value
+        .replace(/\D/g, "")
+        .slice(0, 11)
+        .replace(/^(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{5})(\d)/, "$1-$2");
+    }
 
-  setter((f: any) => ({
-    ...f,
-    [e.target.name]: value,
-  }));
-};
+    setter((f: any) => ({ ...f, [e.target.name]: value }));
+
+    // Limpa erro do campo ao editar
+    if (erros[e.target.name]) {
+      setErros((prev) => {
+        const next = { ...prev };
+        delete next[e.target.name];
+        return next;
+      });
+    }
+  };
 
   const switchTab = (newTab: Tab) => {
     setTab(newTab);
     setSent(false);
     setDonationAmount(null);
     setShowQr(false);
+    setErros({});
   };
-
 
   return (
     <section id="contato" className="bg-white py-20">
@@ -219,26 +226,11 @@ const handleChange = (
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                {
-                  icon: <Phone size={22} />,
-                  label: "Telefone",
-                  value: "(19) 99845-3478",
-                },
-                {
-                  icon: <Mail size={22} />,
-                  label: "E-mail",
-                  value: "filarmonicademetais@gmail.com",
-                },
-                {
-                  icon: <MapPin size={22} />,
-                  label: "Endereço",
-                  value: "R. Padre Avelino Canaza, 258 – Vila Galo, Americana – SP",
-                },
+                { icon: <Phone size={22} />, label: "Telefone", value: "(19) 99845-3478" },
+                { icon: <Mail size={22} />, label: "E-mail", value: "filarmonicademetais@gmail.com" },
+                { icon: <MapPin size={22} />, label: "Endereço", value: "R. Padre Avelino Canaza, 258 – Vila Galo, Americana – SP" },
               ].map((info, i) => (
-                <div
-                  key={i}
-                  className="bg-gray-50 rounded-xl p-4 flex flex-col break-all gap-2"
-                >
+                <div key={i} className="bg-gray-50 rounded-xl p-4 flex flex-col break-all gap-2">
                   <div className="text-[#ffc300]">{info.icon}</div>
                   <span
                     className="text-xs text-gray-400 uppercase tracking-wider"
@@ -264,9 +256,7 @@ const handleChange = (
               <button
                 onClick={() => switchTab("interesse")}
                 className={`flex items-center justify-center cursor-pointer gap-2 py-3 px-4 rounded-lg transition-all ${
-                  tab === "interesse"
-                    ? "bg-[#ffc300] text-[#001856]"
-                    : "text-white/70 hover:text-white"
+                  tab === "interesse" ? "bg-[#ffc300] text-[#001856]" : "text-white/70 hover:text-white"
                 }`}
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "0.85rem" }}
               >
@@ -276,9 +266,7 @@ const handleChange = (
               <button
                 onClick={() => switchTab("apoio")}
                 className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all ${
-                  tab === "apoio"
-                    ? "bg-[#ffc300] text-[#001856]"
-                    : "text-white/70 hover:text-white"
+                  tab === "apoio" ? "bg-[#ffc300] text-[#001856]" : "text-white/70 hover:text-white"
                 }`}
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "0.85rem" }}
               >
@@ -288,9 +276,7 @@ const handleChange = (
               <button
                 onClick={() => switchTab("doacao")}
                 className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all ${
-                  tab === "doacao"
-                    ? "bg-[#ffc300] text-[#001856]"
-                    : "text-white/70 hover:text-white"
+                  tab === "doacao" ? "bg-[#ffc300] text-[#001856]" : "text-white/70 hover:text-white"
                 }`}
                 style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "0.85rem" }}
               >
@@ -299,16 +285,13 @@ const handleChange = (
               </button>
             </div>
 
+            {/* ── SUCESSO ── */}
             {sent ? (
               <div className="h-full flex flex-col items-center justify-center text-center gap-6 py-12">
                 <CheckCircle size={64} className="text-[#ffc300]" />
                 <h3
                   className="text-white"
-                  style={{
-                    fontFamily: "'Instrument Sans', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "1.8rem",
-                  }}
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.8rem" }}
                 >
                   Mensagem enviada!
                 </h3>
@@ -326,15 +309,13 @@ const handleChange = (
                   Enviar outra mensagem
                 </button>
               </div>
+
+            /* ── DOAÇÃO ── */
             ) : tab === "doacao" ? (
               <div>
                 <h3
                   className="text-white mb-2"
-                  style={{
-                    fontFamily: "'Instrument Sans', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "1.5rem",
-                  }}
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
                 >
                   Faça sua doação
                 </h3>
@@ -342,8 +323,8 @@ const handleChange = (
                   className="text-white/60 mb-6"
                   style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}
                 >
-                  Contribua diretamente para que possamos manter as aulas, ensaios e
-                  apresentações gratuitas para todos os músicos do projeto.
+                  Contribua diretamente para que possamos manter as aulas, ensaios e apresentações
+                  gratuitas para todos os músicos do projeto.
                 </p>
 
                 {!showQr ? (
@@ -355,24 +336,24 @@ const handleChange = (
                       Escolha o valor da sua doação:
                     </p>
                     <div className="grid grid-cols-2 gap-3 mb-5">
-                {donationOptions.map((opt) => {
-  const active = donationAmount === opt.value;
-  return (
-    <button
-      key={opt.value}
-      type="button"
-      onClick={() => setDonationAmount(opt.value)} // ← dispara o useMemo
-      className={`py-4 rounded-xl border-2 transition-all ${
-        active
-          ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
-          : "border-white/20 text-white hover:border-[#ffc300]/60"
-      }`}
-      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
-    >
-      {opt.label}
-    </button>
-  );
-})}
+                      {donationOptions.map((opt) => {
+                        const active = donationAmount === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setDonationAmount(opt.value)}
+                            className={`py-4 rounded-xl border-2 transition-all ${
+                              active
+                                ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
+                                : "border-white/20 text-white hover:border-[#ffc300]/60"
+                            }`}
+                            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
                     </div>
                     <button
                       type="button"
@@ -403,51 +384,39 @@ const handleChange = (
                     </p>
                     <p
                       className="text-white mb-4"
-                      style={{
-                        fontFamily: "'Instrument Sans', sans-serif",
-                        fontWeight: 700,
-                        fontSize: "1.75rem",
-                      }}
+                      style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.75rem" }}
                     >
                       {donationAmount === 0
                         ? "Valor a combinar"
                         : `R$ ${donationAmount?.toLocaleString("pt-BR")},00`}
                     </p>
-                 <div className="bg-white p-3 rounded-xl mb-4">
-  {pixPayload ? (
-    <QRCodeSVG value={pixPayload} size={208} />
-  ) : (
-    <p className="text-gray-400 text-sm w-52 h-52 flex items-center justify-center">
-      QR Code indisponível
-    </p>
-  )}
-
-</div>
- {/* Botão copiar código Pix */}
-{pixPayload && (
-  <button
-    type="button"
-    onClick={handleCopy}
-    className={`flex items-center gap-2 cursor-pointer px-5 py-2.5 rounded-xl border-2 transition-all mb-4 ${
-      copied
-        ? "border-green-400 text-green-400 bg-green-400/10"
-        : "border-white/20 text-white/70 hover:border-[#ffc300] hover:text-[#ffc300]"
-    }`}
-    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.85rem" }}
-  >
-    {copied ? (
-      <>
-        <CheckCircle size={15} />
-        Código copiado!
-      </>
-    ) : (
-      <>
-        <QrCode size={15} />
-        Copiar código Pix
-      </>
-    )}
-  </button>
-)}
+                    <div className="bg-white p-3 rounded-xl mb-4">
+                      {pixPayload ? (
+                        <QRCodeSVG value={pixPayload} size={208} />
+                      ) : (
+                        <p className="text-gray-400 text-sm w-52 h-52 flex items-center justify-center">
+                          QR Code indisponível
+                        </p>
+                      )}
+                    </div>
+                    {pixPayload && (
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        className={`flex items-center gap-2 cursor-pointer px-5 py-2.5 rounded-xl border-2 transition-all mb-4 ${
+                          copied
+                            ? "border-green-400 text-green-400 bg-green-400/10"
+                            : "border-white/20 text-white/70 hover:border-[#ffc300] hover:text-[#ffc300]"
+                        }`}
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.85rem" }}
+                      >
+                        {copied ? (
+                          <><CheckCircle size={15} /> Código copiado!</>
+                        ) : (
+                          <><QrCode size={15} /> Copiar código Pix</>
+                        )}
+                      </button>
+                    )}
                     <p
                       className="text-white/60 max-w-xs"
                       style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.85rem", lineHeight: 1.6 }}
@@ -459,15 +428,13 @@ const handleChange = (
                   </div>
                 )}
               </div>
+
+            /* ── INTERESSE ── */
             ) : tab === "interesse" ? (
               <>
                 <h3
                   className="text-white mb-2"
-                  style={{
-                    fontFamily: "'Instrument Sans', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "1.5rem",
-                  }}
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
                 >
                   Conheça a filarmônica
                 </h3>
@@ -478,7 +445,7 @@ const handleChange = (
                   Para pais que querem inscrever seus filhos ou músicos interessados em participar.
                 </p>
 
-                <form onSubmit={handleSubmit} noValidate={true} className="flex flex-col gap-4">
+                <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label
@@ -491,11 +458,15 @@ const handleChange = (
                         name="nome"
                         value={interesseForm.nome}
                         onChange={handleChange}
-                       
                         placeholder="Seu nome"
-                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${
+                          erros.nome ? "border-red-400" : "border-white/20"
+                        }`}
                         style={{ fontFamily: "'Inter', sans-serif" }}
                       />
+                      {erros.nome && (
+                        <p className="text-red-400 text-xs mt-1">{erros.nome}</p>
+                      )}
                     </div>
                     <div>
                       <label
@@ -509,10 +480,15 @@ const handleChange = (
                         value={interesseForm.telefone}
                         onChange={handleChange}
                         placeholder="(XX) XXXXX-XXXX"
-                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${
+                          erros.telefone ? "border-red-400" : "border-white/20"
+                        }`}
                         style={{ fontFamily: "'Inter', sans-serif" }}
-                        type="phone"
+                        type="tel"
                       />
+                      {erros.telefone && (
+                        <p className="text-red-400 text-xs mt-1">{erros.telefone}</p>
+                      )}
                     </div>
                   </div>
 
@@ -528,12 +504,15 @@ const handleChange = (
                       type="email"
                       value={interesseForm.email}
                       onChange={handleChange}
-                      
                       placeholder="seu@email.com"
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                      className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${
+                        erros.email ? "border-red-400" : "border-white/20"
+                      }`}
                       style={{ fontFamily: "'Inter', sans-serif" }}
                     />
-                    {erros && <p className="text-red-600">{erros}</p>}
+                    {erros.email && (
+                      <p className="text-red-400 text-xs mt-1">{erros.email}</p>
+                    )}
                   </div>
 
                   <div>
@@ -580,23 +559,22 @@ const handleChange = (
 
                   <button
                     type="submit"
-                    className="bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors mt-2"
+                    disabled={loadingSubmit}
+                    className="bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
                   >
                     <Send size={18} />
-                    Enviar mensagem
+                    {loadingSubmit ? "Enviando..." : "Enviar mensagem"}
                   </button>
                 </form>
               </>
+
+            /* ── APOIO ── */
             ) : (
               <>
                 <h3
                   className="text-white mb-2"
-                  style={{
-                    fontFamily: "'Instrument Sans', sans-serif",
-                    fontWeight: 700,
-                    fontSize: "1.5rem",
-                  }}
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
                 >
                   Apoie o projeto
                 </h3>
