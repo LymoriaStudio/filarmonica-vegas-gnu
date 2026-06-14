@@ -38,17 +38,12 @@ export async function getInteressadoById(id: string): Promise<Interessado> {
 }
 
 // ── POST ─────────────────────────────────────────────
-export async function createInteressado(
-  payload: Omit<Interessado, 'id' | 'date' | 'status' | 'created_at' | 'updated_at'>
-): Promise<Interessado> {
-  const { data, error } = await supabase
+export async function createInteressado(payload): Promise<void> {
+  const { error } = await supabase
     .from('interessados')
     .insert([payload])
-    .select()
-    .single()
 
   if (error) throw error
-  return data
 }
 
 // ── PUT ──────────────────────────────────────────────
