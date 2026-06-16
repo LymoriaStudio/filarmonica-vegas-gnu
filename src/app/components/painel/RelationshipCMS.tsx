@@ -20,7 +20,6 @@ import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
 import { supabase } from '../../../lib/supabase';
 
 // ── Tipo local derivado da tabela Supabase ────────────────────────────────────
-// Mapeia Interessado (snake_case) para o shape usado no JSX (camelCase)
 function toInterestView(i: Interessado) {
   return {
     id: i.id ?? '',
@@ -36,6 +35,21 @@ function toInterestView(i: Interessado) {
 }
 
 type InterestView = ReturnType<typeof toInterestView>;
+
+// ── Mapper: tabela quero_apoiar -> SupportFormResponse ────────────────────────
+function toSupportView(row: any): SupportFormResponse {
+  return {
+    id: row.id ?? '',
+    name: row.name,
+    company: row.company ?? '',
+    email: row.email,
+    phone: row.phone,
+    supportType: row.support_type,
+    message: row.message ?? '',
+    date: row.date ? new Date(row.date).toLocaleDateString('pt-BR') : '',
+    status: row.status ?? 'pendente',
+  };
+}
 
 // ── Mapper: ficha de matrícula (camelCase) -> tabela `alunos` (snake_case) ────
 const mapStudentFormToDb = (f: Partial<StudentEnrollmentForm>) => ({
@@ -105,10 +119,14 @@ export default function RelationshipCMS({
 }: RelationshipCMSProps) {
   const [subTab, setSubTab] = useState<'interesse' | 'apoiar' | 'contato'>('interesse');
 
-  // ── Estado local dos interessados (vem do Supabase) ───────────────────────
+  // ── Estado local dos interessados ─────────────────────────────────────────
   const [interests, setInterests] = useState<InterestView[]>([]);
   const [loadingInterests, setLoadingInterests] = useState(false);
   const [errorInterests, setErrorInterests] = useState<string | null>(null);
+
+  // ── Estado local dos apoiadores (Supabase) ────────────────────────────────
+  const [loadingSupports, setLoadingSupports] = useState(false);
+  const [errorSupports, setErrorSupports] = useState<string | null>(null);
 
   // ── Modal de e-mail simulado ──────────────────────────────────────────────
   const [activeFicha, setActiveFicha] = useState<any | null>(null);
@@ -116,14 +134,14 @@ export default function RelationshipCMS({
   const [simDocMail, setSimDocMail] = useState<string>('');
   const [simMailOpen, setSimMailOpen] = useState(false);
 
-  // ── Modal de ficha de matrícula (interessado -> aluno) ────────────────────
+  // ── Modal de ficha de matrícula ───────────────────────────────────────────
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [enrollSource, setEnrollSource] = useState<InterestView | null>(null);
   const [enrollForm, setEnrollForm] = useState<StudentEnrollmentForm | null>(null);
   const [enrollSaving, setEnrollSaving] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
 
-  // ── GET ao montar e ao trocar para a aba interesse ────────────────────────
+  // ── GET interessados ──────────────────────────────────────────────────────
   useEffect(() => {
     if (subTab !== 'interesse') return;
     setLoadingInterests(true);
@@ -135,7 +153,27 @@ export default function RelationshipCMS({
       .finally(() => setLoadingInterests(false));
   }, [subTab]);
 
-  // ── ABRE A FICHA DE MATRÍCULA pré-preenchida com dados do interessado ─────
+  // ── GET apoiadores da tabela quero_apoiar ─────────────────────────────────
+  useEffect(() => {
+    if (subTab !== 'apoiar') return;
+    setLoadingSupports(true);
+    setErrorSupports(null);
+
+    supabase
+      .from('quero_apoiar')
+      .select('*')
+      .order('date', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setErrorSupports('Erro ao carregar apoiadores: ' + error.message);
+        } else {
+          setSupports((data ?? []).map(toSupportView));
+        }
+      })
+      .finally(() => setLoadingSupports(false));
+  }, [subTab]);
+
+  // ── ABRE FICHA DE MATRÍCULA ───────────────────────────────────────────────
   const handleOpenEnrollModal = (item: InterestView) => {
     const exists = students.some((s) => s.email === item.email);
     if (exists) {
@@ -160,7 +198,7 @@ export default function RelationshipCMS({
     setEnrollModalOpen(true);
   };
 
-  // ── CONFIRMA A FICHA: POST em `alunos` + PUT status do interessado ────────
+  // ── CONFIRMA MATRÍCULA ────────────────────────────────────────────────────
   const handleConfirmEnroll = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!enrollForm || !enrollSource) return;
@@ -191,7 +229,6 @@ export default function RelationshipCMS({
       const newStudent = mapStudentFromDb(data);
       setStudents((prev) => [...prev, newStudent]);
 
-      // Status válidos na constraint: 'novo' | 'convertido' | 'arquivado'
       await updateInteressado(enrollSource.id, { status: 'convertido' });
       setInterests((prev) =>
         prev.map((i) => (i.id === enrollSource.id ? { ...i, status: 'convertido' } : i))
@@ -218,40 +255,50 @@ export default function RelationshipCMS({
   };
 
   // ── CONVERSÃO: apoiador proposta → apoiador oficial ───────────────────────
-  const handlePromoToSupporter = (item: SupportFormResponse) => {
+  const handlePromoToSupporter = async (item: SupportFormResponse) => {
     const exists = supporters.some((s) => s.name === item.name);
     if (exists) {
       alert('Este parceiro já está ativo no quadro oficial!');
       return;
     }
 
-    const newSupporter: Supporter = {
-      id: `sup-${Date.now()}`,
-      logo: 'https://images.unsplash.com/photo-1599305445671-ac2c68ad383b?auto=format&fit=crop&w=150&h=80&q=80',
-      name: item.company || item.name,
-      siteUrl: 'https://example.com',
-      description: item.message,
-      category: 'Incentivo Cultural',
-      sponsorshipLevel: 'silver',
-      highlightedOnHome: true,
-    };
+    try {
+      const { error } = await supabase
+        .from('quero_apoiar')
+        .update({ status: 'aprovado', updated_at: new Date().toISOString() })
+        .eq('id', item.id);
 
-    setSupporters((prev) => [...prev, newSupporter]);
-    setSupports((prev) =>
-      prev.map((s) => (s.id === item.id ? { ...s, status: 'approved' } : s))
-    );
-    addAuditLog(
-      'Converteu Apoiador',
-      'Relacionamento',
-      `Proposta de ${item.name} convertida para quadro oficial de patrocinadores`
-    );
-    alert(`${item.company || item.name} promovido para patrocinador Prata!`);
+      if (error) throw error;
+
+      const newSupporter: Supporter = {
+        id: `sup-${Date.now()}`,
+        logo: 'https://images.unsplash.com/photo-1599305445671-ac2c68ad383b?auto=format&fit=crop&w=150&h=80&q=80',
+        name: item.company || item.name,
+        siteUrl: 'https://example.com',
+        description: item.message,
+        category: 'Incentivo Cultural',
+        sponsorshipLevel: 'silver',
+        highlightedOnHome: true,
+      };
+
+      setSupporters((prev) => [...prev, newSupporter]);
+      setSupports((prev) =>
+        prev.map((s) => (s.id === item.id ? { ...s, status: 'aprovado' } : s))
+      );
+      addAuditLog(
+        'Converteu Apoiador',
+        'Relacionamento',
+        `Proposta de ${item.name} convertida para quadro oficial de patrocinadores`
+      );
+      alert(`${item.company || item.name} promovido para patrocinador Prata!`);
+    } catch (err: any) {
+      alert('Erro ao promover apoiador: ' + err.message);
+    }
   };
 
-  // ── PUT: arquivar interessado ─────────────────────────────────────────────
+  // ── ARQUIVAR interessado ──────────────────────────────────────────────────
   const handleArchiveInterest = async (id: string, name: string) => {
     try {
-      // Status válidos na constraint: 'novo' | 'convertido' | 'arquivado'
       await updateInteressado(id, { status: 'arquivado' });
       setInterests((prev) =>
         prev.map((i) => (i.id === id ? { ...i, status: 'arquivado' } : i))
@@ -262,7 +309,7 @@ export default function RelationshipCMS({
     }
   };
 
-  // ── DELETE: excluir interessado permanentemente ───────────────────────────
+  // ── DELETE interessado ────────────────────────────────────────────────────
   const handleDeleteInterest = async (id: string, name: string) => {
     if (!confirm(`Excluir permanentemente a ficha de ${name}? Esta ação não pode ser desfeita.`)) return;
     try {
@@ -274,21 +321,31 @@ export default function RelationshipCMS({
     }
   };
 
-  // ── Marcar como "contactado" (apenas estado local, não persistido) ───────
-  // A constraint `interessados_status_check` só permite 'novo' | 'convertido' | 'arquivado',
-  // então "contactado" é tratado como um marcador visual local e não é salvo no banco.
+  // ── ARQUIVAR apoiador (persiste no Supabase) ──────────────────────────────
+  const handleArchiveSupport = async (id: string, name: string) => {
+    try {
+      const { error } = await supabase
+        .from('quero_apoiar')
+        .update({ status: 'arquivado', updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSupports((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'arquivado' } : s)));
+      addAuditLog('Arquivou Proposta Apoio', 'Relacionamento', `Arquivou proposta de: ${name}`);
+    } catch (err: any) {
+      alert('Erro ao arquivar: ' + err.message);
+    }
+  };
+
+  // ── Marcar como "contactado" (visual local) ───────────────────────────────
   const handleMarkContacted = (id: string) => {
     setInterests((prev) =>
       prev.map((i) => (i.id === id ? { ...i, status: i.status === 'novo' ? 'contacted' as any : i.status } : i))
     );
   };
 
-  // ── Apoio e contatos (lógica local inalterada) ────────────────────────────
-  const handleArchiveSupport = (id: string, name: string) => {
-    setSupports((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'archived' } : s)));
-    addAuditLog('Arquivou Proposta Apoio', 'Relacionamento', `Arquivou proposta de: ${name}`);
-  };
-
+  // ── Contatos gerais ───────────────────────────────────────────────────────
   const handleStatusContact = (
     id: string,
     status: 'unread' | 'replied' | 'resolved' | 'archived',
@@ -343,7 +400,7 @@ export default function RelationshipCMS({
       </div>
 
       {/* ================================================================
-          SUBTAB 1 — INTERESSADOS (dados reais do Supabase)
+          SUBTAB 1 — INTERESSADOS
           ================================================================ */}
       {subTab === 'interesse' && (
         <div className="space-y-4">
@@ -351,7 +408,6 @@ export default function RelationshipCMS({
             🚨 <strong>Painel Inteligente</strong>: Clique em <strong>"Converter em Aluno"</strong> para injetar o registro na lista acadêmica e gerar matrícula no ERP.
           </div>
 
-          {/* Estados de carregamento / erro */}
           {loadingInterests && (
             <p className="text-neutral-400 text-sm text-center py-8">Carregando interessados...</p>
           )}
@@ -424,7 +480,6 @@ export default function RelationshipCMS({
                   </div>
                 </div>
 
-                {/* Ações */}
                 <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
                   {inter.status !== 'convertido' && inter.status !== 'arquivado' && (
                     <button
@@ -476,7 +531,7 @@ export default function RelationshipCMS({
       )}
 
       {/* ================================================================
-          SUBTAB 2 — APOIADORES (lógica local inalterada)
+          SUBTAB 2 — APOIADORES (dados reais do Supabase / quero_apoiar)
           ================================================================ */}
       {subTab === 'apoiar' && (
         <div className="space-y-4">
@@ -484,14 +539,24 @@ export default function RelationshipCMS({
             💸 <strong>Painel Patrocinador</strong>: Clique em <strong>"Tornar Apoiador Oficial"</strong> para incluir a logomarca no hall dos mecenas da Home.
           </div>
 
+          {loadingSupports && (
+            <p className="text-neutral-400 text-sm text-center py-8">Carregando apoiadores...</p>
+          )}
+          {errorSupports && (
+            <p className="text-red-400 text-sm text-center py-8">{errorSupports}</p>
+          )}
+          {!loadingSupports && !errorSupports && supports.length === 0 && (
+            <p className="text-neutral-500 text-sm text-center py-8">Nenhuma proposta de apoio recebida ainda.</p>
+          )}
+
           <div className="space-y-4">
             {supports.map((sup) => (
               <div
                 key={sup.id}
                 className={`p-4 rounded-xl border flex flex-col md:flex-row gap-4 justify-between items-start transition-all ${
-                  sup.status === 'approved'
+                  sup.status === 'aprovado'
                     ? 'border-emerald-600/30 bg-emerald-950/10'
-                    : sup.status === 'archived'
+                    : sup.status === 'arquivado'
                     ? 'border-neutral-800 bg-neutral-950/40 opacity-55'
                     : 'border-neutral-800 bg-neutral-900'
                 }`}
@@ -502,9 +567,19 @@ export default function RelationshipCMS({
                       Apoio: {sup.supportType}
                     </span>
                     <span className="text-neutral-500">{sup.date}</span>
-                    {sup.status === 'approved' && (
+                    {sup.status === 'aprovado' && (
                       <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 p-0.5 px-2 rounded-full font-bold">
                         APOIADOR APROVADO
+                      </span>
+                    )}
+                    {sup.status === 'pendente' && (
+                      <span className="bg-amber-500 text-black p-0.5 px-2 rounded-full text-[9px] font-bold">
+                        PENDENTE
+                      </span>
+                    )}
+                    {sup.status === 'arquivado' && (
+                      <span className="bg-neutral-800 text-neutral-400 border border-neutral-700 p-0.5 px-2 rounded-full text-[9px] font-bold">
+                        ARQUIVADO
                       </span>
                     )}
                   </div>
@@ -514,9 +589,11 @@ export default function RelationshipCMS({
                       {sup.name}
                       {sup.company && <span className="text-amber-500 ml-1.5 font-sans">• {sup.company}</span>}
                     </h4>
-                    <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed bg-neutral-950/50 p-3 rounded-lg">
-                      "{sup.message}"
-                    </p>
+                    {sup.message && (
+                      <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed bg-neutral-950/50 p-3 rounded-lg">
+                        "{sup.message}"
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-4 text-[10px] font-mono text-neutral-500">
@@ -526,7 +603,7 @@ export default function RelationshipCMS({
                 </div>
 
                 <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
-                  {sup.status !== 'approved' && (
+                  {sup.status !== 'aprovado' && sup.status !== 'arquivado' && (
                     <button
                       type="button"
                       onClick={() => handlePromoToSupporter(sup)}
@@ -549,11 +626,12 @@ export default function RelationshipCMS({
                     >
                       Enviar Negociação
                     </button>
-                    {sup.status !== 'archived' && (
+                    {sup.status !== 'arquivado' && (
                       <button
                         type="button"
                         onClick={() => handleArchiveSupport(sup.id, sup.name)}
                         className="p-1 px-2.5 bg-neutral-800 hover:bg-neutral-950 text-neutral-400 rounded border border-neutral-750"
+                        title="Arquivar"
                       >
                         <Archive size={11} />
                       </button>
@@ -567,7 +645,7 @@ export default function RelationshipCMS({
       )}
 
       {/* ================================================================
-          SUBTAB 3 — CONTATOS GERAIS (lógica local inalterada)
+          SUBTAB 3 — CONTATOS GERAIS
           ================================================================ */}
       {subTab === 'contato' && (
         <div className="space-y-4">
@@ -653,7 +731,7 @@ export default function RelationshipCMS({
       )}
 
       {/* ================================================================
-          MODAL: FICHA DE INSCRIÇÃO / MATRÍCULA (interessado -> aluno)
+          MODAL: FICHA DE MATRÍCULA
           ================================================================ */}
       {enrollModalOpen && enrollForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fade-in">
@@ -676,7 +754,6 @@ export default function RelationshipCMS({
             </div>
 
             <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
-              {/* Dados pessoais */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Nome Completo</label>
@@ -722,25 +799,24 @@ export default function RelationshipCMS({
                 </div>
               </div>
 
-              {/* Dados acadêmicos */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Instrumento</label>
-  <select
-    required
-    value={enrollForm.instrument}
-    onChange={(e) => setEnrollForm({ ...enrollForm, instrument: e.target.value })}
-    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 p-2 text-xs rounded focus:outline-none"
-  >
-    <option value="">Selecione um instrumento</option>
-    <option value="trompete">Trompete</option>
-    <option value="trombone">Trombone</option>
-    <option value="trompa">Trompa</option>
-    <option value="bombardino">Bombardino</option>
-    <option value="tuba">Tuba</option>
-    <option value="outros">Outros</option>
-  </select>
-</div>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Instrumento</label>
+                  <select
+                    required
+                    value={enrollForm.instrument}
+                    onChange={(e) => setEnrollForm({ ...enrollForm, instrument: e.target.value })}
+                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+                  >
+                    <option value="">Selecione um instrumento</option>
+                    <option value="trompete">Trompete</option>
+                    <option value="trombone">Trombone</option>
+                    <option value="trompa">Trompa</option>
+                    <option value="bombardino">Bombardino</option>
+                    <option value="tuba">Tuba</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Turma / Classe</label>
                   <input
@@ -753,7 +829,6 @@ export default function RelationshipCMS({
                 </div>
               </div>
 
-              {/* Responsável e endereço */}
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Responsável (se menor de idade)</label>
                 <input
@@ -776,7 +851,6 @@ export default function RelationshipCMS({
                 />
               </div>
 
-              {/* Foto do aluno */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Foto do Aluno</label>
                 {enrollForm.photo && (
@@ -796,7 +870,6 @@ export default function RelationshipCMS({
                 />
               </div>
 
-              {/* Status da matrícula */}
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Status da Matrícula</label>
                 <select

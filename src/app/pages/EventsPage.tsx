@@ -1,14 +1,16 @@
 import { useEffect } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, Calendar, Clock, MapPin, Ticket, MessageCircle, Tag, DollarSign } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Ticket, MessageCircle, Tag, DollarSign, Loader2, AlertCircle } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
-import { events } from "../data/events";
+import { useEvents } from "../hooks/useEvents";
 
 export function EventsPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
+
+  const { events, loading, error } = useEvents({ onlyPublished: true, highlightedFirst: true });
 
   const buildWhatsAppLink = (phone: string, title: string) =>
     `https://wa.me/${phone}?text=${encodeURIComponent(
@@ -23,21 +25,21 @@ export function EventsPage() {
       <section className="bg-[#001856] pt-32 pb-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-white/70 hover:text-[#ffc300] transition-colors mb-6"
-            style={{ fontFamily: "'Inter', sans-serif", fontSize: "14px" }}
-          >
-            <ArrowLeft size={16} /> Voltar para a página inicial
-          </Link>
-          <span
-            className="text-[#ffc300] uppercase tracking-widest"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "13px" }}
-          >
-            Programação Completa
-          </span>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 text-white/70 hover:text-[#ffc300] transition-colors mb-6"
+              style={{ fontFamily: "'Inter', sans-serif", fontSize: "14px" }}
+            >
+              <ArrowLeft size={16} /> Voltar para a página inicial
+            </Link>
+            <span
+              className="text-[#ffc300] uppercase tracking-widest"
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "13px" }}
+            >
+              Programação Completa
+            </span>
           </div>
-        
+
           <h1
             className="text-white mt-3"
             style={{
@@ -62,7 +64,51 @@ export function EventsPage() {
       {/* Events list */}
       <section className="py-16 bg-[#f5f6fa]">
         <div className="max-w-6xl mx-auto px-6 flex flex-col gap-10">
-          {events.map((event, idx) => {
+
+          {/* Loading state */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <Loader2
+                size={36}
+                className="text-[#ffc300] animate-spin"
+              />
+              <p
+                className="text-[#001856]/60"
+                style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
+              >
+                Carregando eventos...
+              </p>
+            </div>
+          )}
+
+          {/* Error state */}
+          {!loading && error && (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+              <AlertCircle size={36} className="text-red-400" />
+              <p
+                className="text-gray-500"
+                style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
+              >
+                Não foi possível carregar os eventos. Tente novamente em instantes.
+              </p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && events.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+              <Calendar size={36} className="text-[#ffc300]" />
+              <p
+                className="text-gray-500"
+                style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
+              >
+                Nenhum evento publicado no momento. Volte em breve!
+              </p>
+            </div>
+          )}
+
+          {/* Events */}
+          {!loading && !error && events.map((event, idx) => {
             const reverse = idx % 2 === 1;
             return (
               <article
@@ -70,13 +116,12 @@ export function EventsPage() {
                 className="bg-white rounded-3xl overflow-hidden shadow-xl flex flex-col lg:flex-row"
               >
                 {/* Image */}
-                <div
-                  className={`lg:w-2/5 relative ${reverse ? "lg:order-2" : ""}`}
-                >
+                <div className={`lg:w-2/5 relative ${reverse ? "lg:order-2" : ""}`}>
                   <div className="h-64 lg:h-full">
                     <img
                       src={event.image}
                       alt={event.title}
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -140,7 +185,13 @@ export function EventsPage() {
                     {[
                       { icon: Calendar, label: "Data", value: event.date },
                       { icon: Clock, label: "Horário", value: event.time },
-                      { icon: MapPin, label: "Local", value: event.location, sub: event.address },
+                      {
+                        icon: MapPin,
+                        label: "Local",
+                        value: event.location,
+                        sub: event.address,
+                        href: event.mapsUrl ?? undefined,
+                      },
                       { icon: DollarSign, label: "Ingresso", value: event.price },
                     ].map((info, i) => (
                       <div key={i} className="flex items-start gap-3">
@@ -157,12 +208,29 @@ export function EventsPage() {
                           >
                             {info.label}
                           </span>
-                          <p
-                            className="text-[#001856]"
-                            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.9rem" }}
-                          >
-                            {info.value}
-                          </p>
+                          {info.href ? (
+                            <a
+                              href={info.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                              style={{
+                                fontFamily: "'Inter', sans-serif",
+                                fontWeight: 600,
+                                fontSize: "0.9rem",
+                                color: event.color,
+                              }}
+                            >
+                              {info.value}
+                            </a>
+                          ) : (
+                            <p
+                              className="text-[#001856]"
+                              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.9rem" }}
+                            >
+                              {info.value}
+                            </p>
+                          )}
                           {info.sub && (
                             <p
                               className="text-gray-500 mt-0.5"
