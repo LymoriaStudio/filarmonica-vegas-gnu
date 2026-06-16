@@ -91,6 +91,8 @@ export default function PessoasERP({
       highlighted: false,
       order: professors.length + 1
     });
+
+    
     setProfModalOpen(true);
   };
 

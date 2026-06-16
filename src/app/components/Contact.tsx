@@ -8,6 +8,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { schemaInteresse } from "../validations/contactRules";
 import { createInteressado } from "../services/interessadosService";
 import { createApoiador } from "../services/useApoiadores";
+import { createDoacao } from "../services/doacoesService"
 
 type Tab = "interesse" | "apoio" | "doacao";
 
@@ -19,6 +20,7 @@ export function Contact() {
   const [sent, setSent] = useState(false);
   const [donationAmount, setDonationAmount] = useState<number | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [loadingDoacao, setLoadingDoacao] = useState(false);
   const [interesseForm, setInteresseForm] = useState({
     nome: "",
     email: "",
@@ -70,6 +72,21 @@ export function Contact() {
     }
   }, [donationAmount]);
 
+  const handleDoareAgora = async () => {
+    if (donationAmount === null) return;
+
+    setLoadingDoacao(true);
+    try {
+      await createDoacao({ amount: donationAmount });
+    } catch (err) {
+      console.error("Erro ao registrar doação no Supabase:", err);
+    } finally {
+      setLoadingDoacao(false);
+    }
+
+    setShowQr(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -119,7 +136,6 @@ export function Contact() {
       ].join("\n");
 
     } else {
-      // ── POST apoiador no Supabase ──────────────────
       setLoadingSubmit(true);
       try {
         await createApoiador({
@@ -216,6 +232,7 @@ export function Contact() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch">
+          {/* Left: image + info */}
           <div className="flex flex-col gap-8">
             <div className="rounded-2xl overflow-hidden h-64 lg:h-auto flex-1 relative">
               <img
@@ -261,7 +278,9 @@ export function Contact() {
             </div>
           </div>
 
+          {/* Right: form */}
           <div className="bg-[#001856] rounded-2xl p-8 lg:p-10">
+            {/* Tabs */}
             <div className="grid grid-cols-3 gap-2 p-1 bg-white/5 rounded-xl mb-6">
               <button
                 onClick={() => switchTab("interesse")}
@@ -298,10 +317,16 @@ export function Contact() {
             {sent ? (
               <div className="h-full flex flex-col items-center justify-center text-center gap-6 py-12">
                 <CheckCircle size={64} className="text-[#ffc300]" />
-                <h3 className="text-white" style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.8rem" }}>
+                <h3
+                  className="text-white"
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.8rem" }}
+                >
                   Mensagem enviada!
                 </h3>
-                <p className="text-white/70 max-w-xs" style={{ fontFamily: "'Inter', sans-serif", lineHeight: 1.7 }}>
+                <p
+                  className="text-white/70 max-w-xs"
+                  style={{ fontFamily: "'Inter', sans-serif", lineHeight: 1.7 }}
+                >
                   Obrigado pelo contato! Em breve nossa equipe entrará em contato com você.
                 </p>
                 <button
@@ -315,16 +340,25 @@ export function Contact() {
 
             ) : tab === "doacao" ? (
               <div>
-                <h3 className="text-white mb-2" style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}>
+                <h3
+                  className="text-white mb-2"
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
+                >
                   Faça sua doação
                 </h3>
-                <p className="text-white/60 mb-6" style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                <p
+                  className="text-white/60 mb-6"
+                  style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}
+                >
                   Contribua diretamente para que possamos manter as aulas, ensaios e apresentações gratuitas para todos os músicos do projeto.
                 </p>
 
                 {!showQr ? (
                   <>
-                    <p className="text-white/80 mb-4" style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", fontWeight: 600 }}>
+                    <p
+                      className="text-white/80 mb-4"
+                      style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", fontWeight: 600 }}
+                    >
                       Escolha o valor da sua doação:
                     </p>
                     <div className="grid grid-cols-2 gap-3 mb-5">
@@ -336,7 +370,9 @@ export function Contact() {
                             type="button"
                             onClick={() => setDonationAmount(opt.value)}
                             className={`py-4 rounded-xl border-2 transition-all ${
-                              active ? "bg-[#ffc300] border-[#ffc300] text-[#001856]" : "border-white/20 text-white hover:border-[#ffc300]/60"
+                              active
+                                ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
+                                : "border-white/20 text-white hover:border-[#ffc300]/60"
                             }`}
                             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
                           >
@@ -345,14 +381,16 @@ export function Contact() {
                         );
                       })}
                     </div>
+
                     <button
                       type="button"
-                      disabled={donationAmount === null}
-                      onClick={() => setShowQr(true)}
+                      disabled={donationAmount === null || loadingDoacao}
+                      onClick={handleDoareAgora}
                       className="w-full cursor-pointer bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                     >
-                      <QrCode size={18} /> Doar agora
+                      <QrCode size={18} />
+                      {loadingDoacao ? "Registrando..." : "Doar agora"}
                     </button>
                   </>
                 ) : (
@@ -365,17 +403,27 @@ export function Contact() {
                     >
                       <ArrowLeft size={14} /> Alterar valor
                     </button>
-                    <p className="text-[#ffc300] uppercase tracking-widest mb-1" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "11px" }}>
+                    <p
+                      className="text-[#ffc300] uppercase tracking-widest mb-1"
+                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "11px" }}
+                    >
                       Doação via Pix
                     </p>
-                    <p className="text-white mb-4" style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.75rem" }}>
-                      {donationAmount === 0 ? "Valor a combinar" : `R$ ${donationAmount?.toLocaleString("pt-BR")},00`}
+                    <p
+                      className="text-white mb-4"
+                      style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.75rem" }}
+                    >
+                      {donationAmount === 0
+                        ? "Valor a combinar"
+                        : `R$ ${donationAmount?.toLocaleString("pt-BR")},00`}
                     </p>
                     <div className="bg-white p-3 rounded-xl mb-4">
                       {pixPayload ? (
                         <QRCodeSVG value={pixPayload} size={208} />
                       ) : (
-                        <p className="text-gray-400 text-sm w-52 h-52 flex items-center justify-center">QR Code indisponível</p>
+                        <p className="text-gray-400 text-sm w-52 h-52 flex items-center justify-center">
+                          QR Code indisponível
+                        </p>
                       )}
                     </div>
                     {pixPayload && (
@@ -383,14 +431,23 @@ export function Contact() {
                         type="button"
                         onClick={handleCopy}
                         className={`flex items-center gap-2 cursor-pointer px-5 py-2.5 rounded-xl border-2 transition-all mb-4 ${
-                          copied ? "border-green-400 text-green-400 bg-green-400/10" : "border-white/20 text-white/70 hover:border-[#ffc300] hover:text-[#ffc300]"
+                          copied
+                            ? "border-green-400 text-green-400 bg-green-400/10"
+                            : "border-white/20 text-white/70 hover:border-[#ffc300] hover:text-[#ffc300]"
                         }`}
                         style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.85rem" }}
                       >
-                        {copied ? <><CheckCircle size={15} /> Código copiado!</> : <><QrCode size={15} /> Copiar código Pix</>}
+                        {copied ? (
+                          <><CheckCircle size={15} /> Código copiado!</>
+                        ) : (
+                          <><QrCode size={15} /> Copiar código Pix</>
+                        )}
                       </button>
                     )}
-                    <p className="text-white/60 max-w-xs" style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.85rem", lineHeight: 1.6 }}>
+                    <p
+                      className="text-white/60 max-w-xs"
+                      style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.85rem", lineHeight: 1.6 }}
+                    >
                       {donationAmount === 0
                         ? "Entre em contato pela aba 'Quero apoiar' para combinarmos o valor e enviarmos o QR Code personalizado."
                         : "Escaneie o QR Code com o app do seu banco para concluir a doação. Muito obrigado pelo apoio!"}
@@ -401,36 +458,56 @@ export function Contact() {
 
             ) : tab === "interesse" ? (
               <>
-                <h3 className="text-white mb-2" style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}>
+                <h3
+                  className="text-white mb-2"
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
+                >
                   Conheça a filarmônica
                 </h3>
-                <p className="text-white/60 mb-6" style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                <p
+                  className="text-white/60 mb-6"
+                  style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}
+                >
                   Para pais que querem inscrever seus filhos ou músicos interessados em participar.
                 </p>
 
                 <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Nome completo *</label>
+                      <label
+                        className="text-white/70 text-sm mb-1 block"
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                      >
+                        Nome completo *
+                      </label>
                       <input
                         name="nome"
                         value={interesseForm.nome}
                         onChange={handleChange}
                         placeholder="Seu nome"
-                        className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${erros.nome ? "border-red-400" : "border-white/20"}`}
+                        className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${
+                          erros.nome ? "border-red-400" : "border-white/20"
+                        }`}
                         style={{ fontFamily: "'Inter', sans-serif" }}
                       />
                       {erros.nome && <p className="text-red-400 text-xs mt-1">{erros.nome}</p>}
                     </div>
                     <div>
-                      <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Telefone</label>
+                      <label
+                        className="text-white/70 text-sm mb-1 block"
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                      >
+                        Telefone
+                      </label>
                       <input
                         name="telefone"
                         value={interesseForm.telefone}
                         onChange={handleChange}
                         placeholder="(XX) XXXXX-XXXX"
                         type="tel"
-                        className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${erros.telefone ? "border-red-400" : "border-white/20"}`}
+                        className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${
+                          erros.telefone ? "border-red-400" : "border-white/20"
+                        }`}
                         style={{ fontFamily: "'Inter', sans-serif" }}
                       />
                       {erros.telefone && <p className="text-red-400 text-xs mt-1">{erros.telefone}</p>}
@@ -438,22 +515,40 @@ export function Contact() {
                   </div>
 
                   <div>
-                    <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>E-mail *</label>
+                    <label
+                      className="text-white/70 text-sm mb-1 block"
+                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                    >
+                      E-mail *
+                    </label>
                     <input
                       name="email"
                       type="email"
                       value={interesseForm.email}
                       onChange={handleChange}
                       placeholder="seu@email.com"
-                      className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${erros.email ? "border-red-400" : "border-white/20"}`}
+                      className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors ${
+                        erros.email ? "border-red-400" : "border-white/20"
+                      }`}
                       style={{ fontFamily: "'Inter', sans-serif" }}
                     />
                     {erros.email && <p className="text-red-400 text-xs mt-1">{erros.email}</p>}
                   </div>
 
                   <div>
-                    <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Instrumento de interesse</label>
-                    <select name="instrumento" value={interesseForm.instrumento} onChange={handleChange} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none" style={{ fontFamily: "'Inter', sans-serif" }}>
+                    <label
+                      className="text-white/70 text-sm mb-1 block"
+                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                    >
+                      Instrumento de interesse
+                    </label>
+                    <select
+                      name="instrumento"
+                      value={interesseForm.instrumento}
+                      onChange={handleChange}
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none"
+                      style={{ fontFamily: "'Inter', sans-serif" }}
+                    >
                       <option value="" className="text-gray-800">Selecione um instrumento</option>
                       <option value="trompete" className="text-gray-800">Trompete</option>
                       <option value="trombone" className="text-gray-800">Trombone</option>
@@ -465,11 +560,29 @@ export function Contact() {
                   </div>
 
                   <div>
-                    <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Mensagem (opcional)</label>
-                    <textarea name="mensagem" value={interesseForm.mensagem} onChange={handleChange} rows={4} placeholder="Conte um pouco sobre você e sua experiência musical..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors resize-none" style={{ fontFamily: "'Inter', sans-serif" }} />
+                    <label
+                      className="text-white/70 text-sm mb-1 block"
+                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                    >
+                      Mensagem (opcional)
+                    </label>
+                    <textarea
+                      name="mensagem"
+                      value={interesseForm.mensagem}
+                      onChange={handleChange}
+                      rows={4}
+                      placeholder="Conte um pouco sobre você e sua experiência musical..."
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors resize-none"
+                      style={{ fontFamily: "'Inter', sans-serif" }}
+                    />
                   </div>
 
-                  <button type="submit" disabled={loadingSubmit} className="bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}>
+                  <button
+                    type="submit"
+                    disabled={loadingSubmit}
+                    className="bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
+                  >
                     <Send size={18} />
                     {loadingSubmit ? "Enviando..." : "Enviar mensagem"}
                   </button>
@@ -478,39 +591,108 @@ export function Contact() {
 
             ) : (
               <>
-                <h3 className="text-white mb-2" style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}>
+                <h3
+                  className="text-white mb-2"
+                  style={{ fontFamily: "'Instrument Sans', sans-serif", fontWeight: 700, fontSize: "1.5rem" }}
+                >
                   Apoie o projeto
                 </h3>
-                <p className="text-white/60 mb-6" style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}>
+                <p
+                  className="text-white/60 mb-6"
+                  style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", lineHeight: 1.6 }}
+                >
                   Para empresas, escolas e instituições que desejam patrocinar ou firmar parceria.
                 </p>
 
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Empresa / Instituição *</label>
-                      <input name="empresa" value={apoioForm.empresa} onChange={handleChange} required placeholder="Razão social" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors" style={{ fontFamily: "'Inter', sans-serif" }} />
+                      <label
+                        className="text-white/70 text-sm mb-1 block"
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                      >
+                        Empresa / Instituição *
+                      </label>
+                      <input
+                        name="empresa"
+                        value={apoioForm.empresa}
+                        onChange={handleChange}
+                        required
+                        placeholder="Razão social"
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
                     </div>
                     <div>
-                      <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Nome do responsável *</label>
-                      <input name="responsavel" value={apoioForm.responsavel} onChange={handleChange} required placeholder="Quem está entrando em contato" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors" style={{ fontFamily: "'Inter', sans-serif" }} />
+                      <label
+                        className="text-white/70 text-sm mb-1 block"
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                      >
+                        Nome do responsável *
+                      </label>
+                      <input
+                        name="responsavel"
+                        value={apoioForm.responsavel}
+                        onChange={handleChange}
+                        required
+                        placeholder="Quem está entrando em contato"
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>E-mail *</label>
-                      <input name="email" type="email" value={apoioForm.email} onChange={handleChange} required placeholder="contato@empresa.com" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors" style={{ fontFamily: "'Inter', sans-serif" }} />
+                      <label
+                        className="text-white/70 text-sm mb-1 block"
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                      >
+                        E-mail *
+                      </label>
+                      <input
+                        name="email"
+                        type="email"
+                        value={apoioForm.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="contato@empresa.com"
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
                     </div>
                     <div>
-                      <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Telefone</label>
-                      <input name="telefone" value={apoioForm.telefone} onChange={handleChange} placeholder="(XX) XXXXX-XXXX" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors" style={{ fontFamily: "'Inter', sans-serif" }} />
+                      <label
+                        className="text-white/70 text-sm mb-1 block"
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                      >
+                        Telefone
+                      </label>
+                      <input
+                        name="telefone"
+                        value={apoioForm.telefone}
+                        onChange={handleChange}
+                        placeholder="(XX) XXXXX-XXXX"
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Tipo de apoio</label>
-                    <select name="tipo" value={apoioForm.tipo} onChange={handleChange} className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none" style={{ fontFamily: "'Inter', sans-serif" }}>
+                    <label
+                      className="text-white/70 text-sm mb-1 block"
+                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                    >
+                      Tipo de apoio
+                    </label>
+                    <select
+                      name="tipo"
+                      value={apoioForm.tipo}
+                      onChange={handleChange}
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none"
+                      style={{ fontFamily: "'Inter', sans-serif" }}
+                    >
                       <option value="" className="text-gray-800">Selecione</option>
                       <option value="patrocinio" className="text-gray-800">Patrocínio</option>
                       <option value="parceria-escola" className="text-gray-800">Parceria com escola</option>
@@ -519,11 +701,29 @@ export function Contact() {
                   </div>
 
                   <div>
-                    <label className="text-white/70 text-sm mb-1 block" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}>Mensagem (opcional)</label>
-                    <textarea name="mensagem" value={apoioForm.mensagem} onChange={handleChange} rows={3} placeholder="Conte como sua empresa gostaria de apoiar o projeto..." className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors resize-none" style={{ fontFamily: "'Inter', sans-serif" }} />
+                    <label
+                      className="text-white/70 text-sm mb-1 block"
+                      style={{ fontFamily: "'Inter', sans-serif", fontWeight: 500 }}
+                    >
+                      Mensagem (opcional)
+                    </label>
+                    <textarea
+                      name="mensagem"
+                      value={apoioForm.mensagem}
+                      onChange={handleChange}
+                      rows={3}
+                      placeholder="Conte como sua empresa gostaria de apoiar o projeto..."
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-[#ffc300] transition-colors resize-none"
+                      style={{ fontFamily: "'Inter', sans-serif" }}
+                    />
                   </div>
 
-                  <button type="submit" disabled={loadingSubmit} className="bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors mt-1 disabled:opacity-60 disabled:cursor-not-allowed" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}>
+                  <button
+                    type="submit"
+                    disabled={loadingSubmit}
+                    className="bg-[#ffc300] text-[#001856] py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "1rem" }}
+                  >
                     <Send size={18} />
                     {loadingSubmit ? "Enviando..." : "Enviar proposta de apoio"}
                   </button>
