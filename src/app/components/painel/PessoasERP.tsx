@@ -5,7 +5,8 @@ import {
   Instagram, Facebook, Youtube, Linkedin, MessageCircle, FileSpreadsheet, X
 } from 'lucide-react';
 import { Professor, Student, Organizer, AuditLog } from '../../validations/types';
-import { ImageUploader } from './MiniWidgets';
+import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
+import { getStudents, createStudent, updateStudent, updateStudentStatus, deleteStudent } from '../../services/studentsService';
 
 interface PessoasERPProps {
   professors: Professor[];
@@ -50,7 +51,17 @@ export default function PessoasERP({
   // Simulated export to CSV modal
   const [exportModalContent, setExportModalContent] = useState<string | null>(null);
 
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [pendingStudentPhoto, setPendingStudentPhoto] = useState<File | null>(null);
 
+
+  // useEffect de carregamento — coloque ANTES do useEffect do selectedEntityForEdit
+useEffect(() => {
+  getStudents()
+    .then(setStudents)
+    .catch((err) => console.error('Erro ao carregar alunos:', err))
+    .finally(() => setStudentsLoading(false));
+}, []);
   // Catch any external routing redirect (from header)
   useEffect(() => {
     if (selectedEntityForEdit) {
@@ -138,6 +149,7 @@ export default function PessoasERP({
   // STUDENTS MANAGEMENT (TABLE)
   // ==========================================
   const handleOpenStudentModal = (student: Partial<Student> | null) => {
+    setPendingStudentPhoto(null); 
     setActiveStudent(student || {
       id: '',
       name: '',
@@ -154,30 +166,52 @@ export default function PessoasERP({
     setStudentModalOpen(true);
   };
 
-  const handleSaveStudent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeStudent) return;
+const handleSaveStudent = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!activeStudent) return;
+  try {
+    // ← entra aqui, antes do if/else
+    let finalPhoto = activeStudent.photo;
+    if (pendingStudentPhoto) {
+      finalPhoto = await uploadFileToSupabase(pendingStudentPhoto, 'students');
+    }
 
     if (activeStudent.id) {
-      setStudents(prev => prev.map(s => s.id === activeStudent.id ? (activeStudent as Student) : s));
-      addAuditLog('Alterou Cadastro Aluno', 'Alunos', `Atualizou matrícula de: ${activeStudent.name}`);
+      const updated = await updateStudent(activeStudent.id, { ...activeStudent, photo: finalPhoto });
+      setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+      addAuditLog('Alterou Cadastro Aluno', 'Alunos', `Atualizou matrícula de: ${updated.name}`);
     } else {
-      const newSt = { ...activeStudent, id: `alu-${Date.now()}` } as Student;
-      setStudents(prev => [...prev, newSt]);
-      addAuditLog('Matriculou Aluno', 'Alunos', `Matriculou novo bolsista: ${newSt.name}`);
+      const created = await createStudent({ ...activeStudent, photo: finalPhoto });
+      setStudents(prev => [...prev, created]);
+      addAuditLog('Matriculou Aluno', 'Alunos', `Matriculou novo bolsista: ${created.name}`);
     }
     setStudentModalOpen(false);
-  };
-
-  const handleDeleteStudent = (id: string, name: string) => {
+    setPendingStudentPhoto(null); // ← limpa após salvar
+  } catch (err: any) {
+    alert('Erro ao salvar aluno: ' + err.message);
+  }
+};
+const handleDeleteStudent = async (id: string, name: string) => {
+  if (!confirm(`Remover permanentemente a matrícula de "${name}"?`)) return;
+  try {
+    await deleteStudent(id);
     setStudents(prev => prev.filter(s => s.id !== id));
     addAuditLog('Deletou Matrícula Aluno', 'Alunos', `Removeu matrícula ID: ${id} (${name})`);
-  };
+  } catch (err: any) {
+    alert('Erro ao remover aluno: ' + err.message);
+  }
+};
 
-  const handleArchiveStudent = (id: string, name: string) => {
+const handleArchiveStudent = async (id: string, name: string) => {
+  try {
+    await updateStudentStatus(id, 'archived');
     setStudents(prev => prev.map(s => s.id === id ? { ...s, status: 'archived' } : s));
     addAuditLog('Arquivou Aluno', 'Alunos', `Alterou status de: ${name} para Arquivado`);
-  };
+  } catch (err: any) {
+    alert('Erro ao arquivar aluno: ' + err.message);
+  }
+};
+
 
   // Mock list exporter
   const handleExportStudents = () => {
@@ -300,11 +334,12 @@ export default function PessoasERP({
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="bg-neutral-950 border border-neutral-800 text-neutral-400 text-xs p-2 rounded-lg focus:outline-none"
               >
-                <option value="all">Todos Status Matrícula</option>
-                <option value="active">Alunos Ativos</option>
-                <option value="inactive">Afastados / Inativos</option>
-                <option value="graduated">Formados</option>
-                <option value="archived">Arquivados</option>
+                <option value="all">Todos Status</option>
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativos</option>
+                <option value="formado">Formados</option>
+                <option value="trancado">Trancado</option>
+                <option value="arquivado">Arquivados</option>
               </select>
 
               {/* Instrument filter selection */}
@@ -313,7 +348,7 @@ export default function PessoasERP({
                 onChange={(e) => setInstrumentFilter(e.target.value)}
                 className="bg-neutral-950 border border-neutral-800 text-neutral-400 text-xs p-2 rounded-lg focus:outline-none"
               >
-                <option value="all">Sopros / Percussão</option>
+                <option value="all">Todos</option>
                 <option value="trompete">Trompete</option>
                 <option value="trombone">Trombone</option>
                 <option value="trompa">Trompa</option>
@@ -340,6 +375,9 @@ export default function PessoasERP({
           </div>
 
           {/* Real Grid table presentation */}
+          {studentsLoading && (
+  <div className="text-center py-8 text-xs text-neutral-500 font-mono">Carregando alunos...</div>
+)}
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -365,6 +403,9 @@ export default function PessoasERP({
                         <img 
                           src={alu.photo} 
                           alt={alu.name} 
+                          onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(alu.name)}&background=0B4DA2&color=fff&size=64`;
+                                      }}
                           referrerPolicy="no-referrer"
                           className="w-7 h-7 rounded-full object-cover border border-neutral-850 shrink-0" 
                         />
@@ -395,18 +436,20 @@ export default function PessoasERP({
                         </div>
                       </td>
                       <td className="p-3">
-                        <span className={`inline-block p-1 px-2 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                          alu.status === 'active' ? 'bg-emerald-950 text-emerald-400' :
-                          alu.status === 'inactive' ? 'bg-amber-950 text-amber-400' :
-                          alu.status === 'graduated' ? 'bg-indigo-950 text-indigo-400' :
-                          'bg-neutral-850 text-neutral-500'
-                        }`}>
-                          {alu.status === 'active' && 'Ativo'}
-                          {alu.status === 'inactive' && 'Inativo'}
-                          {alu.status === 'graduated' && 'Formado'}
-                          {alu.status === 'archived' && 'Arquivado'}
-                        </span>
-                      </td>
+  <span className={`inline-block p-1 px-2 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+    alu.status === 'ativo'     ? 'bg-emerald-950 text-emerald-400' :
+    alu.status === 'inativo'   ? 'bg-amber-950 text-amber-400' :
+    alu.status === 'formado'   ? 'bg-indigo-950 text-indigo-400' :
+    alu.status === 'trancado'  ? 'bg-violet-950 text-violet-400' :
+    'bg-neutral-800 text-neutral-500'
+  }`}>
+    {alu.status === 'ativo'    && 'Ativo'}
+    {alu.status === 'inativo'  && 'Inativo'}
+    {alu.status === 'formado'  && 'Formado'}
+    {alu.status === 'trancado' && 'Trancado'}
+    {alu.status === 'arquivado' && 'Arquivado'}
+  </span>
+</td>
                       <td className="p-3 text-right pr-4 space-x-2">
                         <button
                           type="button"
@@ -629,148 +672,268 @@ export default function PessoasERP({
       
       {/* Modal A: Student CRUD form */}
       {studentModalOpen && activeStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
-          <form 
-            onSubmit={handleSaveStudent}
-            className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold text-amber-500 uppercase tracking-widest">
-                {activeStudent.id ? 'Alterar Ficha do Aluno' : 'Cadastrar Novo Aluno'}
-              </h3>
-              <button type="button" onClick={() => setStudentModalOpen(false)} className="text-neutral-400 hover:text-white">Fechar</button>
-            </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
+  <form 
+    onSubmit={handleSaveStudent}
+    className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl space-y-4"
+  >
+    <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
+      <h3 className="text-xs font-mono font-bold text-amber-500 uppercase tracking-widest">
+        {activeStudent.id ? 'Alterar Ficha do Aluno' : 'Cadastrar Novo Aluno'}
+      </h3>
+      <button type="button" onClick={() => setStudentModalOpen(false)} className="text-neutral-400 hover:text-white">Fechar</button>
+    </div>
 
-            <div className="p-5 space-y-3.5 max-h-[450px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Nome Completo</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={activeStudent.name || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, name: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Data de Nascimento</label>
-                  <input 
-                    type="date" 
-                    required
-                    value={activeStudent.birthDate || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, birthDate: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none font-mono"
-                  />
-                </div>
-              </div>
+    <div className="p-5 space-y-3.5 max-h-[500px] overflow-y-auto">
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Instrumento Principal</label>
-                  <select
-                    value={activeStudent.instrument || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, instrument: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded focus:outline-none"
-                  >
-                    <option value="">Selecione Instrumento...</option>
-                    <option value="Trompete Bb">Trompete Bb</option>
-                    <option value="Trombone de Vara">Trombone de Vara</option>
-                    <option value="Trompa Solista">Trompa Solista</option>
-                    <option value="Tuba Grave">Tuba Grave</option>
-                    <option value="Bombardino Bb">Bombardino Bb</option>
-                    <option value="Percussão Sinfônica">Percussão Sinfônica</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Turma de Admissão</label>
-                  <select
-                    value={activeStudent.classroom || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, classroom: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded focus:outline-none"
-                  >
-                    <option value="Iniciante">Iniciante</option>
-                    <option value="Intermediário">Intermediário</option>
-                    <option value="Avançado">Avançado</option>
-                    <option value="Formado">Formado</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Telefone Fone</label>
-                  <input 
-                    type="text" 
-                    value={activeStudent.phone || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, phone: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Responsável (se menor)</label>
-                  <input 
-                    type="text" 
-                    value={activeStudent.guardian || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, guardian: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
-                    placeholder="Nome do Pai/Mãe..."
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1 font-bold">Endereço Residencial</label>
-                  <textarea 
-                    value={activeStudent.address || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, address: e.target.value })}
-                    rows={2}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">E-mail para Boletim</label>
-                  <input 
-                    type="email" 
-                    value={activeStudent.email || ''}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, email: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-825 text-neutral-100 p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Status Atribuição</label>
-                  <select
-                    value={activeStudent.status || 'active'}
-                    onChange={(e) => setActiveStudent({ ...activeStudent, status: e.target.value as any })}
-                    className="w-full bg-neutral-950 border border-neutral-825 text-neutral-400 p-2 text-xs rounded focus:outline-none font-bold"
-                  >
-                    <option value="active">Regular Ativo</option>
-                    <option value="inactive">Matrícula Trancada</option>
-                    <option value="graduated">Formado / Alumni</option>
-                    <option value="archived">Arquivado no ERP</option>
-                  </select>
-                </div>
-                <div className="flex flex-col justify-end">
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Inserção de Foto</label>
-                  <ImageUploader 
-                    onUploadSuccess={(url) => setActiveStudent({ ...activeStudent, photo: url })} 
-                  />
-                </div>
-              </div>
-
-            </div>
-
-            <div className="bg-neutral-950 p-3 border-t border-neutral-800 flex justify-end space-x-2">
-              <button type="button" onClick={() => setStudentModalOpen(false)} className="text-xs text-neutral-400 px-3 py-1 bg-neutral-905 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#0B4DA2] rounded">Confirmar Ficha Aluno</button>
-            </div>
-          </form>
+      {/* Nome + Data nascimento */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Nome Completo</label>
+          <input 
+            type="text" 
+            required
+            value={activeStudent.name || ''}
+            onChange={(e) => setActiveStudent({ ...activeStudent, name: e.target.value })}
+            className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+          />
         </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Data de Nascimento</label>
+          <input 
+            type="date" 
+            value={activeStudent.birthDate || ''}
+            onChange={(e) => setActiveStudent({ ...activeStudent, birthDate: e.target.value })}
+            className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none font-mono"
+          />
+        </div>
+      </div>
+
+      {/* Instrumento + Turma */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Instrumento Principal</label>
+          <select
+            value={activeStudent.instrument || ''}
+            onChange={(e) => setActiveStudent({ ...activeStudent, instrument: e.target.value })}
+            className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+          >
+            <option value="">Selecione Instrumento...</option>
+            <option value="Trompete Bb">Trompete Bb</option>
+            <option value="Trombone de Vara">Trombone de Vara</option>
+            <option value="Trompa Solista">Trompa Solista</option>
+            <option value="Tuba Grave">Tuba Grave</option>
+            <option value="Bombardino Bb">Bombardino Bb</option>
+            <option value="Percussão Sinfônica">Percussão Sinfônica</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Turma de Admissão</label>
+          <select
+            value={activeStudent.classroom || ''}
+            onChange={(e) => setActiveStudent({ ...activeStudent, classroom: e.target.value })}
+            className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+          >
+            <option value="Iniciante">Iniciante</option>
+            <option value="Intermediário">Intermediário</option>
+            <option value="Avançado">Avançado</option>
+            <option value="Formado">Formado</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Telefone + Responsável */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Telefone/Celular</label>
+          <input 
+            type="text"
+            value={activeStudent.phone || ''}
+            onChange={(e) => {
+              const masked = e.target.value
+                .replace(/\D/g, '')
+                .slice(0, 11)
+                .replace(/^(\d{2})(\d)/, '($1) $2')
+                .replace(/(\d{5})(\d)/, '$1-$2');
+              setActiveStudent({ ...activeStudent, phone: masked });
+            }}
+            className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+            placeholder="(11) 99999-9999"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Responsável (se menor)</label>
+          <input 
+            type="text" 
+            value={activeStudent.guardian || ''}
+            onChange={(e) => setActiveStudent({ ...activeStudent, guardian: e.target.value })}
+            className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
+            placeholder="Nome do Pai/Mãe..."
+          />
+        </div>
+      </div>
+
+      {/* E-mail */}
+      <div>
+        <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">E-mail</label>
+        <input 
+          type="email" 
+          required
+          value={activeStudent.email || ''}
+          onChange={(e) => setActiveStudent({ ...activeStudent, email: e.target.value })}
+          className="w-full bg-neutral-950 border border-neutral-825 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+        />
+      </div>
+
+      {/* Endereço estruturado */}
+      <div className="space-y-3 p-3 rounded-lg border border-neutral-800 bg-neutral-950/40">
+        <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">
+          Endereço
+        </label>
+
+        {/* CEP + Rua */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">CEP</label>
+            <input
+              type="text"
+              value={activeStudent.zipCode || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, zipCode: e.target.value })}
+              onBlur={async (e) => {
+                const cep = e.target.value.replace(/\D/g, '');
+                if (cep.length !== 8) return;
+                try {
+                  const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                  const data = await res.json();
+                  if (!data.erro) {
+                    setActiveStudent(prev => prev ? {
+                      ...prev,
+                      street: data.logradouro || prev.street,
+                      neighborhood: data.bairro || prev.neighborhood,
+                      city: data.localidade || prev.city,
+                      uf: data.uf || prev.uf,
+                    } : prev);
+                  }
+                } catch {}
+              }}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded font-mono focus:outline-none"
+              placeholder="00000-000"
+              maxLength={9}
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Rua / Logradouro</label>
+            <input
+              type="text"
+              value={activeStudent.street || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, street: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+              placeholder="Ex: Rua das Flores"
+            />
+          </div>
+        </div>
+
+        {/* Número + Complemento */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Número</label>
+            <input
+              type="text"
+              value={activeStudent.number || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, number: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded font-mono focus:outline-none"
+              placeholder="Ex: 123"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Complemento</label>
+            <input
+              type="text"
+              value={activeStudent.complement || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, complement: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+              placeholder="Ex: Apto 12, Bloco B"
+            />
+          </div>
+        </div>
+
+        {/* Bairro + Cidade + UF */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Bairro</label>
+            <input
+              type="text"
+              value={activeStudent.neighborhood || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, neighborhood: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+              placeholder="Ex: Centro"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Cidade</label>
+            <input
+              type="text"
+              value={activeStudent.city || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, city: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+              placeholder="Ex: Americana"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">UF</label>
+            <select
+              value={activeStudent.uf || ''}
+              onChange={(e) => setActiveStudent({ ...activeStudent, uf: e.target.value })}
+              className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded font-mono focus:outline-none"
+            >
+              <option value="">--</option>
+              {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf => (
+                <option key={uf} value={uf}>{uf}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Status + Foto */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Status Atribuição</label>
+          <select
+            value={activeStudent.status || 'ativo'}
+            onChange={(e) => setActiveStudent({ ...activeStudent, status: e.target.value as any })}
+            className="w-full bg-neutral-950 border border-neutral-825 text-neutral-400 p-2 text-xs rounded focus:outline-none font-bold"
+          >
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+            <option value="trancado">Trancado</option>
+            <option value="formado">Formado</option>
+            <option value="arquivado">Arquivado</option>
+          </select>
+        </div>
+        <div className="flex flex-col justify-end">
+          <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Inserção de Foto</label>
+            {/* Preview da foto atual */}
+
+          <ImageUploader
+            allowedTypes="Imagens (.jpg, .png, .webp)"
+            bg={activeStudent.photo && activeStudent.photo}
+            onFileSelected={(file, previewUrl) => {
+              setPendingStudentPhoto(file);
+              setActiveStudent(prev => prev ? { ...prev, photo: previewUrl } : prev);
+            }}
+          />
+        </div>
+      </div>
+
+    </div>
+
+    <div className="bg-neutral-950 p-3 border-t border-neutral-800 flex justify-end space-x-2">
+      <button type="button" onClick={() => setStudentModalOpen(false)} className="text-xs text-neutral-400 px-3 py-1 bg-neutral-905 rounded">Cancelar</button>
+      <button type="submit" className="text-xs text-white px-5 py-1 bg-[#0B4DA2] rounded">Confirmar Ficha Aluno</button>
+    </div>
+  </form>
+</div>
       )}
 
       {/* Modal B: Professor CRUD form */}

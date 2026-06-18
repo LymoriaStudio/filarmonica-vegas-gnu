@@ -486,6 +486,7 @@ export function ImageUploader({
   onFileSelected,
   allowedTypes = 'Imagens (.jpg, .png), PDFs, Vídeo e Doc',
   maxSizeMB = 10,
+  bg
 }: ImageUploaderProps) {
   const [isDrag, setIsDrag] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string>('');
@@ -527,7 +528,8 @@ export function ImageUploader({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 relative">
+
       <div
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
           isDrag
@@ -539,6 +541,15 @@ export function ImageUploader({
         onDrop={handDrop}
         onClick={() => fileInputRef.current?.click()}
       >
+
+         {bg && (
+    <img
+      src={bg}
+      alt="Preview"
+      referrerPolicy="no-referrer"
+      className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none"
+    />
+  )}
         <input
           ref={fileInputRef}
           type="file"
@@ -547,7 +558,7 @@ export function ImageUploader({
         />
 
         {!selectedFilename ? (
-          <div className="flex flex-col items-center justify-center space-y-2">
+          <div className="z-10 flex flex-col items-center justify-center space-y-2">
             <div className="p-3 bg-neutral-800 rounded-full text-amber-500 hover:scale-105 transition-all">
               <Upload size={24} />
             </div>

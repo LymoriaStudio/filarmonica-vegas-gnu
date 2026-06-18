@@ -435,7 +435,7 @@ export default function RelationshipCMS({
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[#F2C94C] font-mono text-xs font-bold bg-amber-500/10 p-0.5 px-2 rounded">
-                      Naipe: {inter.instrumentOfInterest}
+                      Instrumento: {inter.instrumentOfInterest}
                     </span>
                     <span className="text-[10px] text-neutral-500 font-mono">{inter.date}</span>
                     {inter.status === 'convertido' && (
@@ -487,12 +487,12 @@ export default function RelationshipCMS({
                       onClick={() => handleOpenEnrollModal(inter)}
                       className="p-2 px-3 bg-[#0B4DA2] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider shadow-lg"
                     >
-                      <UserPlus size={13} className="mr-1.5" /> Converter em Aluno ERP
+                      <UserPlus size={13} className="mr-1.5" /> Converter em Aluno
                     </button>
                   )}
 
                   <div className="flex space-x-1.5">
-                    <button
+             {      /* <button
                       type="button"
                       onClick={() => {
                         handleMarkContacted(inter.id);
@@ -501,7 +501,7 @@ export default function RelationshipCMS({
                       className="p-1 px-3 bg-neutral-800 hover:bg-neutral-750 text-[#F2C94C] text-[10.5px] rounded border border-neutral-750 font-mono flex-1 text-center cursor-pointer"
                     >
                       Contatar Candidato
-                    </button>
+                    </button> */}
 
                     {inter.status !== 'arquivado' && inter.status !== 'convertido' && (
                       <button
@@ -742,7 +742,7 @@ export default function RelationshipCMS({
             <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
               <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500 flex items-center">
                 <GraduationCap size={14} className="mr-2" />
-                Ficha de Matrícula — Conversão para Aluno
+                Pré Cadastro Aluno
               </h3>
               <button
                 type="button"
