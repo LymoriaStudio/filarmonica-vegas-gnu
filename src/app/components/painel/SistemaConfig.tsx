@@ -218,13 +218,14 @@ export default function SistemaConfig({
           >
             Logs de Auditoria
           </button>
+     {    /* 
           <button
             type="button"
             onClick={() => setSubTab('backup')}
             className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'backup' ? 'bg-[#0B4DA2] text-white' : 'text-neutral-400'}`}
           >
             Backups Catalunha
-          </button>
+          </button> */}
         </div>
       </div>
 

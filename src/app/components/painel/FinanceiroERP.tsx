@@ -192,7 +192,7 @@ export default function FinanceiroERP({
           </p>
         </div>
 
-        <div className="flex bg-neutral-900 border border-neutral-800 p-0.5 rounded-lg text-xs">
+       { /*<div className="flex bg-neutral-900 border border-neutral-800 p-0.5 rounded-lg text-xs">
           {(['doacoes', 'apoiadores', 'relatorios'] as const).map((t) => (
             <button
               key={t}
@@ -203,7 +203,7 @@ export default function FinanceiroERP({
               {t === 'doacoes' ? 'Lançamentos Gerais' : t === 'apoiadores' ? 'Patrocinadores Jurídicos' : 'Relatórios Fiscais'}
             </button>
           ))}
-        </div>
+        </div> */}
       </div>
 
       {/* ================================================================
@@ -268,7 +268,7 @@ export default function FinanceiroERP({
                       <td className="p-3 text-neutral-400">{don.date}</td>
                       <td className="p-3">
                         <span className={`inline-block p-1 px-2.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                          don.status === 'confirmada' ? 'bg-emerald-950 text-emerald-400'
+                          don.status === 'confirmado' ? 'bg-emerald-950 text-emerald-400'
                           : don.status === 'pendente' ? 'bg-amber-900/30 text-amber-500'
                           : 'bg-neutral-800 text-neutral-500'
                         }`}>

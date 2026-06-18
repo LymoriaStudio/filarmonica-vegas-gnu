@@ -87,6 +87,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
         { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> }
       ]
     },
+    
     {
       id: 'sistema',
       title: 'Configurações Sistema',
@@ -97,9 +98,10 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
         { id: 'sistema-biblioteca', label: 'Biblioteca Mídias', icon: <Library size={14} /> },
         { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
         { id: 'sistema-auditoria', label: 'Logs Auditoria', icon: <FileClock size={14} /> },
-        { id: 'sistema-backup', label: 'Backup Banco Dados', icon: <Database size={14} /> }
+        /*
+        { id: 'sistema-backup', label: 'Backup Banco Dados', icon: <Database size={14} /> }*/
       ]
-    }
+    } 
   ];
 
   const handleItemClick = (id: string) => {
