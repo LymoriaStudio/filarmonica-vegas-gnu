@@ -47,10 +47,10 @@ export default function DashboardHome({
   // Dynamic calculations for the 9 specified cards
   const metrics = useMemo(() => {
     // 1. Total Alunos
-    const totalStudents = students.length;
+    const totalStudents = students?.length;
     
     // 2. Total Professores
-    const totalProfs = professors.length;
+    const totalProfs = professors?.length;
     
     // 3. Total Organizadores
     const totalOrgs = organizers.length;

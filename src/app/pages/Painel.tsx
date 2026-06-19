@@ -75,8 +75,8 @@ export default function Painel() {
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [statistics, setStatistics] = useState<SiteStatistics>(initialStatistics);
   const [values, setValues] = useState<ValueItem[]>(initialValues);
-  const [professors, setProfessors] = useState<Professor[]>(initialProfessors);
-  const [students, setStudents] = useState<Student[]>(initialStudents);
+const [professors, setProfessors] = useState<Professor[]>([]);
+const [students, setStudents] = useState<Student[]>([]);
   const [organizers, setOrganizers] = useState<Organizer[]>(initialOrganizers);
   const [supporters, setSupporters] = useState<Supporter[]>(initialSupporters);
 
@@ -303,6 +303,7 @@ export default function Painel() {
           onQuickAction={handleQuickActionTrigger}
           students={students}
           professors={professors}
+          setProfessors={setProfessors}
           events={orchestraEventsForSearch}
           setActiveTab={setActiveTab}
           setSelectedEntityForEdit={setSelectedEntityForEdit}
@@ -346,17 +347,17 @@ export default function Painel() {
 
           {/* PESSOAS SECTION */}
           {(activeTab === 'pessoas-professores' || activeTab === 'pessoas-alunos' || activeTab === 'pessoas-organizadores') && (
-            <PessoasERP 
-              professors={professors}
-              setProfessors={setProfessors}
-              students={students}
-              setStudents={setStudents}
-              organizers={organizers}
-              setOrganizers={setOrganizers}
-              addAuditLog={addAuditLog}
-              selectedEntityForEdit={selectedEntityForEdit}
-              setSelectedEntityForEdit={setSelectedEntityForEdit}
-            />
+          <PessoasERP 
+  professors={professors}
+  setProfessors={setProfessors}
+  students={students}
+  setStudents={setStudents}
+  organizers={organizers}
+  setOrganizers={setOrganizers}
+  addAuditLog={addAuditLog}
+  selectedEntityForEdit={selectedEntityForEdit}
+  setSelectedEntityForEdit={setSelectedEntityForEdit}
+/>
           )}
 
           {/* RELACIONAMENTO / CRM */}

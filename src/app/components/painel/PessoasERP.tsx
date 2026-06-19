@@ -7,6 +7,7 @@ import {
 import { Professor, Student, Organizer, AuditLog } from '../../validations/types';
 import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
 import { getStudents, createStudent, updateStudent, updateStudentStatus, deleteStudent } from '../../services/studentsService';
+import { getProfessors, createProfessor, updateProfessor, updateProfessorHighlight, updateProfessorOrder, deleteProfessor } from '../../services/professorsService';
 
 interface PessoasERPProps {
   professors: Professor[];
@@ -53,6 +54,7 @@ export default function PessoasERP({
 
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [pendingStudentPhoto, setPendingStudentPhoto] = useState<File | null>(null);
+  const [pendingProfPhoto, setPendingProfPhoto] = useState<File | null>(null);
 
 
   // useEffect de carregamento — coloque ANTES do useEffect do selectedEntityForEdit
@@ -78,7 +80,16 @@ useEffect(() => {
     }
   }, [selectedEntityForEdit]);
 
+  useEffect(() => {
+  getProfessors()
+    .then(setProfessors)
+    .catch((err) => console.error('Erro ao carregar professores:', err));
+}, []);
 
+
+// Gera avatar com iniciais do nome quando não há foto cadastrada
+const getProfessorAvatarFallback = (name?: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name?.trim() || 'Professor')}&background=F2C94C&color=1a1a1a&size=400&bold=true`;
   // ==========================================
   // PROFESSORS MANAGEMENT (CARDS)
   // ==========================================
@@ -86,7 +97,7 @@ useEffect(() => {
     setActiveProf(prof || {
       id: '',
       name: '',
-      photo: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=400&h=400&q=80',
+      photo: '',
       role: '',
       specialty: '',
       instrument: '',
@@ -100,50 +111,84 @@ useEffect(() => {
       email: '',
       phone: '',
       highlighted: false,
-      order: professors.length + 1
+      order: professors?.length + 1
     });
 
     
     setProfModalOpen(true);
   };
 
-  const handleSaveProf = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeProf) return;
+const handleSaveProf = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!activeProf) return;
+  try {
+    let finalPhoto = activeProf.photo;
+    if (pendingProfPhoto) {
+      finalPhoto = await uploadFileToSupabase(pendingProfPhoto, 'professors');
+    }  else if (!finalPhoto) {
+      finalPhoto = getProfessorAvatarFallback(activeProf.name); }
+
 
     if (activeProf.id) {
-      setProfessors(prev => prev.map(p => p.id === activeProf.id ? (activeProf as Professor) : p));
-      addAuditLog('Alterou Professor', 'Professores', `Editou cadastro de: ${activeProf.name}`);
+      const updated = await updateProfessor(activeProf.id, { ...activeProf, photo: finalPhoto });
+      setProfessors(prev => prev.map(p => p.id === updated.id ? updated : p));
+      addAuditLog('Alterou Professor', 'Professores', `Editou cadastro de: ${updated.name}`);
     } else {
-      const newProf = { ...activeProf, id: `prof-${Date.now()}` } as Professor;
-      setProfessors(prev => [...prev, newProf]);
-      addAuditLog('Cadastrou Professor', 'Professores', `Inseriu novo professor titular: ${newProf.name}`);
+      const created = await createProfessor({ ...activeProf, photo: finalPhoto });
+      setProfessors(prev => [...prev, created]);
+      addAuditLog('Cadastrou Professor', 'Professores', `Inseriu novo professor: ${created.name}`);
     }
     setProfModalOpen(false);
-  };
+    setPendingProfPhoto(null);
+  } catch (err: any) {
+    alert('Erro ao salvar professor: ' + err.message);
+  }
+};
 
-  const handleDeleteProf = (id: string, name: string) => {
+ const handleDeleteProf = async (id: string, name: string) => {
+  if (!confirm(`Remover permanentemente o professor "${name}"?`)) return;
+  try {
+    await deleteProfessor(id);
     setProfessors(prev => prev.filter(p => p.id !== id));
-    addAuditLog('Deletou Professor', 'Professores', `Removeu cadastro docente ID: ${id} (${name})`);
-  };
+    addAuditLog('Deletou Professor', 'Professores', `Removeu: ${name}`);
+  } catch (err: any) {
+    alert('Erro ao remover professor: ' + err.message);
+  }
+};
 
-  const handleToggleHighlightProf = (id: string, name: string, active: boolean) => {
+const handleToggleHighlightProf = async (id: string, name: string, active: boolean) => {
+  try {
+    await updateProfessorHighlight(id, active);
     setProfessors(prev => prev.map(p => p.id === id ? { ...p, highlighted: active } : p));
-    addAuditLog('Destacou Professor', 'Professores', `${active ? 'Destacou' : 'Ocultou'} professor ${name} na homepage`);
-  };
+    addAuditLog('Destacou Professor', 'Professores', `${active ? 'Destacou' : 'Ocultou'} ${name}`);
+  } catch (err: any) {
+    alert('Erro ao atualizar destaque: ' + err.message);
+  }
+};
 
-  const handleOrderProf = (index: number, direction: 'up' | 'down') => {
-    const sorted = [...professors].sort((a,b)=>a.order-b.order);
-    const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= sorted.length) return;
+const handleOrderProf = async (index: number, direction: 'up' | 'down') => {
+  const sorted = [...professors].sort((a, b) => a.order - b.order);
+  const targetIdx = direction === 'up' ? index - 1 : index + 1;
+  if (targetIdx < 0 || targetIdx >= sorted.length) return;
 
-    const temp = sorted[index].order;
-    sorted[index].order = sorted[targetIdx].order;
-    sorted[targetIdx].order = temp;
+  const a = sorted[index];
+  const b = sorted[targetIdx];
+  const tempOrder = a.order;
 
-    setProfessors(sorted);
-  };
-
+  try {
+    await Promise.all([
+      updateProfessorOrder(a.id, b.order),
+      updateProfessorOrder(b.id, tempOrder),
+    ]);
+    setProfessors(prev => prev.map(p => {
+      if (p.id === a.id) return { ...p, order: b.order };
+      if (p.id === b.id) return { ...p, order: tempOrder };
+      return p;
+    }));
+  } catch (err: any) {
+    alert('Erro ao reordenar: ' + err.message);
+  }
+};
 
   // ==========================================
   // STUDENTS MANAGEMENT (TABLE)
@@ -262,7 +307,7 @@ const handleArchiveStudent = async (id: string, name: string) => {
 
 
   // Filtering Students
-  const filteredStudents = students.filter(s => {
+  const filteredStudents = students?.filter(s => {
     const matchQuery = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                        s.instrument.toLowerCase().includes(searchQuery.toLowerCase()) ||
                        s.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -392,12 +437,12 @@ const handleArchiveStudent = async (id: string, name: string) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-850">
-                {filteredStudents.length === 0 ? (
+                {filteredStudents?.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="text-center p-8 text-neutral-500 font-serif italic">Nenhum aluno corresponde a esta filtragem orquestral.</td>
                   </tr>
                 ) : (
-                  filteredStudents.map((alu) => (
+                  filteredStudents?.map((alu) => (
                     <tr key={alu.id} className="hover:bg-neutral-950/40 transition-all">
                       <td className="p-3 pl-4 flex items-center space-x-2.5">
                         <img 
@@ -505,7 +550,7 @@ const handleArchiveStudent = async (id: string, name: string) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xxl:grid-cols-3 gap-6">
-            {professors.sort((a,b)=>a.order-b.order).map((prof, idx) => (
+            {professors?.sort((a,b)=>a.order-b.order).map((prof, idx) => (
               <div 
                 key={prof.id} 
                 className="rounded-xl overflow-hidden bg-neutral-900 border border-neutral-800 flex flex-col justify-between hover:border-neutral-700 transition-all"
@@ -513,9 +558,12 @@ const handleArchiveStudent = async (id: string, name: string) => {
                 {/* Header detail */}
                 <div className="p-4 bg-neutral-950 border-b border-neutral-850 flex items-start gap-4">
                   <img 
-                    src={prof.photo} 
+                    onError={(e) => {
+                   (e.target as HTMLImageElement).src = getProfessorAvatarFallback(prof.name);
+                 }}
                     alt={prof.name} 
                     referrerPolicy="no-referrer"
+                    src={prof.photo || getProfessorAvatarFallback(prof.name)} 
                     className="w-14 h-14 object-cover rounded-lg border border-neutral-800 shrink-0" 
                   />
                   <div className="min-w-0">
@@ -529,6 +577,9 @@ const handleArchiveStudent = async (id: string, name: string) => {
                     <span className="block text-[10px] text-neutral-400 mt-0.5 uppercase tracking-wide">Especialidade: {prof.specialty}</span>
                   </div>
                 </div>
+
+                {/* Instrumento — campo NOT NULL na tabela, adicionar após Especialidade */}
+
 
                 {/* Narrative mini biography */}
                 <div className="p-4 flex-1 text-[11px] text-neutral-400 leading-relaxed bg-neutral-900/40">
@@ -565,7 +616,7 @@ const handleArchiveStudent = async (id: string, name: string) => {
                     </button>
                     <button
                       type="button"
-                      disabled={idx === professors.length - 1}
+                      disabled={idx === professors?.length - 1}
                       onClick={() => handleOrderProf(idx, 'down')}
                       className="p-1 px-1.5 bg-neutral-900 text-neutral-400 hover:text-white rounded disabled:opacity-30"
                     >
@@ -986,16 +1037,23 @@ const handleArchiveStudent = async (id: string, name: string) => {
                     placeholder="Ex: Metais graves e o bocal amplo"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Telefone Fone</label>
-                  <input 
-                    type="text" 
-                    value={activeProf.phone || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, phone: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
-                    placeholder="(11) 98888-8888"
-                  />
-                </div>
+           <div>
+  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Telefone Fone</label>
+  <input 
+    type="text" 
+    value={activeProf.phone || ''}
+    onChange={(e) => {
+      const masked = e.target.value
+        .replace(/\D/g, '')
+        .slice(0, 11)
+        .replace(/^(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2');
+      setActiveProf({ ...activeProf, phone: masked });
+    }}
+    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded"
+    placeholder="(11) 98888-8888"
+  />
+</div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1072,11 +1130,40 @@ const handleArchiveStudent = async (id: string, name: string) => {
                   />
                   <label htmlFor="highlighted" className="text-[10px] font-mono uppercase text-neutral-400">Destacar na Capa</label>
                 </div>
-                <div className="flex flex-col justify-end">
-                  <ImageUploader 
-                    onUploadSuccess={(url) => setActiveProf({ ...activeProf, photo: url })} 
-                  />
-                </div>
+           <div>
+  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Instrumento</label>
+  <select
+    value={activeProf.instrument || ''}
+    onChange={(e) => setActiveProf({ ...activeProf, instrument: e.target.value })}
+    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+  >
+    <option value="">Selecione...</option>
+    <option value="Trompete">Trompete</option>
+    <option value="Trombone">Trombone</option>
+    <option value="Trompa">Trompa</option>
+    <option value="Tuba">Tuba</option>
+    <option value="Bombardino">Bombardino</option>
+    <option value="Percussão">Percussão</option>
+    <option value="Regência">Regência</option>
+  </select>
+</div>
+
+{/* mini_bio e full_bio são NOT NULL — marque como required */}
+
+
+{/* ImageUploader — troque onUploadSuccess pelo padrão onFileSelected */}
+<div className="flex flex-col justify-end">
+  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Foto do Professor</label>
+
+  <ImageUploader
+  bg={activeProf.photo && activeProf.photo}
+    allowedTypes="Imagens (.jpg, .png, .webp)"
+    onFileSelected={(file, previewUrl) => {
+      setPendingProfPhoto(file);
+      setActiveProf(prev => prev ? { ...prev, photo: previewUrl } : prev);
+    }}
+  />
+</div>
               </div>
 
             </div>

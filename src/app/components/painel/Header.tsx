@@ -75,7 +75,7 @@ export default function Header({
     const matches: typeof searchResults = [];
 
     // Alunos
-    const matchedStudents = students.filter(s => s.name.toLowerCase().includes(q) || s.instrument.toLowerCase().includes(q));
+    const matchedStudents = students?.filter(s => s.name.toLowerCase().includes(q) || s.instrument.toLowerCase().includes(q));
     if (matchedStudents.length > 0) {
       matches.push({
         category: 'Alunos (ERP Pessoas)',
@@ -87,6 +87,8 @@ export default function Header({
         }))
       });
     }
+
+    
 
     // Professores
     const matchedProfs = professors.filter(p => p.name.toLowerCase().includes(q) || p.specialty.toLowerCase().includes(q));
@@ -182,9 +184,6 @@ export default function Header({
                 { label: 'Novo Aluno', key: 'new-student' },
                 { label: 'Novo Professor', key: 'new-professor' },
                 { label: 'Novo Evento / Show', key: 'new-event' },
-                { label: 'Nova Notícia / Edital', key: 'new-news' },
-                { label: 'Novo Organizador', key: 'new-organizer' },
-                { label: 'Novo Apoiador Jurídico', key: 'new-supporter' }
               ].map(action => (
                 <button
                   key={action.key}

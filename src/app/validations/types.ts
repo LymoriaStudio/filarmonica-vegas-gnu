@@ -354,7 +354,7 @@ export interface MusicCourse {
   ageLimit: string;
   duration: string;
   vagas: number;
-  responsibleProfessor: string;
+  professorId: string;
 }
 
 export interface GalleryPhoto {
