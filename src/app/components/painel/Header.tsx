@@ -8,14 +8,12 @@ import {
   Search, Bell, User, ChevronDown, Check, Zap, Sparkles, X, 
   UserCheck, PlusCircle, ShieldAlert, CheckSquare, ListFilter, Play
 } from 'lucide-react';
-import { AppUser, AdminNotification, Student, Professor, OrchestraEvent, NewsArticle } from '../../validations/types';
+import { AdminNotification, Student, Professor, OrchestraEvent, NewsArticle } from '../../validations/types';
+import { useCurrentProfile } from '../../hooks/useCurrentProfile';
 
 interface HeaderProps {
   notifications: AdminNotification[];
   setNotifications: React.Dispatch<React.SetStateAction<AdminNotification[]>>;
-  activeUser: AppUser;
-  setActiveUser: (user: AppUser) => void;
-  systemUsers: AppUser[];
   onQuickAction: (actionKey: string) => void;
   
   // Data for global search
@@ -30,9 +28,6 @@ interface HeaderProps {
 export default function Header({
   notifications,
   setNotifications,
-  activeUser,
-  setActiveUser,
-  systemUsers,
   onQuickAction,
   students,
   professors,
@@ -41,8 +36,10 @@ export default function Header({
   setActiveTab,
   setSelectedEntityForEdit
 }: HeaderProps) {
+  const { profile, loading: profileLoading } = useCurrentProfile();
+
   const [showNotificationOverlay, setShowNotificationOverlay] = useState(false);
-  const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   
   // Search state
@@ -151,11 +148,17 @@ export default function Header({
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, resolved: !n.resolved } : n));
   };
 
+  const displayName = profileLoading ? '...' : (profile?.name ?? 'Usuário');
+  const displayRole = profileLoading ? '' : (profile?.role ?? '');
+  const initials = displayName.substring(0, 2).toUpperCase();
+
+  console.log("nome: ", profile?.name)
+
   return (
     <header className="relative h-16 w-full glass-panel border-b border-neutral-800 flex items-center justify-between px-6 z-30 select-none bg-neutral-900/40">
       
       <div>
-        <h2>Olá, Izabela</h2>
+        <h2>Olá, {displayName}</h2>
       </div>
 
       {/* Right controls */}
@@ -168,7 +171,7 @@ export default function Header({
             onClick={() => {
               setShowQuickActions(!showQuickActions);
               setShowNotificationOverlay(false);
-              setShowRoleSelector(false);
+              setShowUserMenu(false);
             }}
             className="flex items-center space-x-1.5 p-2 px-3 rounded-lg bg-neutral-800/80 hover:bg-[#0B4DA2] text-xs font-semibold text-white cursor-pointer transition-all border border-neutral-700 hover:border-[#0B4DA2]"
           >
@@ -203,12 +206,15 @@ export default function Header({
         </div>
 
         {/* 3. Real-time Notifications Center */}
-        <div className="relative">
+
+        {
+          /*
+  <div className="relative">
           <button
             type="button"
             onClick={() => {
               setShowNotificationOverlay(!showNotificationOverlay);
-              setShowRoleSelector(false);
+              setShowUserMenu(false);
               setShowQuickActions(false);
             }}
             className="relative p-2 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-750 transition-all border border-neutral-700/50"
@@ -277,59 +283,42 @@ export default function Header({
           )}
         </div>
 
-        {/* 4. Swappable Administrator Profile Select Selector */}
+
+          */
+        }
+      
+        {/* 4. Logged-in user display (read-only, dados reais do profile) */}
         <div className="relative">
           <button
             type="button"
             onClick={() => {
-              setShowRoleSelector(!showRoleSelector);
+              setShowUserMenu(!showUserMenu);
               setShowNotificationOverlay(false);
               setShowQuickActions(false);
             }}
             className="flex items-center space-x-2.5 p-1.5 px-3 hover:bg-neutral-800 rounded-lg text-xs font-medium cursor-pointer transition-all text-neutral-300"
           >
             <div className="w-6 h-6 rounded bg-[#F2C94C]/10 border border-[#F2C94C]/25 text-[#F2C94C] font-mono font-extrabold flex items-center justify-center text-[10px]">
-              {activeUser.name.substring(0,2).toUpperCase()}
+              {initials}
             </div>
             <div className="text-left hidden lg:block leading-tight select-none">
-              <span className="block font-semibold text-neutral-200 text-[11px] max-w-[120px] truncate">{activeUser.name}</span>
-              <span className="text-[9px] font-mono text-amber-400 capitalize">{activeUser.role.replace('_', ' ')}</span>
+              <span className="block font-semibold text-neutral-200 text-[11px] max-w-[120px] truncate">{displayName}</span>
+              <span className="text-[9px] font-mono text-amber-400 capitalize">{displayRole.replace('_', ' ')}</span>
             </div>
             <ChevronDown size={12} className="opacity-60" />
           </button>
 
-          {showRoleSelector && (
-            <div className="absolute right-0 mt-2 w-64 bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-lg shadow-2xl p-2 z-50">
-              <div className="p-2 border-b border-neutral-850 mb-1.5">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#F2C94C] block font-mono">Alterar Perfil de Acesso</span>
-                <p className="text-[9px] text-neutral-500 mt-0.5 leading-tight">Mude os perfis para ver regras e permissões em ação imediata!</p>
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-64 bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-lg shadow-2xl p-3 z-50">
+              <div className="p-1 mb-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#F2C94C] block font-mono">Sessão Atual</span>
+                <p className="text-[9px] text-neutral-500 mt-0.5 leading-tight">Dados do operador autenticado neste painel.</p>
               </div>
 
-              <div className="space-y-1 max-h-60 overflow-y-auto">
-                {systemUsers.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveUser(user);
-                      setShowRoleSelector(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded text-left transition-all ${
-                      activeUser.id === user.id 
-                        ? 'bg-[#0B4DA2]/20 border-l-2 border-[#0B4DA2] text-white' 
-                        : 'hover:bg-neutral-800 text-neutral-400 hover:text-white'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-semibold flex items-center space-x-1.5">
-                        <span>{user.name}</span>
-                        {!user.active && <span className="bg-red-500 text-white text-[7px] px-1 rounded">Inativo</span>}
-                      </div>
-                      <div className="text-[9px] font-mono text-neutral-500">{user.role.toUpperCase()}</div>
-                    </div>
-                    {activeUser.id === user.id && <Check size={11} className="text-[#0B4DA2]" />}
-                  </button>
-                ))}
+              <div className="p-2.5 rounded bg-neutral-950 border border-neutral-850 space-y-1">
+                <div className="text-xs font-semibold text-neutral-200">{displayName}</div>
+                <div className="text-[10px] font-mono text-neutral-500">{profile?.email}</div>
+                <div className="text-[9px] font-mono text-amber-400 uppercase">{displayRole}</div>
               </div>
             </div>
           )}

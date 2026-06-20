@@ -197,13 +197,15 @@ export default function SistemaConfig({
           >
             IAM Staffs
           </button>
-          <button
+
+
+   {/* {       <button
             type="button"
             onClick={() => setSubTab('biblioteca')}
             className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'biblioteca' ? 'bg-[#0B4DA2] text-white' : 'text-neutral-400'}`}
           >
             Mídia Biblioteca
-          </button>
+          </button>} */}
           <button
             type="button"
             onClick={() => setSubTab('instituicao')}

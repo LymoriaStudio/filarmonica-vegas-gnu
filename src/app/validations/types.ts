@@ -173,6 +173,18 @@ export interface InterestFormResponse {
   status: 'new' | 'contacted' | 'converted' | 'archived';
 }
 
+export interface Instrument {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  longDescription: string;
+  image: string;
+  gallery: string[];
+  videoUrl?: string;
+  color?: string;
+}
+
 // Relacionamento: Quero Apoiar
 export interface SupportFormResponse {
   id: string;

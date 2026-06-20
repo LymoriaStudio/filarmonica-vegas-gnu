@@ -95,7 +95,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
       permissionKey: 'sistema',
       items: [
         { id: 'sistema-usuarios', label: 'Controle Usuários', icon: <ShieldAlert size={14} /> },
-        { id: 'sistema-biblioteca', label: 'Biblioteca Mídias', icon: <Library size={14} /> },
+        //{ id: 'sistema-biblioteca', label: 'Biblioteca Mídias', icon: <Library size={14} /> },
         { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
         { id: 'sistema-auditoria', label: 'Logs Auditoria', icon: <FileClock size={14} /> },
         /*

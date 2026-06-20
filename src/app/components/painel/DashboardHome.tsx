@@ -3,108 +3,157 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
-  Users, UserCheck, Shield, HelpCircle, Heart, DollarSign, Calendar, MessageSquare, Plus, ArrowUpRight, Clock, MapPin, 
-  UserPlus, Mail, Award, CheckCircle2, TrendingUp, Zap, Sparkles
+  Users, UserCheck, Heart, DollarSign, Calendar, Plus, ArrowUpRight, Clock, MapPin, 
+  Award, CheckCircle2, TrendingUp, Sparkles
 } from 'lucide-react';
-import { 
-  Student, Professor, Organizer, Supporter, DirectDonation, OrchestraEvent, NewsArticle, InterestFormResponse, 
-  ContactMessage, AuditLog 
-} from '../../validations/types';
+import { supabase } from '../../../lib/supabase';
+import { getProfessors } from '../../services/professorsService'; // ajuste o path se necessário
+import { getDoacoes } from '../../services/doacoesService';       // ajuste o path se necessário
+import { useEvents } from '../../hooks/useEvents';
+import { OrchestraEvent, AuditLog, InterestFormResponse } from '../../validations/types';
 import { CustomAreaChart, CustomBarChart } from './MiniWidgets';
 
+// ─── Tipos locais mínimos ─────────────────────────────────────────────────────
+
+interface StudentRow { id: string; created_at: string; [key: string]: unknown }
+interface ProfessorRow { id: string; [key: string]: unknown }
+interface SupporterRow { id: string; status: string; [key: string]: unknown }
+interface DoacaoRow { id: string; status: string; amount: number; date: string; donor_name?: string; payment_method?: string; [key: string]: unknown }
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface DashboardHomeProps {
-  students: Student[];
-  professors: Professor[];
-  organizers: Organizer[];
-  supporters: Supporter[];
-  donations: DirectDonation[];
-  events: OrchestraEvent[];
-  news: NewsArticle[];
+  events?: OrchestraEvent[];        // mantido para compatibilidade, mas será sobrescrito
   interests: InterestFormResponse[];
-  contacts: ContactMessage[];
   auditLogs: AuditLog[];
   onNavigate: (tabId: string) => void;
   onQuickAction: (actionKey: string) => void;
 }
 
 export default function DashboardHome({
-  students,
-  professors,
-  organizers,
-  supporters,
-  donations,
-  events,
-  news,
   interests,
-  contacts,
   auditLogs,
   onNavigate,
-  onQuickAction
 }: DashboardHomeProps) {
 
-  // Dynamic calculations for the 9 specified cards
+  // ─── Estado dos dados da API ─────────────────────────────────────────────
+
+  const [students, setStudents]       = useState<StudentRow[]>([]);
+  const [professors, setProfessors]   = useState<ProfessorRow[]>([]);
+  const [supporters, setSupporters]   = useState<SupporterRow[]>([]);
+  const [donations, setDonations]     = useState<DoacaoRow[]>([]);
+
+  const { events, loading: eventsLoading } = useEvents({ onlyPublished: true });
+
+  useEffect(() => {
+    // Alunos
+    supabase
+      .from('students')
+      .select('id, created_at')
+      .then(({ data }) => setStudents(data ?? []));
+
+    // Professores
+    getProfessors().then(setProfessors).catch(console.error);
+
+    // Apoiadores aprovados
+    supabase
+      .from('quero_apoiar')
+      .select('id, status')
+      .eq('status', 'aprovado')
+      .then(({ data }) => setSupporters(data ?? []));
+
+    // Doações confirmadas
+    getDoacoes()
+      .then(all => setDonations(all.filter((d: DoacaoRow) => d.status === 'confirmado')))
+      .catch(console.error);
+  }, []);
+
+  // ─── Métricas ─────────────────────────────────────────────────────────────
+
   const metrics = useMemo(() => {
-    // 1. Total Alunos
-    const totalStudents = students?.length;
-    
-    // 2. Total Professores
-    const totalProfs = professors?.length;
-    
-    // 3. Total Organizadores
-    const totalOrgs = organizers.length;
-    
-    // 4. Total Apoiadores
-    const totalSups = supporters.length;
-    
-    // 5. Total de Doações (Quantidade)
-    const totalDonationsCount = donations.length;
-    
-    // 6. Valor Total Arrecadado (R$)
-    const grossDonationsValue = donations
-      .filter(d => d.status === 'confirmed')
-      .reduce((sum, d) => sum + d.amount, 0);
-      
-    // 7. Eventos Agendados
-    const scheduledEventsCount = events.filter(e => e.status === 'published').length;
-    
-    // 8. Mensagens Recebidas
-    const totalMessages = contacts.length;
-    
-    // 9. Interessados Cadastrados
-    const totalInterestsCount = interests.length;
+    const totalStudents        = students.length;
+    const totalProfs           = professors.length;
+    const totalSups            = supporters.length;
+    const totalDonationsCount  = donations.length;
+    const grossDonationsValue  = donations.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+    const scheduledEventsCount = events.length;
+    const totalInterestsCount  = interests.length;
 
     return {
       totalStudents,
       totalProfs,
-      totalOrgs,
       totalSups,
       totalDonationsCount,
       grossDonationsValue,
       scheduledEventsCount,
-      totalMessages,
-      totalInterestsCount
+      totalInterestsCount,
     };
-  }, [students, professors, organizers, supporters, donations, events, contacts, interests]);
+  }, [students, professors, supporters, donations, events, interests]);
 
-  // Data modeling for growth charts
-  const studentGrowthData = [
-    { label: '2022', value: 85 },
-    { label: '2023', value: 112 },
-    { label: '2024', value: 140 },
-    { label: '2025', value: 168 },
-    { label: '2026', value: metrics.totalStudents === 5 ? 184 : metrics.totalStudents + 180 }
-  ];
+  // ─── Dados dos gráficos (derivados de dados reais) ────────────────────────
 
-  const donationGrowthData = [
-    { label: 'Jan', v1: 15000, v2: 12000 },
-    { label: 'Fev', v1: 24000, v2: 18000 },
-    { label: 'Mar', v1: 32000, v2: 25000 },
-    { label: 'Abr', v1: 28000, v2: 30000 },
-    { label: 'Mai', v1: metrics.grossDonationsValue > 65000 ? Math.round(metrics.grossDonationsValue * 0.4) : 41000, v2: 35000 },
-    { label: 'Jun', v1: metrics.grossDonationsValue > 65000 ? Math.round(metrics.grossDonationsValue * 0.6) : 45000, v2: 38000 }
-  ];
+  const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  // Crescimento de alunos: acumulado mês a mês, rastreando created_at de cada aluno
+  const studentGrowthData = useMemo(() => {
+    if (students.length === 0) {
+      return [{ label: 'Sem dados', value: 0 }];
+    }
+
+    // Conta quantos alunos entraram em cada "AAAA-MM"
+    const countsByMonth = new Map<string, number>();
+    students.forEach(s => {
+      const d = new Date(s.created_at);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      countsByMonth.set(key, (countsByMonth.get(key) ?? 0) + 1);
+    });
+
+    // Ordena as chaves cronologicamente
+    const sortedKeys = Array.from(countsByMonth.keys()).sort();
+
+    // Acumula para formar uma curva de crescimento
+    let running = 0;
+    return sortedKeys.map(key => {
+      const [year, month] = key.split('-');
+      running += countsByMonth.get(key)!;
+      return {
+        label: `${MONTH_LABELS[Number(month) - 1]}/${year.slice(2)}`,
+        value: running,
+      };
+    });
+  }, [students]);
+
+  // Doações confirmadas: soma por mês, uma única série
+  // (CustomBarChart exige { label, v1, v2 } — v2 fica zerado para não desenhar a segunda barra)
+  const donationGrowthData = useMemo(() => {
+    if (donations.length === 0) {
+      return [{ label: 'Sem dados', v1: 0, v2: 0 }];
+    }
+
+    const sumByMonth = new Map<string, number>();
+    donations.forEach(d => {
+      const raw = d.date;
+      if (!raw) return;
+      const parsed = new Date(raw);
+      if (isNaN(parsed.getTime())) return;
+      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+      sumByMonth.set(key, (sumByMonth.get(key) ?? 0) + (d.amount ?? 0));
+    });
+
+    const sortedKeys = Array.from(sumByMonth.keys()).sort();
+
+    return sortedKeys.map(key => {
+      const [year, month] = key.split('-');
+      return {
+        label: `${MONTH_LABELS[Number(month) - 1]}/${year.slice(2)}`,
+        v1: Math.round(sumByMonth.get(key)!),
+        v2: 0,
+      };
+    });
+  }, [donations]);
 
   return (
     <div className="space-y-6 animate-fade-in p-6 select-none bg-neutral-950/10 min-h-screen">
@@ -139,7 +188,7 @@ export default function DashboardHome({
       </div>
 
       {/* ========================================================
-          1. METRICS CARDS: DECLARED OF THE 9 REQUIRED SPECIFICATIONS 
+          1. METRICS CARDS
           ======================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="indicators">
         
@@ -175,7 +224,7 @@ export default function DashboardHome({
           </div>
         </div>
 
-        {/* Card 4: Total Apoiadores */}
+        {/* Card 3: Total Apoiadores */}
         <div 
           onClick={() => onNavigate('financeiro-apoiadores')} 
           className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-[#0B4DA2] hover:bg-neutral-900/90 transition-all cursor-pointer group flex items-start justify-between"
@@ -190,7 +239,7 @@ export default function DashboardHome({
           </div>
         </div>
 
-        {/* Card 5: Total de Doações */}
+        {/* Card 4: Total de Doações */}
         <div 
           onClick={() => onNavigate('financeiro-doacoes')} 
           className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-900/90 transition-all cursor-pointer group flex items-start justify-between"
@@ -205,7 +254,7 @@ export default function DashboardHome({
           </div>
         </div>
 
-        {/* Card 7: Eventos Agendados */}
+        {/* Card 5: Eventos Agendados */}
         <div 
           onClick={() => onNavigate('conteudo-eventos')} 
           className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-[#0B4DA2] hover:bg-neutral-900/90 transition-all cursor-pointer group flex items-start justify-between"
@@ -220,25 +269,10 @@ export default function DashboardHome({
           </div>
         </div>
 
-        {/* Card 8: Mensagens Recebidas */}
-        <div 
-          onClick={() => onNavigate('relacionamento-contato')} 
-          className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-900/90 transition-all cursor-pointer group flex items-start justify-between"
-        >
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-mono font-bold">Ouvidoria / Contatos</span>
-            <div className="text-2xl font-bold font-mono text-neutral-100">{metrics.totalMessages}</div>
-            <p className="text-[10px] text-neutral-400 font-mono mt-1">Pendentes de Retorno</p>
-          </div>
-          <div className="p-2 bg-purple-500/10 group-hover:bg-purple-500/20 text-purple-400 rounded-lg transition-all">
-            <MessageSquare size={16} />
-          </div>
-        </div>
-
-        {/* Card 9: Interessados Cadastrados */}
+        {/* Card 6: Interessados Cadastrados — full width */}
         <div 
           onClick={() => onNavigate('relacionamento-interesse')} 
-          className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-[#0B4DA2] hover:bg-neutral-900/90 transition-all cursor-pointer group flex items-start justify-between sm:col-span-2 lg:col-span-3 xl:col-span-4"
+          className="p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-[#0B4DA2] hover:bg-neutral-900/90 transition-all cursor-pointer group flex items-start justify-between sm:col-span-2 lg:col-span-3 xl:col-span-3"
         >
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full">
             <div className="space-y-1">
@@ -257,7 +291,7 @@ export default function DashboardHome({
       </div>
 
       {/* ========================================================
-          2. CHARTS REGION: 100% RESPONSIVE CUSTOM SVG ANALYTICS
+          2. CHARTS REGION
           ======================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
@@ -276,8 +310,8 @@ export default function DashboardHome({
           </div>
           
           <div className="mt-4 pt-3 border-t border-neutral-850 flex items-center justify-between text-[11px] text-neutral-400 font-mono">
-            <span>Início das vagas em 2022</span>
-            <span className="text-[#F2C94C] font-bold">Meta: 200 alunos até fim do ano</span>
+            <span>Acumulado por mês de matrícula</span>
+            <span className="text-[#F2C94C] font-bold">Total atual: {metrics.totalStudents} alunos</span>
           </div>
         </div>
 
@@ -288,31 +322,31 @@ export default function DashboardHome({
               <span className="text-[11px] font-mono text-[#0B4DA2] uppercase tracking-widest font-bold">Financiamento Coletivo</span>
               <span className="text-xs text-neutral-500">Fluxo de Caixa</span>
             </div>
-            <h3 className="text-base font-bold text-neutral-200 mt-1">Doações e Captação Federal (Mensal)</h3>
+            <h3 className="text-base font-bold text-neutral-200 mt-1">Doações Confirmadas (Mensal)</h3>
           </div>
 
           <div className="mt-6 flex-1 flex items-center justify-center">
             <CustomBarChart 
               data={donationGrowthData} 
-              v1Name="Exercício 2026" 
-              v2Name="Exercício 2025" 
+              v1Name="Doações" 
+              v2Name="" 
               color1="#0B4DA2" 
-              color2="#F2C94C" 
+              color2="transparent" 
             />
           </div>
 
           <div className="mt-4 pt-3 border-t border-neutral-850 flex items-center justify-between text-[11px] text-neutral-400 font-mono">
             <span>Valores Expressos em Reais</span>
-            <span className="text-emerald-400 font-bold">+18.5% acima do ano anterior</span>
+            <span className="text-emerald-400 font-bold">R$ {metrics.grossDonationsValue.toLocaleString('pt-BR')}</span>
           </div>
         </div>
 
       </div>
 
       {/* ========================================================
-          4. RECENT WIDGETS FEED: FIVE SPECIFIED INDICATORS FEED
+          3. RECENT WIDGETS FEED
           ======================================================== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="widgets">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6" id="widgets">
         
         {/* Widget 1: Próximos Eventos */}
         <div className="p-4 rounded-xl bg-neutral-900/50 border border-neutral-800 flex flex-col justify-between">
@@ -327,21 +361,23 @@ export default function DashboardHome({
           </div>
           
           <div className="space-y-3 flex-1">
-            {events.slice(0, 3).map((evt) => (
+            {eventsLoading ? (
+              <p className="text-[11px] text-neutral-500 font-mono">Carregando eventos...</p>
+            ) : events.slice(0, 3).map((evt) => (
               <div key={evt.id} className="p-2.5 rounded-lg bg-neutral-950/80 border border-neutral-900 flex items-start space-x-3">
                 <div className="w-10 h-10 rounded-md bg-[#2B2B2B] text-center flex flex-col justify-center border border-neutral-800 shrink-0">
                   <span className="text-[9px] uppercase font-bold text-[#F2C94C] font-mono leading-none">
-                    {evt.date.substring(5,7)}
+                    {evt.date.substring(3, 6)}
                   </span>
                   <span className="text-xs font-bold text-neutral-200 font-mono mt-0.5">
-                    {evt.date.substring(8,10)}
+                    {evt.date.substring(0, 2)}
                   </span>
                 </div>
                 <div className="min-w-0">
                   <span className="block text-[11px] font-bold text-neutral-100 truncate">{evt.title}</span>
                   <div className="flex items-center space-x-2 text-[9px] text-neutral-400 font-mono mt-1">
                     <MapPin size={9} className="text-amber-500" />
-                    <span className="truncate">{evt.venue}</span>
+                    <span className="truncate">{evt.location}</span>
                     <span>• {evt.time}</span>
                   </div>
                 </div>
@@ -350,7 +386,7 @@ export default function DashboardHome({
           </div>
         </div>
 
-        {/* Widget 2: Últimas Atividades (Audit log feed to maintain integrity) */}
+        {/* Widget 2: Últimas Atividades */}
         <div className="p-4 rounded-xl bg-neutral-900/50 border border-neutral-800 flex flex-col justify-between">
           <div className="pb-3 border-b border-neutral-800 flex justify-between items-center mb-3">
             <span className="text-xs font-bold text-neutral-200">Últimas Atividades</span>
@@ -376,51 +412,6 @@ export default function DashboardHome({
                   <p className="text-neutral-500 text-[9px] mt-0.5 font-mono">{log.details}</p>
                   <span className="text-[8px] font-mono text-neutral-500">{log.dateTime}</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Widget 3: Novas Mensagens / Leads (Contacts + Interests merged in a modern list) */}
-        <div className="p-4 rounded-xl bg-neutral-900/50 border border-neutral-800 flex flex-col justify-between md:col-span-2 xl:col-span-1">
-          <div className="pb-3 border-b border-neutral-800 flex justify-between items-center mb-3">
-            <span className="text-xs font-bold text-neutral-200">Novas Mensagens & Doações</span>
-            <span className="text-[9px] bg-emerald-900/30 text-emerald-400 p-0.5 px-2 rounded-sm font-mono">Recebidos Hoje</span>
-          </div>
-
-          <div className="space-y-3 flex-1">
-            {/* Direct Donation top */}
-            {donations.filter(d => d.status === 'confirmed').slice(0,1).map(don => (
-              <div key={don.id} className="p-2 bg-emerald-950/10 border border-emerald-900/30 rounded-lg flex items-center justify-between text-xs">
-                <div className="min-w-0">
-                  <span className="block font-bold text-[#E5E5E5] truncate">{don.donorName}</span>
-                  <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-wider">{don.paymentMethod} confirmado</span>
-                </div>
-                <span className="font-mono text-xs font-bold text-[#F2C94C]">R$ {don.amount.toLocaleString()}</span>
-              </div>
-            ))}
-
-            {/* Interest Ficha */}
-            {interests.slice(0, 1).map(inter => (
-              <div key={inter.id} className="p-2 bg-neutral-950 border border-neutral-850 rounded-lg text-xs space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-amber-500 text-[10px] font-mono">Ficha Interessado</span>
-                  <span className="text-[9px] text-[#0B4DA2]">{inter.instrumentOfInterest}</span>
-                </div>
-                <div className="text-[11px] text-neutral-200">{inter.name}, {inter.age} anos</div>
-                <p className="text-[9px] text-neutral-400 italic truncate">"{inter.message}"</p>
-              </div>
-            ))}
-
-            {/* Contact messages */}
-            {contacts.slice(0, 1).map(con => (
-              <div key={con.id} className="p-2 bg-neutral-950 border border-neutral-850 rounded-lg text-xs space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-neutral-400 text-[10px]">E-mail Ouvidoria</span>
-                  <span className="text-[8px] font-mono text-neutral-500">{con.date}</span>
-                </div>
-                <div className="text-[11px] text-neutral-200 leading-tight truncate">{con.subject}</div>
-                <span className="text-[9px] text-neutral-500 block truncate">{con.email}</span>
               </div>
             ))}
           </div>

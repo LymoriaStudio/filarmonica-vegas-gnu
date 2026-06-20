@@ -8,6 +8,7 @@ import RelationshipCMS from '../components/painel/RelationshipCMS';
 import FinanceiroERP from '../components/painel/FinanceiroERP';
 import ConteudoCMS from '../components/painel/ConteudoCMS';
 import SistemaConfig from '../components/painel/SistemaConfig';
+import { useAuditLogs } from '../hooks/useAuditLogs';
 
 import {
   initialBanners,
@@ -71,6 +72,7 @@ export default function Painel() {
   // 2. Click Highlights State (from Search results or table clicks)
   const [selectedEntityForEdit, setSelectedEntityForEdit] = useState<any>(null);
 
+
   // 3. System States - Real CMS & ERP Live Databases
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [statistics, setStatistics] = useState<SiteStatistics>(initialStatistics);
@@ -86,7 +88,8 @@ const [students, setStudents] = useState<Student[]>([]);
   const [contacts, setContacts] = useState<ContactMessage[]>(initialContacts);
 
   const [notifications, setNotifications] = useState<AdminNotification[]>(initialNotifications);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+
+  const { auditLogs, setAuditLogs, addAuditLog } = useAuditLogs();
 
   // 4. Adapt/Convert states for subcomponents matching their local definitions
   // Mapped Events state (stored in local standard format)
@@ -218,34 +221,6 @@ const [students, setStudents] = useState<Student[]>([]);
       permissions: su.scopes
     }));
   }, [systemUsers]);
-
-
-  // ==========================================
-  // SHARED MUTATION HELPER (AUDIT LOGGER)
-  // ==========================================
-  const addAuditLog = (action: string, module: string, details: string) => {
-    const newLog: AuditLog = {
-      id: `log-${Date.now()}`,
-      userName: activeAdminUser.name.replace(' (Você)', ''),
-      userEmail: activeAdminUser.email,
-      action,
-      dateTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      module,
-      details
-    };
-    setAuditLogs(prev => [newLog, ...prev]);
-
-    // Push local real-time administrative toast and notification count 
-    const newNot: AdminNotification = {
-      id: `not-${Date.now()}`,
-      title: action,
-      message: details,
-      category: module.toLowerCase().includes('apoio') ? 'support' : 'donation',
-      resolved: false,
-      createdAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
-    };
-    setNotifications(prev => [newNot, ...prev]);
-  };
 
 
   // ==========================================
