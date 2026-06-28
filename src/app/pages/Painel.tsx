@@ -309,6 +309,7 @@ const [students, setStudents] = useState<Student[]>([]);
           {/* SITE INSTITUCIONAL SECTION */}
           {(activeTab === 'site-banners' || activeTab === 'site-sobre' || activeTab === 'site-timeline') && (
             <SiteCMS
+              key={activeTab}
               banners={banners}
               setBanners={setBanners}
               statistics={statistics}
@@ -325,6 +326,7 @@ const [students, setStudents] = useState<Student[]>([]);
           {/* PESSOAS SECTION */}
           {(activeTab === 'pessoas-professores' || activeTab === 'pessoas-alunos' || activeTab === 'pessoas-organizadores') && (
             <PessoasERP
+              key={activeTab}
               professors={professors}
               setProfessors={setProfessors}
               students={students}
@@ -341,6 +343,7 @@ const [students, setStudents] = useState<Student[]>([]);
           {/* RELACIONAMENTO / CRM */}
           {(activeTab === 'relacionamento-interesse' || activeTab === 'relacionamento-apoiar' || activeTab === 'relacionamento-contato') && (
             <RelationshipCMS
+              key={activeTab}
               supports={supports}
               setSupports={setSupports}
               contacts={contacts}
@@ -357,6 +360,7 @@ const [students, setStudents] = useState<Student[]>([]);
           {/* FINANCEIRO SECTION */}
           {(activeTab === 'financeiro-doacoes' || activeTab === 'financeiro-apoiadores' || activeTab === 'financeiro-relatorios') && (
             <FinanceiroERP
+              key={activeTab}
               supporters={supporters}
               setSupporters={setSupporters}
               addAuditLog={addAuditLog}
@@ -367,6 +371,7 @@ const [students, setStudents] = useState<Student[]>([]);
           {/* CONTEÚDO SECTION */}
           {(activeTab === 'conteudo-eventos' || activeTab === 'conteudo-noticias' || activeTab === 'conteudo-cursos' || activeTab === 'conteudo-galeria') && (
             <ConteudoCMS
+              key={activeTab}
               events={events}
               setEvents={setEvents}
               news={EMPTY_NEWS}
@@ -386,6 +391,7 @@ const [students, setStudents] = useState<Student[]>([]);
           {/* CONFIGURAÇÕES GERAIS / SISTEMA */}
           {(activeTab === 'sistema-usuarios' || activeTab === 'sistema-biblioteca' || activeTab === 'sistema-configuracoes' || activeTab === 'sistema-auditoria' || activeTab === 'sistema-backup') && (
             <SistemaConfig
+              key={activeTab}
               users={systemUsers}
               setUsers={setSystemUsers}
               library={libraryFiles}

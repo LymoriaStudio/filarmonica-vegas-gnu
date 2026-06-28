@@ -4,12 +4,19 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Search, Bell, User, ChevronDown, Check, Zap, Sparkles, X, 
-  UserCheck, PlusCircle, ShieldAlert, CheckSquare, ListFilter, Play
+import {
+  Search, Bell, User, ChevronDown, Check, Zap, Sparkles, X,
+  UserCheck, PlusCircle, ShieldAlert, CheckSquare, ListFilter, Play, LogOut
 } from 'lucide-react';
 import { AdminNotification, Student, Professor, OrchestraEvent, NewsArticle } from '../../validations/types';
 import { useCurrentProfile } from '../../hooks/useCurrentProfile';
+import { createClient } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 interface HeaderProps {
   notifications: AdminNotification[];
@@ -37,6 +44,12 @@ export default function Header({
   setSelectedEntityForEdit
 }: HeaderProps) {
   const { profile, loading: profileLoading } = useCurrentProfile();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
 
   const [showNotificationOverlay, setShowNotificationOverlay] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -322,6 +335,17 @@ export default function Header({
                 <div className="text-xs font-semibold text-[#001856]">{displayName}</div>
                 <div className="text-[10px] text-gray-500">{profile?.email}</div>
                 <div className="text-[9px] text-[#ffc300] bg-[#001856] inline-block px-1.5 py-0.5 rounded uppercase font-semibold">{displayRole}</div>
+              </div>
+
+              <div className="border-t border-gray-100 mt-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors font-medium"
+                >
+                  <LogOut size={13} />
+                  Sair da conta
+                </button>
               </div>
             </div>
           )}

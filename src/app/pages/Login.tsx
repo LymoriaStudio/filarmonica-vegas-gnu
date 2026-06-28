@@ -20,10 +20,10 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { data, authError } = await supabase.auth.signInWithPassword({ email, password }) as any;
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     console.log({ data, authError });
     setLoading(false);
-    if (authError) { setError('E-mail ou senha inválidos. Tente novamente.'); return; }
+    if (authError || !data.session) { setError('E-mail ou senha incorretos. Tente novamente.'); return; }
     navigate('/painel');
   }
 
