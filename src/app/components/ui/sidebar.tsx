@@ -241,6 +241,7 @@ function Sidebar({
         )}
         {...props}
       >
+
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"

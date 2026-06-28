@@ -5,6 +5,8 @@ import { InstrumentsPage } from "./pages/InstrumentsPage";
 import { EventsPage } from "./pages/EventsPage";
 import Painel from "./pages/Painel";
 import LoginPage from './pages/Login';
+import {AdminPage} from './pages/AdminPage';
+
 import { ProtectedRoute } from './auth/ProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -16,6 +18,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Painel />
+      </ProtectedRoute>
+    )
+  },
+   {
+    path: "/admin",
+    element: (
+      <ProtectedRoute>
+        <AdminPage />
       </ProtectedRoute>
     )
   },

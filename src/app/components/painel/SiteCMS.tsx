@@ -18,6 +18,7 @@ interface SiteCMSProps {
   addAuditLog: (action: string, module: string, details: string) => void;
   selectedEntityForEdit: any;
   setSelectedEntityForEdit: (entity: any) => void;
+  activeTab?: string;
 }
 
 // Map a row from the `banners` table (snake_case) to the app's Banner type (camelCase)
@@ -62,9 +63,11 @@ export default function SiteCMS({
   setValues,
   addAuditLog,
   selectedEntityForEdit,
-  setSelectedEntityForEdit
+  setSelectedEntityForEdit,
+  activeTab,
 }: SiteCMSProps) {
-  const [subTab, setSubTab] = useState<'banners' | 'stats' | 'sobre' >('banners');
+  const initialSubTab = activeTab === 'site-sobre' ? 'sobre' : activeTab === 'site-timeline' ? 'stats' : 'banners';
+  const [subTab, setSubTab] = useState<'banners' | 'stats' | 'sobre'>(initialSubTab as any);
 
   // Modal triggers
   const [bannerModalOpen, setBannerModalOpen] = useState(false);
@@ -353,13 +356,13 @@ export default function SiteCMS({
     <div className="space-y-6 p-6 animate-fade-in select-none">
       
       {/* CMS Site Top Section Header */}
-      <div className="pb-4 border-b border-neutral-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="pb-4 border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-sans text-neutral-100 tracking-tight flex items-center">
-            <Globe className="mr-2 text-[#0B4DA2]" size={20} />
+          <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
+            <Globe className="mr-2 text-[#001856]" size={20} />
             Editor CMS do Site Institucional
           </h2>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Controle todo o conteúdo visível na página pública oficial sem precisar digitar uma única linha de código.
           </p>
         </div>
@@ -372,24 +375,24 @@ export default function SiteCMS({
           ========================================================== */}
       {subTab === 'banners' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-neutral-900/40 p-4 border border-neutral-800 rounded-xl">
+          <div className="flex justify-between items-center bg-white p-4 border border-gray-200 rounded-xl">
             <div>
-              <h3 className="text-sm font-bold text-neutral-200">Banners Rotativos Principais</h3>
-              <p className="text-[11px] text-neutral-500 mt-0.5">Disposição sequencial de imagens na capa do site público.</p>
+              <h3 className="text-sm font-bold text-gray-800">Banners Rotativos Principais</h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Disposição sequencial de imagens na capa do site público.</p>
             </div>
             <button
               type="button"
               onClick={() => handleOpenBannerModal(null)}
-              className="p-2 px-3 bg-gradient-to-r from-[#0B4DA2] to-blue-750 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center shadow-lg"
+              className="p-2 px-3 bg-gradient-to-r from-[#001856] to-[#001856] text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center shadow-lg"
             >
               <Plus size={14} className="mr-1.5" /> Adicionar Banner
             </button>
           </div>
 
           {bannersLoading ? (
-            <div className="text-center py-12 text-xs text-neutral-500 font-mono">Carregando banners...</div>
+            <div className="text-center py-12 text-xs text-gray-400 font-mono">Carregando banners...</div>
           ) : BannersSorted().length === 0 ? (
-            <div className="text-center py-12 text-xs text-neutral-500 font-mono border border-dashed border-neutral-800 rounded-xl">
+            <div className="text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
               Nenhum banner cadastrado ainda.
             </div>
           ) : (
@@ -397,34 +400,34 @@ export default function SiteCMS({
               {BannersSorted().map((b, idx) => (
                 <div 
                   key={b.id} 
-                  className="rounded-xl overflow-hidden bg-neutral-900 border border-neutral-800 flex flex-col justify-between"
+                  className="rounded-xl overflow-hidden bg-white border border-gray-200 flex flex-col justify-between"
                 >
                   {/* Visual Banner Preview Container */}
-                  <div className="h-40 relative bg-neutral-950 flex items-center justify-center">
+                  <div className="h-40 relative bg-gray-100 flex items-center justify-center">
                     <img 
                       src={b.imageDesktop} 
                       alt={b.title} 
                       referrerPolicy="no-referrer"
                       className="absolute inset-0 w-full h-full object-cover opacity-35" 
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-transparent" />
                     <div className="relative p-4 text-center z-10 max-w-sm">
-                      <span className="text-[8px] font-mono p-0.5 px-1.5 rounded-full bg-neutral-900 text-amber-400 uppercase tracking-widest font-bold">
+                      <span className="text-[8px] font-mono p-0.5 px-1.5 rounded-full bg-white text-[#ffc300] uppercase tracking-widest font-bold">
                         Slide {b.order} • {b.status}
                       </span>
-                      <h4 className="text-sm font-bold text-neutral-100 font-sans tracking-tight mt-1.5 line-clamp-1">{b.title}</h4>
-                      <p className="text-[10px] text-neutral-300 mt-1 line-clamp-2">{b.subtitle}</p>
+                      <h4 className="text-sm font-bold text-white font-sans tracking-tight mt-1.5 line-clamp-1">{b.title}</h4>
+                      <p className="text-[10px] text-white/80 mt-1 line-clamp-2">{b.subtitle}</p>
                     </div>
                   </div>
 
                   {/* Info and Actions */}
-                  <div className="p-4 bg-neutral-950 border-t border-neutral-850 flex items-center justify-between">
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
                     <div className="flex items-center space-x-1">
                       <button
                         type="button"
                         disabled={idx === 0}
                         onClick={() => handleMoveBanner(idx, 'up')}
-                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                        className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-400 hover:text-[#001856] disabled:opacity-30 disabled:pointer-events-none"
                       >
                         <ArrowUp size={12} />
                       </button>
@@ -432,7 +435,7 @@ export default function SiteCMS({
                         type="button"
                         disabled={idx === BannersSorted().length - 1}
                         onClick={() => handleMoveBanner(idx, 'down')}
-                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                        className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-400 hover:text-[#001856] disabled:opacity-30 disabled:pointer-events-none"
                       >
                         <ArrowDown size={12} />
                       </button>
@@ -442,21 +445,21 @@ export default function SiteCMS({
                       <button
                         type="button"
                         onClick={() => handleDuplicateBanner(b)}
-                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-neutral-400 hover:text-white flex items-center text-[10px] uppercase font-bold tracking-wider font-mono cursor-pointer"
+                        className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-400 hover:text-[#001856] flex items-center text-[10px] uppercase font-bold tracking-wider font-mono cursor-pointer"
                       >
                         <Copy size={11} className="mr-1" /> Copiar
                       </button>
                       <button
                         type="button"
                         onClick={() => handleOpenBannerModal(b)}
-                        className="p-1.5 bg-neutral-900 hover:bg-neutral-800 rounded text-[#F2C94C] hover:text-amber-300 transition-all cursor-pointer"
+                        className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded text-[#ffc300] hover:text-[#ffc300] transition-all cursor-pointer"
                       >
                         <Edit2 size={12} />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteBanner(b.id, b.title)}
-                        className="p-1.5 bg-neutral-900 hover:bg-rose-950 rounded text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
+                        className="p-1.5 bg-gray-100 hover:bg-rose-950 rounded text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -474,16 +477,16 @@ export default function SiteCMS({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fade-in">
           <form 
             onSubmit={handleSaveBanner}
-            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl flex flex-col"
+            className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl flex flex-col"
           >
-            <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500">
+            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#ffc300]">
                 {activeBanner.id ? 'Modificar Banner Existente' : 'Adicionar Novo Slider Capa'}
               </h3>
               <button 
                 type="button" 
                 onClick={() => setBannerModalOpen(false)} 
-                className="text-neutral-400 hover:text-white"
+                className="text-gray-400 hover:text-[#001856]"
               >
                 Fechar
               </button>
@@ -492,59 +495,59 @@ export default function SiteCMS({
             <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Título do Banner</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Título do Banner</label>
                   <input 
                     type="text" 
                     required
                     value={activeBanner.title || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, title: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Subtítulo (Destaque Médio)</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Subtítulo (Destaque Médio)</label>
                   <input 
                     type="text" 
                     value={activeBanner.subtitle || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, subtitle: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Tag (opcional)</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Tag (opcional)</label>
                   <input 
                     type="text" 
                     value={activeBanner.tag || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, tag: e.target.value })}
                     placeholder="ex: projeto social musical"
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Corpo do Texto Principal (Breve Resumo)</label>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Corpo do Texto Principal (Breve Resumo)</label>
                 <textarea 
                   value={activeBanner.text || ''} 
                   onChange={(e) => setActiveBanner({ ...activeBanner, text: e.target.value })}
                   rows={2}
-                  className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none focus:border-amber-400"
+                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none focus:border-[#ffc300]"
                 />
               </div>
 
               {/* Image desktop and mobile uploads */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Imagem Desktop</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400">Imagem Desktop</label>
                   {activeBanner.imageDesktop && (
                     <img
                       src={activeBanner.imageDesktop}
                       alt="Pré-visualização desktop"
                       referrerPolicy="no-referrer"
-                      className="w-full h-24 object-cover rounded border border-neutral-800"
+                      className="w-full h-24 object-cover rounded border border-gray-200"
                     />
                   )}
                   <ImageUploader
@@ -556,13 +559,13 @@ export default function SiteCMS({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Imagem Mobile</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400">Imagem Mobile</label>
                   {activeBanner.imageMobile && (
                     <img
                       src={activeBanner.imageMobile}
                       alt="Pré-visualização mobile"
                       referrerPolicy="no-referrer"
-                      className="w-full h-24 object-cover rounded border border-neutral-800"
+                      className="w-full h-24 object-cover rounded border border-gray-200"
                     />
                   )}
                   <ImageUploader
@@ -578,59 +581,59 @@ export default function SiteCMS({
               {/* Action buttons and links */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-[#0B4DA2] mb-1">Rótulo Botão Primário</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-[#001856] mb-1">Rótulo Botão Primário</label>
                   <input 
                     type="text" 
                     value={activeBanner.primaryBtnText || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, primaryBtnText: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-[#0B4DA2] mb-1">Link Botão Primário</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-[#001856] mb-1">Link Botão Primário</label>
                   <input 
                     type="text" 
                     value={activeBanner.primaryBtnLink || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, primaryBtnLink: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-505 mb-1">Rótulo Botão Secundário</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Rótulo Botão Secundário</label>
                   <input 
                     type="text" 
                     value={activeBanner.secondaryBtnText || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, secondaryBtnText: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-505 mb-1">Link Botão Secundário</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Link Botão Secundário</label>
                   <input 
                     type="text" 
                     value={activeBanner.secondaryBtnLink || ''} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, secondaryBtnLink: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Disposição de Ordem</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Disposição de Ordem</label>
                   <input 
                     type="number" 
                     value={activeBanner.order || 0} 
                     onChange={(e) => setActiveBanner({ ...activeBanner, order: Number(e.target.value) })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none font-mono"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Status de Publicação</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Status de Publicação</label>
                   <select
                     value={activeBanner.status || 'rascunho'}
                     onChange={(e) => setActiveBanner({ ...activeBanner, status: e.target.value as any })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
                   >
                     <option value="ativo">Ativo</option>
                     <option value="rascunho">Rascunho</option>
@@ -640,18 +643,18 @@ export default function SiteCMS({
 
             </div>
 
-            <div className="bg-neutral-950 p-4 border-t border-neutral-800 flex justify-end space-x-3">
-              <button 
-                type="button" 
+            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                type="button"
                 onClick={() => setBannerModalOpen(false)}
-                className="p-1.5 px-4 bg-neutral-900 text-xs rounded hover:bg-neutral-800 cursor-pointer"
+                className="p-1.5 px-4 bg-gray-100 text-xs rounded hover:bg-gray-200 cursor-pointer"
               >
                 Cancelar
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={bannerSaving}
-                className="p-1.5 px-6 bg-[#0B4DA2] text-xs font-semibold text-white rounded hover:bg-blue-750 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="p-1.5 px-6 bg-[#001856] text-xs font-semibold text-white rounded hover:bg-[#001856] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {bannerSaving ? 'Salvando...' : 'Confirmar e Salvar'}
               </button>
@@ -665,51 +668,51 @@ export default function SiteCMS({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
           <form 
             onSubmit={handleSaveValue}
-            className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl"
+            className="w-full max-w-md bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl"
           >
-            <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold uppercase text-[#F2C94C] tracking-wider">
+            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-xs font-mono font-bold uppercase text-[#ffc300] tracking-wider">
                 {activeValue.id ? 'Alterar Valor' : 'Adicionar Novo Valor'}
               </h3>
-              <button type="button" onClick={() => setValueModalOpen(false)} className="text-neutral-400">Fechar</button>
+              <button type="button" onClick={() => setValueModalOpen(false)} className="text-gray-400">Fechar</button>
             </div>
             
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Nome do Valor</label>
+                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome do Valor</label>
                 <input 
                   type="text" 
                   required
                   value={activeValue.title || ''}
                   onChange={(e) => setActiveValue({ ...activeValue, title: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Descrição Explicativa</label>
+                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição Explicativa</label>
                 <textarea 
                   value={activeValue.description || ''}
                   onChange={(e) => setActiveValue({ ...activeValue, description: e.target.value })}
                   rows={3}
-                  className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Ordem</label>
+                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Ordem</label>
                 <input 
                   type="number" 
                   value={activeValue.order || 0}
                   onChange={(e) => setActiveValue({ ...activeValue, order: Number(e.target.value) })}
-                  className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="bg-neutral-950 p-3 border-t border-neutral-800 flex justify-end space-x-2">
-              <button type="button" onClick={() => setValueModalOpen(false)} className="text-xs text-neutral-400 px-3 py-1 bg-neutral-900 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#0B4DA2] rounded">Salvar Valor</button>
+            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
+              <button type="button" onClick={() => setValueModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded">Cancelar</button>
+              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Valor</button>
             </div>
           </form>
         </div>
@@ -720,62 +723,62 @@ export default function SiteCMS({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
           <form 
             onSubmit={handleSaveTimeline}
-            className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl space-y-4"
+            className="w-full max-w-lg bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
           >
-            <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold uppercase text-amber-500 tracking-wider">
+            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-xs font-mono font-bold uppercase text-[#ffc300] tracking-wider">
                 {activeTimeline.id ? 'Alterar Marco Histórico' : 'Adicionar Novo Ano'}
               </h3>
-              <button type="button" onClick={() => setTimelineModalOpen(false)} className="text-neutral-400">Fechar</button>
+              <button type="button" onClick={() => setTimelineModalOpen(false)} className="text-gray-400">Fechar</button>
             </div>
 
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Ano do Marco (Ex: 2012)</label>
+                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Ano do Marco (Ex: 2012)</label>
                   <input 
                     type="text" 
                     required
                     value={activeTimeline.year || ''}
                     onChange={(e) => setActiveTimeline({ ...activeTimeline, year: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none font-mono font-bold"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Título do Evento</label>
+                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Título do Evento</label>
                   <input 
                     type="text" 
                     required
                     value={activeTimeline.title || ''}
                     onChange={(e) => setActiveTimeline({ ...activeTimeline, title: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Descrição do Fato Marcante</label>
+                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição do Fato Marcante</label>
                 <textarea 
                   value={activeTimeline.description || ''}
                   onChange={(e) => setActiveTimeline({ ...activeTimeline, description: e.target.value })}
                   rows={3}
-                  className="w-full bg-neutral-950 border border-neutral-820 text-neutral-100 p-2 text-xs rounded focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Upload ou Img Link</label>
+                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Upload ou Img Link</label>
                   <input 
                     type="text" 
                     value={activeTimeline.image || ''}
                     onChange={(e) => setActiveTimeline({ ...activeTimeline, image: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-820 text-neutral-500 p-2 text-xs rounded focus:outline-none font-mono"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none font-mono"
                     placeholder="Link da imagem..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-2">Upload Expresso</label>
+                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Upload Expresso</label>
                   <ImageUploader 
                     onFileSelected={(file, previewUrl) => {
                       setPendingTimelineFile(file);
@@ -786,9 +789,9 @@ export default function SiteCMS({
               </div>
             </div>
 
-            <div className="bg-neutral-950 p-3 border-t border-neutral-800 flex justify-end space-x-2">
-              <button type="button" onClick={() => setTimelineModalOpen(false)} className="text-xs text-neutral-400 px-3 py-1 bg-neutral-900 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#0B4DA2] rounded">Salvar Marco</button>
+            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
+              <button type="button" onClick={() => setTimelineModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded">Cancelar</button>
+              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Marco</button>
             </div>
           </form>
         </div>

@@ -104,6 +104,7 @@ interface RelationshipCMSProps {
   setSupporters: React.Dispatch<React.SetStateAction<Supporter[]>>;
 
   addAuditLog: (action: string, module: string, details: string) => void;
+  activeTab?: string;
 }
 
 export default function RelationshipCMS({
@@ -116,8 +117,10 @@ export default function RelationshipCMS({
   supporters,
   setSupporters,
   addAuditLog,
+  activeTab,
 }: RelationshipCMSProps) {
-  const [subTab, setSubTab] = useState<'interesse' | 'apoiar' | 'contato'>('interesse');
+  const initialSubTab = activeTab === 'relacionamento-apoiar' ? 'apoiar' : activeTab === 'relacionamento-contato' ? 'contato' : 'interesse';
+  const [subTab, setSubTab] = useState<'interesse' | 'apoiar' | 'contato'>(initialSubTab as any);
 
   // ── Estado local dos interessados ─────────────────────────────────────────
   const [interests, setInterests] = useState<InterestView[]>([]);
@@ -372,25 +375,25 @@ export default function RelationshipCMS({
     <div className="space-y-6 p-6 animate-fade-in select-none">
 
       {/* Cabeçalho */}
-      <div className="pb-4 border-b border-neutral-850 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-sans text-neutral-100 tracking-tight flex items-center">
-            <HeartHandshake className="mr-2 text-[#F2C94C]" size={20} />
+          <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
+            <HeartHandshake className="mr-2 text-[#ffc300]" size={20} />
             Central de Atendimento & Ouvidoria (CRM)
           </h2>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Responda formulários do site público e converta interessados diretamente no ERP em 1 clique.
           </p>
         </div>
 
-        <div className="flex bg-neutral-900 border border-neutral-800 p-0.5 rounded-lg text-xs">
+        <div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
           {(['interesse', 'apoiar', 'contato'] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setSubTab(t)}
               className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${
-                subTab === t ? 'bg-[#0B4DA2] text-white shadow' : 'text-neutral-400'
+                subTab === t ? 'bg-[#001856] text-white shadow' : 'text-gray-400'
               }`}
             >
               {t === 'interesse' ? 'Tenho Interesse (Bolsas)' : t === 'apoiar' ? 'Quero Apoiar (Parcerias)' : 'Contatos Gerais (Inbox)'}
@@ -404,18 +407,18 @@ export default function RelationshipCMS({
           ================================================================ */}
       {subTab === 'interesse' && (
         <div className="space-y-4">
-          <div className="text-xs text-neutral-400 italic p-3 bg-neutral-900 border border-neutral-800 rounded-lg">
+          <div className="text-xs text-gray-400 italic p-3 bg-white border border-gray-200 rounded-lg">
             🚨 <strong>Painel Inteligente</strong>: Clique em <strong>"Converter em Aluno"</strong> para injetar o registro na lista acadêmica e gerar matrícula no ERP.
           </div>
 
           {loadingInterests && (
-            <p className="text-neutral-400 text-sm text-center py-8">Carregando interessados...</p>
+            <p className="text-gray-400 text-sm text-center py-8">Carregando interessados...</p>
           )}
           {errorInterests && (
             <p className="text-red-400 text-sm text-center py-8">{errorInterests}</p>
           )}
           {!loadingInterests && !errorInterests && interests.length === 0 && (
-            <p className="text-neutral-500 text-sm text-center py-8">Nenhum interessado cadastrado ainda.</p>
+            <p className="text-gray-400 text-sm text-center py-8">Nenhum interessado cadastrado ainda.</p>
           )}
 
           <div className="space-y-4">
@@ -426,18 +429,18 @@ export default function RelationshipCMS({
                   inter.status === 'convertido'
                     ? 'border-emerald-600/30 bg-emerald-950/10'
                     : inter.status === 'arquivado'
-                    ? 'border-neutral-800 bg-neutral-950/40 opacity-55'
+                    ? 'border-gray-200 bg-gray-50 opacity-55'
                     : inter.status === 'contacted'
                     ? 'border-sky-600/30 bg-sky-950/10'
-                    : 'border-neutral-800 bg-neutral-900'
+                    : 'border-gray-200 bg-white'
                 }`}
               >
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[#F2C94C] font-mono text-xs font-bold bg-amber-500/10 p-0.5 px-2 rounded">
+                    <span className="text-[#ffc300] font-mono text-xs font-bold bg-amber-500/10 p-0.5 px-2 rounded">
                       Instrumento: {inter.instrumentOfInterest}
                     </span>
-                    <span className="text-[10px] text-neutral-500 font-mono">{inter.date}</span>
+                    <span className="text-[10px] text-gray-400 font-mono">{inter.date}</span>
                     {inter.status === 'convertido' && (
                       <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
                         CONVERTIDO EM ALUNO
@@ -454,29 +457,29 @@ export default function RelationshipCMS({
                       </span>
                     )}
                     {inter.status === 'arquivado' && (
-                      <span className="bg-neutral-800 text-neutral-400 border border-neutral-700 p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
+                      <span className="bg-gray-100 text-gray-400 border border-gray-300 p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
                         ARQUIVADO
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold text-neutral-100 flex items-center">
+                    <h4 className="text-xs font-bold text-[#001856] flex items-center">
                       {inter.name}
                       {inter.age > 0 && (
-                        <span className="text-neutral-500 font-mono text-[10px] ml-1.5">• {inter.age} anos</span>
+                        <span className="text-gray-400 font-mono text-[10px] ml-1.5">• {inter.age} anos</span>
                       )}
                     </h4>
                     {inter.message && (
-                      <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed bg-neutral-950/50 p-3 rounded-lg font-serif">
+                      <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed bg-gray-50 p-3 rounded-lg font-serif">
                         "{inter.message}"
                       </p>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-neutral-500 pt-1">
+                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-gray-400 pt-1">
                     <span className="flex items-center"><Mail size={10} className="mr-1 text-amber-500" /> {inter.email}</span>
-                    <span className="flex items-center"><Phone size={10} className="mr-1 text-[#0B4DA2]" /> {inter.phone}</span>
+                    <span className="flex items-center"><Phone size={10} className="mr-1 text-[#001856]" /> {inter.phone}</span>
                   </div>
                 </div>
 
@@ -485,7 +488,7 @@ export default function RelationshipCMS({
                     <button
                       type="button"
                       onClick={() => handleOpenEnrollModal(inter)}
-                      className="p-2 px-3 bg-[#0B4DA2] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider shadow-lg"
+                      className="p-2 px-3 bg-[#001856] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider shadow-lg"
                     >
                       <UserPlus size={13} className="mr-1.5" /> Converter em Aluno
                     </button>
@@ -498,7 +501,7 @@ export default function RelationshipCMS({
                         handleMarkContacted(inter.id);
                         handleOpenSimMail(inter.email, 'interesse', inter);
                       }}
-                      className="p-1 px-3 bg-neutral-800 hover:bg-neutral-750 text-[#F2C94C] text-[10.5px] rounded border border-neutral-750 font-mono flex-1 text-center cursor-pointer"
+                      className="p-1 px-3 bg-gray-100 hover:bg-neutral-750 text-[#ffc300] text-[10.5px] rounded border border-neutral-750 font-mono flex-1 text-center cursor-pointer"
                     >
                       Contatar Candidato
                     </button> */}
@@ -507,7 +510,7 @@ export default function RelationshipCMS({
                       <button
                         type="button"
                         onClick={() => handleArchiveInterest(inter.id, inter.name)}
-                        className="p-1 px-2.5 bg-neutral-800 hover:bg-neutral-950 text-neutral-400 rounded border border-neutral-750"
+                        className="p-1 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-400 rounded border border-gray-200"
                         title="Arquivar"
                       >
                         <Archive size={11} />
@@ -517,7 +520,7 @@ export default function RelationshipCMS({
                     <button
                       type="button"
                       onClick={() => handleDeleteInterest(inter.id, inter.name)}
-                      className="p-1 px-2.5 bg-neutral-800 hover:bg-rose-950 text-rose-500 rounded border border-neutral-750 transition-all cursor-pointer"
+                      className="p-1 px-2.5 bg-gray-100 hover:bg-rose-950 text-rose-500 rounded border border-gray-200 transition-all cursor-pointer"
                       title="Excluir permanentemente"
                     >
                       <Trash2 size={11} />
@@ -535,18 +538,18 @@ export default function RelationshipCMS({
           ================================================================ */}
       {subTab === 'apoiar' && (
         <div className="space-y-4">
-          <div className="text-xs text-neutral-400 italic p-3 bg-neutral-900 border border-neutral-800 rounded-lg">
+          <div className="text-xs text-gray-400 italic p-3 bg-white border border-gray-200 rounded-lg">
             💸 <strong>Painel Patrocinador</strong>: Clique em <strong>"Tornar Apoiador Oficial"</strong> para incluir a logomarca no hall dos mecenas da Home.
           </div>
 
           {loadingSupports && (
-            <p className="text-neutral-400 text-sm text-center py-8">Carregando apoiadores...</p>
+            <p className="text-gray-400 text-sm text-center py-8">Carregando apoiadores...</p>
           )}
           {errorSupports && (
             <p className="text-red-400 text-sm text-center py-8">{errorSupports}</p>
           )}
           {!loadingSupports && !errorSupports && supports.length === 0 && (
-            <p className="text-neutral-500 text-sm text-center py-8">Nenhuma proposta de apoio recebida ainda.</p>
+            <p className="text-gray-400 text-sm text-center py-8">Nenhuma proposta de apoio recebida ainda.</p>
           )}
 
           <div className="space-y-4">
@@ -557,16 +560,16 @@ export default function RelationshipCMS({
                   sup.status === 'aprovado'
                     ? 'border-emerald-600/30 bg-emerald-950/10'
                     : sup.status === 'arquivado'
-                    ? 'border-neutral-800 bg-neutral-950/40 opacity-55'
-                    : 'border-neutral-800 bg-neutral-900'
+                    ? 'border-gray-200 bg-gray-50 opacity-55'
+                    : 'border-gray-200 bg-white'
                 }`}
               >
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center space-x-2.5 text-[10px] font-mono">
-                    <span className="bg-[#0B4DA2]/10 text-sky-400 p-1 px-2 rounded-md font-bold uppercase tracking-wider text-[9px]">
+                    <span className="bg-[#001856]/10 text-sky-400 p-1 px-2 rounded-md font-bold uppercase tracking-wider text-[9px]">
                       Apoio: {sup.supportType}
                     </span>
-                    <span className="text-neutral-500">{sup.date}</span>
+                    <span className="text-gray-400">{sup.date}</span>
                     {sup.status === 'aprovado' && (
                       <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 p-0.5 px-2 rounded-full font-bold">
                         APOIADOR APROVADO
@@ -578,27 +581,27 @@ export default function RelationshipCMS({
                       </span>
                     )}
                     {sup.status === 'arquivado' && (
-                      <span className="bg-neutral-800 text-neutral-400 border border-neutral-700 p-0.5 px-2 rounded-full text-[9px] font-bold">
+                      <span className="bg-gray-100 text-gray-400 border border-gray-300 p-0.5 px-2 rounded-full text-[9px] font-bold">
                         ARQUIVADO
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold text-neutral-100 flex items-center">
+                    <h4 className="text-xs font-bold text-[#001856] flex items-center">
                       {sup.name}
                       {sup.company && <span className="text-amber-500 ml-1.5 font-sans">• {sup.company}</span>}
                     </h4>
                     {sup.message && (
-                      <p className="text-[11px] text-neutral-400 mt-1.5 leading-relaxed bg-neutral-950/50 p-3 rounded-lg">
+                      <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed bg-gray-50 p-3 rounded-lg">
                         "{sup.message}"
                       </p>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-neutral-500">
+                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-gray-400">
                     <span className="flex items-center"><Mail size={10} className="mr-1 text-amber-500" /> {sup.email}</span>
-                    <span className="flex items-center"><Phone size={10} className="mr-1 text-[#0B4DA2]" /> {sup.phone}</span>
+                    <span className="flex items-center"><Phone size={10} className="mr-1 text-[#001856]" /> {sup.phone}</span>
                   </div>
                 </div>
 
@@ -607,7 +610,7 @@ export default function RelationshipCMS({
                     <button
                       type="button"
                       onClick={() => handlePromoToSupporter(sup)}
-                      className="p-2 px-3 bg-[#0B4DA2] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider"
+                      className="p-2 px-3 bg-[#001856] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider"
                     >
                       <UserCheck size={13} className="mr-1.5" /> Tornar Apoiador Oficial
                     </button>
@@ -622,7 +625,7 @@ export default function RelationshipCMS({
                         );
                         handleOpenSimMail(sup.email, 'apoiar', sup);
                       }}
-                      className="p-1 px-3 bg-neutral-800 hover:bg-neutral-750 text-[#F2C94C] text-[10.5px] rounded border border-neutral-750 font-mono flex-1 text-center cursor-pointer"
+                      className="p-1 px-3 bg-gray-100 hover:bg-gray-200 text-[#ffc300] text-[10.5px] rounded border border-gray-200 font-mono flex-1 text-center cursor-pointer"
                     >
                       Enviar Negociação
                     </button>
@@ -630,7 +633,7 @@ export default function RelationshipCMS({
                       <button
                         type="button"
                         onClick={() => handleArchiveSupport(sup.id, sup.name)}
-                        className="p-1 px-2.5 bg-neutral-800 hover:bg-neutral-950 text-neutral-400 rounded border border-neutral-750"
+                        className="p-1 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-400 rounded border border-gray-200"
                         title="Arquivar"
                       >
                         <Archive size={11} />
@@ -649,7 +652,7 @@ export default function RelationshipCMS({
           ================================================================ */}
       {subTab === 'contato' && (
         <div className="space-y-4">
-          <div className="bg-neutral-900 border border-neutral-800 p-3 rounded-lg text-xs flex justify-between items-center text-neutral-400 font-mono">
+          <div className="bg-white border border-gray-200 p-3 rounded-lg text-xs flex justify-between items-center text-gray-400 font-mono">
             <span>Caixa Geral de Entrada Fale Conosco</span>
             <span>{contacts.filter((c) => c.status === 'unread').length} mensagens não lidas</span>
           </div>
@@ -663,7 +666,7 @@ export default function RelationshipCMS({
                     ? 'border-emerald-600/30 bg-emerald-950/10 opacity-70'
                     : con.status === 'unread'
                     ? 'border-amber-500/20 bg-amber-500/5'
-                    : 'border-neutral-800 bg-neutral-900'
+                    : 'border-gray-200 bg-white'
                 }`}
               >
                 <div className="flex-1 space-y-2">
@@ -673,16 +676,16 @@ export default function RelationshipCMS({
                         NÃO LIDA
                       </span>
                     )}
-                    <span className="text-[11px] text-neutral-500 font-mono">{con.date}</span>
-                    <span className="text-neutral-400 text-xs font-bold">{con.subject}</span>
+                    <span className="text-[11px] text-gray-400 font-mono">{con.date}</span>
+                    <span className="text-gray-400 text-xs font-bold">{con.subject}</span>
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-bold text-neutral-100">{con.name}</h4>
-                    <p className="text-[11px] text-neutral-400 mt-1 line-clamp-3">"{con.message}"</p>
+                    <h4 className="text-xs font-bold text-[#001856]">{con.name}</h4>
+                    <p className="text-[11px] text-gray-400 mt-1 line-clamp-3">"{con.message}"</p>
                   </div>
 
-                  <div className="flex gap-4 text-[10px] font-mono text-neutral-500">
+                  <div className="flex gap-4 text-[10px] font-mono text-gray-400">
                     <span>Email: {con.email}</span>
                     <span>•</span>
                     <span>Cel: {con.phone}</span>
@@ -694,7 +697,7 @@ export default function RelationshipCMS({
                     <button
                       type="button"
                       onClick={() => handleStatusContact(con.id, 'resolved', 'Marcou resolvido')}
-                      className="p-1.5 px-3 bg-neutral-800 hover:bg-neutral-750 text-neutral-200 hover:text-white rounded text-xs font-semibold cursor-pointer text-center"
+                      className="p-1.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 hover:text-[#001856] rounded text-xs font-semibold cursor-pointer text-center"
                     >
                       Marcar Resolvido / Respondido
                     </button>
@@ -711,14 +714,14 @@ export default function RelationshipCMS({
                         handleStatusContact(con.id, 'replied', 'Enviou e-mail simulado');
                         handleOpenSimMail(con.email, 'contato', con);
                       }}
-                      className="p-1 px-3 bg-neutral-800 hover:bg-neutral-750 text-amber-500 text-[10px] rounded border border-neutral-750 flex-1 text-center cursor-pointer"
+                      className="p-1 px-3 bg-gray-100 hover:bg-gray-200 text-amber-500 text-[10px] rounded border border-gray-200 flex-1 text-center cursor-pointer"
                     >
                       Enviar E-mail Solução
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteContact(con.id)}
-                      className="p-1 px-2.5 bg-neutral-800 hover:bg-rose-950 text-rose-500 rounded border border-neutral-750 transition-all cursor-pointer"
+                      className="p-1 px-2.5 bg-gray-100 hover:bg-rose-950 text-rose-500 rounded border border-gray-200 transition-all cursor-pointer"
                     >
                       <Trash2 size={11} />
                     </button>
@@ -737,9 +740,9 @@ export default function RelationshipCMS({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fade-in">
           <form
             onSubmit={handleConfirmEnroll}
-            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl flex flex-col"
+            className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl flex flex-col"
           >
-            <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center">
+            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500 flex items-center">
                 <GraduationCap size={14} className="mr-2" />
                 Pré Cadastro Aluno
@@ -747,7 +750,7 @@ export default function RelationshipCMS({
               <button
                 type="button"
                 onClick={() => setEnrollModalOpen(false)}
-                className="text-neutral-400 hover:text-white"
+                className="text-gray-400 hover:text-[#001856]"
               >
                 Fechar
               </button>
@@ -756,57 +759,57 @@ export default function RelationshipCMS({
             <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Nome Completo</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Nome Completo</label>
                   <input
                     type="text"
                     required
                     value={enrollForm.name}
                     onChange={(e) => setEnrollForm({ ...enrollForm, name: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Data de Nascimento</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Data de Nascimento</label>
                   <input
                     type="date"
                     value={enrollForm.birthDate || ''}
                     onChange={(e) => setEnrollForm({ ...enrollForm, birthDate: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded font-mono focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded font-mono focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">E-mail</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">E-mail</label>
                   <input
                     type="email"
                     required
                     value={enrollForm.email}
                     onChange={(e) => setEnrollForm({ ...enrollForm, email: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Telefone</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Telefone</label>
                   <input
                     type="text"
                     required
                     value={enrollForm.phone}
                     onChange={(e) => setEnrollForm({ ...enrollForm, phone: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded font-mono focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded font-mono focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Instrumento</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Instrumento</label>
                   <select
                     required
                     value={enrollForm.instrument}
                     onChange={(e) => setEnrollForm({ ...enrollForm, instrument: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
                   >
                     <option value="">Selecione um instrumento</option>
                     <option value="trompete">Trompete</option>
@@ -818,47 +821,47 @@ export default function RelationshipCMS({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Turma / Classe</label>
+                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Turma / Classe</label>
                   <input
                     type="text"
                     value={enrollForm.classroom || ''}
                     onChange={(e) => setEnrollForm({ ...enrollForm, classroom: e.target.value })}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded focus:outline-none"
                     placeholder="Ex: Iniciante"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Responsável (se menor de idade)</label>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Responsável (se menor de idade)</label>
                 <input
                   type="text"
                   value={enrollForm.guardian || ''}
                   onChange={(e) => setEnrollForm({ ...enrollForm, guardian: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded focus:outline-none"
                   placeholder="Nome do responsável legal"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Endereço</label>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Endereço</label>
                 <textarea
                   value={enrollForm.address || ''}
                   onChange={(e) => setEnrollForm({ ...enrollForm, address: e.target.value })}
                   rows={2}
-                  className="w-full bg-neutral-950 border border-neutral-800 text-neutral-200 p-2 text-xs rounded focus:outline-none focus:border-amber-400"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-800 p-2 text-xs rounded focus:outline-none focus:border-[#ffc300]"
                   placeholder="Endereço completo do aluno"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500">Foto do Aluno</label>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400">Foto do Aluno</label>
                 {enrollForm.photo && (
                   <img
                     src={enrollForm.photo}
                     alt="Pré-visualização foto do aluno"
                     referrerPolicy="no-referrer"
-                    className="w-24 h-24 object-cover rounded-full border border-neutral-800"
+                    className="w-24 h-24 object-cover rounded-full border border-gray-200"
                   />
                 )}
                 <ImageUploader
@@ -871,11 +874,11 @@ export default function RelationshipCMS({
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-neutral-500 mb-1">Status da Matrícula</label>
+                <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Status da Matrícula</label>
                 <select
                   value={enrollForm.status || 'ativo'}
                   onChange={(e) => setEnrollForm({ ...enrollForm, status: e.target.value })}
-                  className="w-full bg-neutral-950 border border-neutral-800 text-neutral-400 p-2 text-xs rounded focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
                 >
                   <option value="ativo">Ativo</option>
                   <option value="inativo">Inativo</option>
@@ -884,18 +887,18 @@ export default function RelationshipCMS({
               </div>
             </div>
 
-            <div className="bg-neutral-950 p-4 border-t border-neutral-800 flex justify-end space-x-3">
+            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setEnrollModalOpen(false)}
-                className="p-1.5 px-4 bg-neutral-900 text-xs rounded hover:bg-neutral-800 cursor-pointer"
+                className="p-1.5 px-4 bg-white text-xs rounded hover:bg-gray-100 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={enrollSaving}
-                className="p-1.5 px-6 bg-[#0B4DA2] text-xs font-semibold text-white rounded hover:bg-blue-750 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                className="p-1.5 px-6 bg-[#001856] text-xs font-semibold text-white rounded hover:bg-blue-750 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {enrollSaving ? 'Matriculando...' : 'Confirmar Matrícula'}
               </button>
@@ -909,51 +912,51 @@ export default function RelationshipCMS({
           ================================================================ */}
       {simMailOpen && activeFicha && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-fade-in">
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-2xl">
-            <div className="bg-neutral-950 p-4 border-b border-neutral-800 flex justify-between items-center text-xs">
+          <div className="w-full max-w-lg bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl">
+            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
               <span className="font-mono font-bold text-amber-500 flex items-center">
                 <Send size={13} className="mr-2" />
                 SIMU EMAIL CLIENT API ENGINE
               </span>
-              <button onClick={() => setSimMailOpen(false)} className="text-neutral-400">
+              <button onClick={() => setSimMailOpen(false)} className="text-gray-400">
                 <X size={15} />
               </button>
             </div>
 
             <div className="p-4 space-y-3.5">
               <div className="grid grid-cols-6 items-center gap-2 text-xs">
-                <span className="col-span-1 text-neutral-500 font-mono">Para:</span>
+                <span className="col-span-1 text-gray-400 font-mono">Para:</span>
                 <input
                   type="text"
                   value={simDocMail}
                   onChange={(e) => setSimDocMail(e.target.value)}
-                  className="col-span-5 bg-neutral-950 border border-neutral-800 p-1.5 px-2 rounded text-xs text-neutral-200"
+                  className="col-span-5 bg-gray-50 border border-gray-200 p-1.5 px-2 rounded text-xs text-gray-800"
                 />
               </div>
 
               <div className="grid grid-cols-6 items-center gap-2 text-xs">
-                <span className="col-span-1 text-neutral-500 font-mono">Assunto:</span>
+                <span className="col-span-1 text-gray-400 font-mono">Assunto:</span>
                 <input
                   type="text"
                   defaultValue={`Retorno Filarmônica Aliança do Ouro - Olá ${activeFicha.name}`}
-                  className="col-span-5 bg-neutral-950 border border-neutral-800 p-1.5 px-2 rounded text-[11.5px] text-neutral-200"
+                  className="col-span-5 bg-gray-50 border border-gray-200 p-1.5 px-2 rounded text-[11.5px] text-gray-800"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-500 mb-1">Corpo do E-mail</label>
+                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Corpo do E-mail</label>
                 <textarea
                   rows={4}
                   defaultValue={`Prezado(a) ${activeFicha.name},\n\nAgradecemos imensamente o seu contato enviado em ${activeFicha.date || ''}.\n\nNossa coordenação já analisou sua proposta e entraremos em contato via WhatsApp em breve.\n\nAtenciosamente,\nSecretaria Acadêmica Aliança do Ouro.`}
-                  className="w-full bg-neutral-950 border border-neutral-800 p-3 rounded text-xs text-neutral-200 leading-relaxed font-sans"
+                  className="w-full bg-gray-50 border border-gray-200 p-3 rounded text-xs text-gray-800 leading-relaxed font-sans"
                 />
               </div>
             </div>
 
-            <div className="bg-neutral-950 p-3.5 border-t border-neutral-800 flex justify-end space-x-2">
+            <div className="bg-gray-50 p-3.5 border-t border-gray-200 flex justify-end space-x-2">
               <button
                 onClick={() => setSimMailOpen(false)}
-                className="text-xs text-neutral-400 px-4 py-1.5 bg-neutral-900 rounded"
+                className="text-xs text-gray-400 px-4 py-1.5 bg-white rounded"
               >
                 Voltar
               </button>
@@ -962,7 +965,7 @@ export default function RelationshipCMS({
                   alert(`E-mail disparado via SMTP com sucesso para: ${simDocMail}`);
                   setSimMailOpen(false);
                 }}
-                className="text-xs text-white px-6 py-1.5 bg-[#0B4DA2] rounded font-bold uppercase tracking-wider flex items-center cursor-pointer"
+                className="text-xs text-white px-6 py-1.5 bg-[#001856] rounded font-bold uppercase tracking-wider flex items-center cursor-pointer"
               >
                 Disparar E-mail <Send size={12} className="ml-1.5" />
               </button>

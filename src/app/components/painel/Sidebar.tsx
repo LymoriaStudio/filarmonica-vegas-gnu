@@ -1,14 +1,8 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from 'react';
-import { 
-  Music, LayoutDashboard, Globe, Users, HeartHandshake, DollarSign, 
-  BookOpen, Settings, ChevronDown, ListMusic, UserCheck, UserPlus, 
-  HelpCircle, Calendar, Newspaper, Image, ShieldAlert, Library, 
-  History, Database, FileClock, Menu, X, Bell
+import {
+  Music, LayoutDashboard, Globe, Users, HeartHandshake, DollarSign,
+  BookOpen, Settings, ChevronDown, ListMusic, UserCheck, UserPlus,
+  HelpCircle, Calendar, Image, ShieldAlert, FileClock, Menu, X,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -18,6 +12,64 @@ interface SidebarProps {
   permissions: string[];
 }
 
+const navGroups = [
+  {
+    id: 'site',
+    title: 'Site Institucional',
+    permissionKey: 'site',
+    items: [
+      { id: 'site-banners', label: 'Hero Banners', icon: <Image size={14} /> },
+    ],
+  },
+  {
+    id: 'pessoas',
+    title: 'Pessoas (ERP)',
+    permissionKey: 'pessoas',
+    items: [
+      { id: 'pessoas-professores', label: 'Professores', icon: <UserCheck size={14} /> },
+      { id: 'pessoas-alunos', label: 'Alunos', icon: <UserPlus size={14} /> },
+    ],
+  },
+  {
+    id: 'relacionamento',
+    title: 'Relacionamento',
+    permissionKey: 'relacionamento',
+    items: [
+      { id: 'relacionamento-interesse', label: 'Tenho Interesse', icon: <BookOpen size={14} /> },
+      { id: 'relacionamento-apoiar', label: 'Quero Apoiar', icon: <HeartHandshake size={14} /> },
+      { id: 'relacionamento-contato', label: 'Contatos / Ouvidoria', icon: <HelpCircle size={14} /> },
+    ],
+  },
+  {
+    id: 'financeiro',
+    title: 'Financeiro',
+    permissionKey: 'financeiro',
+    items: [
+      { id: 'financeiro-doacoes', label: 'Doações Diretas', icon: <DollarSign size={14} /> },
+    ],
+  },
+  {
+    id: 'conteudo',
+    title: 'Conteúdo (CMS)',
+    permissionKey: 'conteudo',
+    items: [
+      { id: 'conteudo-eventos', label: 'Eventos / Concertos', icon: <Calendar size={14} /> },
+      { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
+      { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> },
+    ],
+  },
+  {
+    id: 'sistema',
+    title: 'Configurações Sistema',
+    permissionKey: 'sistema',
+    items: [
+      { id: 'sistema-usuarios', label: 'Controle Usuários', icon: <ShieldAlert size={14} /> },
+      { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
+      { id: 'sistema-auditoria', label: 'Logs Auditoria', icon: <FileClock size={14} /> },
+    ],
+  },
+];
+
 export default function Sidebar({ activeTab, setActiveTab, userRole, permissions }: SidebarProps) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     site: true,
@@ -25,159 +77,78 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
     relacionamento: true,
     financeiro: true,
     conteudo: true,
-    sistema: false
+    sistema: false,
   });
-
   const [isOpenMobile, setIsOpenMobile] = useState(false);
 
-  const toggleGroup = (group: string) => {
-    setExpandedGroups(prev => ({ ...prev, [group]: !prev[group] }));
-  };
+  const hasPermission = (key: string) =>
+    userRole === 'super_admin' || permissions.includes(key);
 
-  const navGroups = [
-    {
-      id: 'site',
-      title: 'Site Institucional',
-      icon: <Globe size={16} className="text-sky-450" />,
-      permissionKey: 'site',
-      items: [
-        { id: 'site-banners', label: 'Hero Banners', icon: <Image size={14} /> },
-    
-      ]
-    },
-    {
-      id: 'pessoas',
-      title: 'Pessoas (ERP)',
-      icon: <Users size={16} className="text-amber-450" />,
-      permissionKey: 'pessoas',
-      items: [
-        { id: 'pessoas-professores', label: 'Professores', icon: <UserCheck size={14} /> },
-        { id: 'pessoas-alunos', label: 'Alunos', icon: <UserPlus size={14} /> },
-     
-      ]
-    },
-    {
-      id: 'relacionamento',
-      title: 'Relacionamento',
-      icon: <HeartHandshake size={16} className="text-[#F2C94C]" />,
-      permissionKey: 'relacionamento',
-      items: [
-        { id: 'relacionamento-interesse', label: 'Tenho Interesse', icon: <BookOpen size={14} /> },
-        { id: 'relacionamento-apoiar', label: 'Quero Apoiar', icon: <HeartHandshake size={14} /> },
-        { id: 'relacionamento-contato', label: 'Contatos / Ouvidoria', icon: <HelpCircle size={14} /> }
-      ]
-    },
-    {
-      id: 'financeiro',
-      title: 'Financeiro',
-      icon: <DollarSign size={16} className="text-emerald-450" />,
-      permissionKey: 'financeiro',
-      items: [
-        { id: 'financeiro-doacoes', label: 'Doações Diretas', icon: <DollarSign size={14} /> },
-      ]
-    },
-    {
-      id: 'conteudo',
-      title: 'Conteúdo (CMS)',
-      icon: <ListMusic size={16} className="text-[#0B4DA2]" />,
-      permissionKey: 'conteudo',
-      items: [
-        { id: 'conteudo-eventos', label: 'Eventos / Concertos', icon: <Calendar size={14} /> },
-        { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
-        { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> }
-      ]
-    },
-    
-    {
-      id: 'sistema',
-      title: 'Configurações Sistema',
-      icon: <Settings size={16} className="text-neutral-400" />,
-      permissionKey: 'sistema',
-      items: [
-        { id: 'sistema-usuarios', label: 'Controle Usuários', icon: <ShieldAlert size={14} /> },
-        //{ id: 'sistema-biblioteca', label: 'Biblioteca Mídias', icon: <Library size={14} /> },
-        { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
-        { id: 'sistema-auditoria', label: 'Logs Auditoria', icon: <FileClock size={14} /> },
-        /*
-        { id: 'sistema-backup', label: 'Backup Banco Dados', icon: <Database size={14} /> }*/
-      ]
-    } 
-  ];
-
-  const handleItemClick = (id: string) => {
+  const navigate = (id: string) => {
     setActiveTab(id);
     setIsOpenMobile(false);
   };
 
-  const hasPermission = (key: string) => {
-    return userRole === 'super_admin' || permissions.includes(key);
-  };
-
-  const renderSidebarContent = () => (
-    <div className="flex flex-col h-full bg-[#1A1A1A] border-r border-neutral-800 text-neutral-200">
-      {/* Brand logo header */}
-      <div className="p-5 border-b border-neutral-800 flex items-center space-x-3 bg-neutral-900/50">
-        <div className="p-2 bg-[#0B4DA2] rounded-lg text-white glow-border animate-pulse">
-          <Music size={20} className="stroke-[2.5]" />
-        </div>
-        <div>
-          <h1 className="text-xs font-mono font-bold tracking-widest text-[#F2C94C] uppercase leading-none">Filarmônica</h1>
-          <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">SaaS ADM & ERP</p>
-        </div>
+  const SidebarContent = (
+    <div className="flex flex-col h-full bg-[#001856] text-white">
+      {/* Logo */}
+      <div className="px-5 py-6 border-b border-white/10">
+        <p className="text-[#ffc300] uppercase tracking-widest text-xs font-bold mb-1">Painel</p>
+        <h1 className="text-white font-bold text-base leading-tight" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+          Filarmônica<br />de Metais
+        </h1>
       </div>
 
-      {/* Main navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-        {/* Dashboard index */}
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {/* Dashboard */}
         {hasPermission('dashboard') && (
           <button
-            onClick={() => handleItemClick('dashboard')}
-            className={`w-full flex items-center justify-between p-2 px-3 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'dashboard' 
-                ? 'bg-[#0B4DA2] text-white shadow-md shadow-[#0B4DA2]/20 font-semibold' 
-                : 'text-neutral-300 hover:bg-neutral-800/60 hover:text-white'
+            type="button"
+            onClick={() => navigate('dashboard')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left mb-3 ${
+              activeTab === 'dashboard'
+                ? 'bg-[#ffc300] text-[#001856] font-semibold'
+                : 'text-white/60 hover:text-white hover:bg-white/10'
             }`}
           >
-            <div className="flex items-center space-x-2.5">
-              <LayoutDashboard size={16} />
-              <span>Painel de Estatísticas</span>
-            </div>
+            <LayoutDashboard size={16} />
+            <span>Painel de Estatísticas</span>
           </button>
         )}
 
-        {/* Dynamic Groups */}
+        {/* Grupos */}
         {navGroups.map((group) => {
           if (!hasPermission(group.permissionKey)) return null;
-
-          const isExpanded = expandedGroups[group.id];
+          const isExpanded = expandedGroups[group.id] ?? true;
 
           return (
-            <div key={group.id} className="space-y-1">
+            <div key={group.id} className="mb-2">
               <button
                 type="button"
-                onClick={() => toggleGroup(group.id)}
-                className="w-full flex items-center justify-between p-1.5 px-2.5 rounded-md hover:bg-neutral-800/30 text-neutral-400 hover:text-neutral-200 transition-all text-[11px] font-semibold tracking-wider uppercase border-none outline-none select-none"
+                onClick={() =>
+                  setExpandedGroups((prev) => ({ ...prev, [group.id]: !prev[group.id] }))
+                }
+                className="w-full flex items-center justify-between px-3 py-1 mb-1 text-white/30 text-[11px] font-bold uppercase tracking-widest hover:text-white/50 transition-colors"
               >
-                <div className="flex items-center space-x-2">
-                  {group.icon}
-                  <span>{group.title}</span>
-                </div>
-                <ChevronDown 
-                  size={12} 
-                  className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
+                <span>{group.title}</span>
+                <ChevronDown
+                  size={11}
+                  className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                 />
               </button>
 
               {isExpanded && (
-                <div className="space-y-0.5 pl-2 border-l border-neutral-800 ml-3.5 mt-1">
+                <div className="space-y-0.5">
                   {group.items.map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => handleItemClick(item.id)}
-                      className={`w-full flex items-center space-x-2.5 p-2 px-3 rounded-md text-[11px] font-medium transition-all ${
+                      type="button"
+                      onClick={() => navigate(item.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                         activeTab === item.id
-                          ? 'text-white bg-neutral-800/80 border-l-2 border-[#F2C94C]'
-                          : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/30'
+                          ? 'bg-[#ffc300] text-[#001856] font-semibold'
+                          : 'text-white/60 hover:text-white hover:bg-white/10'
                       }`}
                     >
                       {item.icon}
@@ -189,16 +160,20 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
             </div>
           );
         })}
-      </div>
+      </nav>
 
-      {/* User role indicator at bottom */}
-      <div className="p-4 border-t border-neutral-800 bg-neutral-900/60 text-xs flex items-center space-x-3">
-        <div className="w-8 h-8 rounded-full bg-[#2B2B2B] flex items-center justify-center font-mono font-bold text-amber-400 text-sm border border-neutral-700">
-          U
+      {/* User bottom */}
+      <div className="px-4 py-4 border-t border-white/10 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-[#ffc300]/20 flex items-center justify-center flex-shrink-0">
+          <span className="text-[#ffc300] text-xs font-bold">
+            {userRole === 'super_admin' ? 'SA' : userRole.substring(0, 2).toUpperCase()}
+          </span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-medium text-neutral-200 truncate">{userRole === 'super_admin' ? 'Super Administrador' : userRole.toUpperCase()}</div>
-          <div className="text-[9px] font-mono text-neutral-500 truncate leading-tight">Painel Operacional</div>
+          <div className="text-xs font-medium text-white/70 truncate">
+            {userRole === 'super_admin' ? 'Super Administrador' : userRole}
+          </div>
+          <div className="text-[10px] text-white/30">Painel Operacional</div>
         </div>
       </div>
     </div>
@@ -206,29 +181,26 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
 
   return (
     <>
-      {/* Mobile Menu Icon to toggle sidebar on small screens */}
+      {/* Botão mobile */}
       <div className="md:hidden fixed top-3 left-3 z-50">
         <button
           type="button"
           onClick={() => setIsOpenMobile(!isOpenMobile)}
-          className="p-2 rounded-md bg-neutral-900 border border-neutral-800 text-amber-400 shadow-lg focus:outline-none focus:ring-1 focus:ring-amber-400"
+          className="p-2 rounded-md bg-[#001856] border border-white/10 text-[#ffc300] shadow-lg"
         >
           {isOpenMobile ? <X size={18} /> : <Menu size={18} />}
         </button>
       </div>
 
-      {/* Desktop Persistent Sidebar */}
-      <aside className="hidden md:block w-64 h-screen sticky top-0 flex-shrink-0 z-40">
-        {renderSidebarContent()}
+      {/* Desktop */}
+      <aside className="hidden md:flex w-64 h-screen sticky top-0 flex-shrink-0 flex-col z-40">
+        {SidebarContent}
       </aside>
 
-      {/* Mobile Overlay Sidebar Drawer */}
+      {/* Mobile overlay */}
       {isOpenMobile && (
         <div className="fixed inset-0 z-40 bg-black/60 md:hidden flex">
-          <div className="w-64 h-full animate-fade-in">
-            {renderSidebarContent()}
-          </div>
-          {/* Backdrop Touch Dismiss */}
+          <div className="w-64 h-full flex-shrink-0">{SidebarContent}</div>
           <div className="flex-1" onClick={() => setIsOpenMobile(false)} />
         </div>
       )}

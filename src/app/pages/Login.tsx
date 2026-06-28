@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { createClient } from '@supabase/supabase-js';
+import logoFilarmonica from '../../imports/LOGO_FILARM_NICA-1.png';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -8,10 +9,10 @@ const supabase = createClient(
 );
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [email, setEmail]             = useState('');
+  const [password, setPassword]       = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
@@ -19,63 +20,56 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { data, authError } = await supabase.auth.signInWithPassword({ email, password }) as any;
     console.log({ data, authError });
     setLoading(false);
-
-    if (authError) {
-      setError('E-mail ou senha inválidos. Tente novamente.');
-      return;
-    }
-
+    if (authError) { setError('E-mail ou senha inválidos. Tente novamente.'); return; }
     navigate('/painel');
   }
 
-  return (
-    <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4 font-sans">
+  const INPUT = "w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all";
+  const LABEL = "block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider";
 
-      {/* Ambient glow background */}
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+
+      {/* Decoração sutil */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[#0B4DA2]/10 blur-[120px]" />
-        <div className="absolute bottom-1/4 left-1/3 w-[300px] h-[300px] rounded-full bg-[#F2C94C]/5 blur-[100px]" />
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[#001856]/5" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-[#ffc300]/10" />
       </div>
 
-      <div className="relative w-full max-w-sm animate-fade-in">
+      <div className="relative w-full max-w-sm">
 
-        {/* Logo / Brand */}
+        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0B4DA2]/20 border border-[#0B4DA2]/30 mb-4">
-            {/* Music note icon using Unicode */}
-            <span className="text-2xl text-[#F2C94C]">♪</span>
-          </div>
-    
-          <p className="text-xs text-neutral-500 font-mono mt-1 tracking-wider uppercase">
+          <img
+            src={logoFilarmonica}
+            alt="Filarmônica de Metais"
+            className="h-20 mx-auto object-contain mb-4"
+          />
+          <span className="inline-block bg-[#001856] text-[#ffc300] text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
             Painel Administrativo
-          </p>
+          </span>
         </div>
 
         {/* Card */}
-        <div className="glass-panel rounded-2xl p-7 space-y-5">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8 space-y-5">
 
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold text-neutral-200">Entrar na sua conta</h2>
-            <p className="text-xs text-neutral-500">Acesso restrito a membros autorizados.</p>
+          <div>
+            <h2 className="text-lg font-bold text-[#001856]" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+              Entrar na sua conta
+            </h2>
+            <p className="text-sm text-gray-400 mt-1">Acesso restrito a membros autorizados.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Email */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-neutral-500">
-                E-mail
-              </label>
+            <div>
+              <label className={LABEL}>E-mail</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
                   </svg>
@@ -86,18 +80,16 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="seu@email.com"
-                  className="w-full bg-neutral-900 border border-neutral-800 text-neutral-100 placeholder-neutral-700 text-xs rounded-lg pl-9 pr-3 py-2.5 font-mono focus:outline-none focus:border-[#0B4DA2] focus:ring-1 focus:ring-[#0B4DA2]/40 transition-all"
+                  className={INPUT}
                 />
               </div>
             </div>
 
-            {/* Password */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-mono font-semibold uppercase tracking-widest text-neutral-500">
-                Senha
-              </label>
+            {/* Senha */}
+            <div>
+              <label className={LABEL}>Senha</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
@@ -108,12 +100,12 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full bg-neutral-900 border border-neutral-800 text-neutral-100 placeholder-neutral-700 text-xs rounded-lg pl-9 pr-10 py-2.5 font-mono focus:outline-none focus:border-[#0B4DA2] focus:ring-1 focus:ring-[#0B4DA2]/40 transition-all"
+                  className={INPUT + ' pr-10'}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-400 transition-colors cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -129,13 +121,13 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error */}
+            {/* Erro */}
             {error && (
-              <div className="flex items-start gap-2 bg-rose-950/50 border border-rose-800/40 rounded-lg p-2.5">
-                <svg className="text-rose-500 shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                <svg className="text-red-500 shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
-                <p className="text-rose-400 text-[11px] font-mono leading-snug">{error}</p>
+                <p className="text-red-600 text-sm leading-snug">{error}</p>
               </div>
             )}
 
@@ -143,11 +135,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0B4DA2] hover:bg-blue-600 active:scale-[0.98] text-white text-xs font-bold font-mono tracking-wider uppercase py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 mt-1"
+              className="w-full bg-[#001856] hover:bg-[#002070] active:scale-[0.98] text-white text-sm font-bold py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1"
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                   </svg>
                   Autenticando...
@@ -155,18 +147,19 @@ export default function LoginPage() {
               ) : (
                 <>
                   Entrar no Painel
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
                   </svg>
                 </>
               )}
             </button>
+
           </form>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[10px] text-neutral-700 font-mono mt-6">
-          Filarmônica © {new Date().getFullYear()}
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Filarmônica de Metais © {new Date().getFullYear()} — Todos os direitos reservados
         </p>
       </div>
     </div>

@@ -155,10 +155,13 @@ export default function Header({
   console.log("nome: ", profile?.name)
 
   return (
-    <header className="relative h-16 w-full glass-panel border-b border-neutral-800 flex items-center justify-between px-6 z-30 select-none bg-neutral-900/40">
+    <header className="relative h-16 w-full border-b border-gray-200 flex items-center justify-between px-6 z-30 select-none bg-white">
       
       <div>
-        <h2>Olá, {displayName}</h2>
+        <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Filarmônica de Metais</p>
+        <h2 className="text-base font-bold text-[#001856]" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+          Olá, {displayName}
+        </h2>
       </div>
 
       {/* Right controls */}
@@ -173,7 +176,7 @@ export default function Header({
               setShowNotificationOverlay(false);
               setShowUserMenu(false);
             }}
-            className="flex items-center space-x-1.5 p-2 px-3 rounded-lg bg-neutral-800/80 hover:bg-[#0B4DA2] text-xs font-semibold text-white cursor-pointer transition-all border border-neutral-700 hover:border-[#0B4DA2]"
+            className="flex items-center space-x-1.5 p-2 px-3 rounded-lg bg-[#001856] hover:bg-[#002070] text-xs font-semibold text-white cursor-pointer transition-all border border-[#001856]"
           >
             <Zap size={14} className="text-[#F2C94C]" />
             <span className="hidden sm:inline">Ações Rápidas</span>
@@ -181,8 +184,8 @@ export default function Header({
           </button>
 
           {showQuickActions && (
-            <div className="absolute right-0 mt-2 w-52 bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-lg shadow-2xl overflow-hidden py-1.5 z-50">
-              <div className="px-3 py-1.5 border-b border-neutral-800 text-[10px] font-semibold text-[#F2C94C] uppercase tracking-wider font-mono">Inserir Módulo</div>
+            <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden py-1.5 z-50">
+              <div className="px-3 py-1.5 border-b border-gray-100 text-[10px] font-semibold text-[#001856] uppercase tracking-wider">Inserir Módulo</div>
               {[
                 { label: 'Novo Aluno', key: 'new-student' },
                 { label: 'Novo Professor', key: 'new-professor' },
@@ -195,9 +198,9 @@ export default function Header({
                     onQuickAction(action.key);
                     setShowQuickActions(false);
                   }}
-                  className="w-full flex items-center space-x-2 px-4 py-2 hover:bg-neutral-800 text-[#E5E5E5] hover:text-white text-xs text-left transition-all border-none outline-none"
+                  className="w-full flex items-center space-x-2 px-4 py-2 hover:bg-gray-50 text-gray-700 hover:text-[#001856] text-xs text-left transition-all border-none outline-none"
                 >
-                  <PlusCircle size={13} className="text-amber-400" />
+                  <PlusCircle size={13} className="text-[#ffc300]" />
                   <span>{action.label}</span>
                 </button>
               ))}
@@ -296,29 +299,29 @@ export default function Header({
               setShowNotificationOverlay(false);
               setShowQuickActions(false);
             }}
-            className="flex items-center space-x-2.5 p-1.5 px-3 hover:bg-neutral-800 rounded-lg text-xs font-medium cursor-pointer transition-all text-neutral-300"
+            className="flex items-center space-x-2.5 p-1.5 px-3 hover:bg-gray-100 rounded-lg text-xs font-medium cursor-pointer transition-all text-gray-700"
           >
-            <div className="w-6 h-6 rounded bg-[#F2C94C]/10 border border-[#F2C94C]/25 text-[#F2C94C] font-mono font-extrabold flex items-center justify-center text-[10px]">
+            <div className="w-6 h-6 rounded bg-[#001856] flex items-center justify-center text-[#ffc300] font-bold text-[10px]">
               {initials}
             </div>
             <div className="text-left hidden lg:block leading-tight select-none">
-              <span className="block font-semibold text-neutral-200 text-[11px] max-w-[120px] truncate">{displayName}</span>
-              <span className="text-[9px] font-mono text-amber-400 capitalize">{displayRole.replace('_', ' ')}</span>
+              <span className="block font-semibold text-[#001856] text-[11px] max-w-[120px] truncate">{displayName}</span>
+              <span className="text-[9px] text-gray-400 capitalize">{displayRole.replace('_', ' ')}</span>
             </div>
             <ChevronDown size={12} className="opacity-60" />
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-64 bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-lg shadow-2xl p-3 z-50">
+            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50">
               <div className="p-1 mb-1.5">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#F2C94C] block font-mono">Sessão Atual</span>
-                <p className="text-[9px] text-neutral-500 mt-0.5 leading-tight">Dados do operador autenticado neste painel.</p>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#001856] block">Sessão Atual</span>
+                <p className="text-[9px] text-gray-400 mt-0.5 leading-tight">Dados do operador autenticado neste painel.</p>
               </div>
 
-              <div className="p-2.5 rounded bg-neutral-950 border border-neutral-850 space-y-1">
-                <div className="text-xs font-semibold text-neutral-200">{displayName}</div>
-                <div className="text-[10px] font-mono text-neutral-500">{profile?.email}</div>
-                <div className="text-[9px] font-mono text-amber-400 uppercase">{displayRole}</div>
+              <div className="p-2.5 rounded bg-gray-50 border border-gray-100 space-y-1">
+                <div className="text-xs font-semibold text-[#001856]">{displayName}</div>
+                <div className="text-[10px] text-gray-500">{profile?.email}</div>
+                <div className="text-[9px] text-[#ffc300] bg-[#001856] inline-block px-1.5 py-0.5 rounded uppercase font-semibold">{displayRole}</div>
               </div>
             </div>
           )}

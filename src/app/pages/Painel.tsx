@@ -65,6 +65,8 @@ import {
   GalleryVideo
 } from '../validations/types';
 
+const EMPTY_NEWS: NewsArticle[] = [];
+
 export default function Painel() {
   // 1. Core Page Navigation state
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -255,7 +257,7 @@ const [students, setStudents] = useState<Student[]>([]);
 
 
   return (
-    <div className="flex h-screen w-full bg-[#0A0A0A] text-neutral-200 font-sans overflow-hidden">
+    <div className="flex h-screen w-full bg-gray-50 font-sans overflow-hidden">
       
       {/* Sidebar - sticky side navigation */}
       <Sidebar 
@@ -285,7 +287,7 @@ const [students, setStudents] = useState<Student[]>([]);
         />
 
         {/* Dynamic Inner Router Views */}
-        <main className="flex-1 overflow-y-auto bg-[#0F0F0F] relative">
+        <main className="flex-1 overflow-y-auto bg-gray-50 relative">
           
           {/* PAINEL / DASHBOARD */}
           {activeTab === 'dashboard' && (
@@ -306,40 +308,39 @@ const [students, setStudents] = useState<Student[]>([]);
 
           {/* SITE INSTITUCIONAL SECTION */}
           {(activeTab === 'site-banners' || activeTab === 'site-sobre' || activeTab === 'site-timeline') && (
-            <SiteCMS 
+            <SiteCMS
               banners={banners}
               setBanners={setBanners}
               statistics={statistics}
               setStatistics={setStatistics}
               values={values}
               setValues={setValues}
-
               addAuditLog={addAuditLog}
               selectedEntityForEdit={selectedEntityForEdit}
               setSelectedEntityForEdit={setSelectedEntityForEdit}
+              activeTab={activeTab}
             />
           )}
 
           {/* PESSOAS SECTION */}
           {(activeTab === 'pessoas-professores' || activeTab === 'pessoas-alunos' || activeTab === 'pessoas-organizadores') && (
-          <PessoasERP 
-  professors={professors}
-  setProfessors={setProfessors}
-  students={students}
-  setStudents={setStudents}
-  organizers={organizers}
-  setOrganizers={setOrganizers}
-  addAuditLog={addAuditLog}
-  selectedEntityForEdit={selectedEntityForEdit}
-  setSelectedEntityForEdit={setSelectedEntityForEdit}
-/>
+            <PessoasERP
+              professors={professors}
+              setProfessors={setProfessors}
+              students={students}
+              setStudents={setStudents}
+              organizers={organizers}
+              setOrganizers={setOrganizers}
+              addAuditLog={addAuditLog}
+              selectedEntityForEdit={selectedEntityForEdit}
+              setSelectedEntityForEdit={setSelectedEntityForEdit}
+              activeTab={activeTab}
+            />
           )}
 
           {/* RELACIONAMENTO / CRM */}
           {(activeTab === 'relacionamento-interesse' || activeTab === 'relacionamento-apoiar' || activeTab === 'relacionamento-contato') && (
-            <RelationshipCMS 
-              interests={interests}
-              setInterests={setInterests}
+            <RelationshipCMS
               supports={supports}
               setSupports={setSupports}
               contacts={contacts}
@@ -349,25 +350,27 @@ const [students, setStudents] = useState<Student[]>([]);
               supporters={supporters}
               setSupporters={setSupporters}
               addAuditLog={addAuditLog}
+              activeTab={activeTab}
             />
           )}
 
           {/* FINANCEIRO SECTION */}
           {(activeTab === 'financeiro-doacoes' || activeTab === 'financeiro-apoiadores' || activeTab === 'financeiro-relatorios') && (
-            <FinanceiroERP 
-              donations={donations}
-              setDonations={setDonations}
+            <FinanceiroERP
               supporters={supporters}
               setSupporters={setSupporters}
               addAuditLog={addAuditLog}
+              activeTab={activeTab}
             />
           )}
 
           {/* CONTEÚDO SECTION */}
           {(activeTab === 'conteudo-eventos' || activeTab === 'conteudo-noticias' || activeTab === 'conteudo-cursos' || activeTab === 'conteudo-galeria') && (
-            <ConteudoCMS 
+            <ConteudoCMS
               events={events}
-              setEvents={setEvents}         
+              setEvents={setEvents}
+              news={EMPTY_NEWS}
+              setNews={() => {}}
               courses={courses}
               setCourses={setCourses}
               photos={photos}
@@ -376,12 +379,13 @@ const [students, setStudents] = useState<Student[]>([]);
               setVideos={setVideos}
               professors={professors}
               addAuditLog={addAuditLog}
+              activeTab={activeTab}
             />
           )}
 
           {/* CONFIGURAÇÕES GERAIS / SISTEMA */}
           {(activeTab === 'sistema-usuarios' || activeTab === 'sistema-biblioteca' || activeTab === 'sistema-configuracoes' || activeTab === 'sistema-auditoria' || activeTab === 'sistema-backup') && (
-            <SistemaConfig 
+            <SistemaConfig
               users={systemUsers}
               setUsers={setSystemUsers}
               library={libraryFiles}
@@ -393,6 +397,7 @@ const [students, setStudents] = useState<Student[]>([]);
               backups={backups}
               setBackups={setBackups}
               addAuditLog={addAuditLog}
+              activeTab={activeTab}
             />
           )}
 
