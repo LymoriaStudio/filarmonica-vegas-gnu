@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import imgRaphael from "../../imports/MAESTRO_RAFAEL.png";
-import imgHannel from "../../imports/HANNEL.png";
+import imgHannel from "../../imports/HANNEL.jpeg";
 import imgChris from "../../imports/CHRIS.png";
 import imgDjinane from "../../imports/DJINANE.png";
 import imgJuliana from "../../imports/JULIANA-1.png";
+import imgDouglas from '../../imports/DOUGLAS.jpeg'
 
 type Member = {
   name: string;
@@ -59,7 +60,7 @@ const team: Member[] = [
     short:
       "Promove acolhimento emocional, fortalecimento de vínculos e desenvolvimento coletivo de crianças e adolescentes por meio da música.",
     full: "Psicólogo clínico, Douglas Winder atua na Filarmônica de Metais promovendo acolhimento emocional, fortalecimento de vínculos e desenvolvimento coletivo de crianças e adolescentes. Seu trabalho integra rodas de conversa, escuta ativa e atividades socioemocionais, utilizando a música e o ambiente cultural como ferramentas de transformação humana e social.",
-    image: "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=600&q=80",
+    image: imgDouglas,
     objectPosition: "top center",
   },
   {
