@@ -9,15 +9,17 @@ interface AreaChartProps {
   height?: number;
 }
 export function CustomAreaChart({ data, color = '#F2C94C', height = 180 }: AreaChartProps) {
+  if (!data || data.length === 0) return <div style={{ height }} className="flex items-center justify-center text-gray-400 text-xs">Sem dados</div>;
+
   const max = Math.max(...data.map(d => d.value), 1) * 1.1;
   const padding = 30;
   const chartHeight = height - padding * 2;
   const width = 500;
   const chartWidth = width - padding * 2;
 
-  // Generate SVG Points
+  // Generate SVG Points (guard against single-point division by zero)
   const points = data.map((d, i) => {
-    const x = padding + (i / (data.length - 1)) * chartWidth;
+    const x = data.length === 1 ? padding + chartWidth / 2 : padding + (i / (data.length - 1)) * chartWidth;
     const y = height - padding - (d.value / max) * chartHeight;
     return { x, y, label: d.label, value: d.value };
   });
@@ -138,14 +140,16 @@ interface BarChartProps {
   color2?: string;
   height?: number;
 }
-export function CustomBarChart({ 
-  data, 
-  v1Name = 'Atual', 
-  v2Name = 'Anterior', 
-  color1 = '#0B4DA2', 
-  color2 = '#F2C94C', 
-  height = 180 
+export function CustomBarChart({
+  data,
+  v1Name = 'Atual',
+  v2Name = 'Anterior',
+  color1 = '#0B4DA2',
+  color2 = '#F2C94C',
+  height = 180
 }: BarChartProps) {
+  if (!data || data.length === 0) return <div style={{ height }} className="flex items-center justify-center text-gray-400 text-xs">Sem dados</div>;
+
   const maxVal = Math.max(...data.flatMap(d => [d.v1, d.v2]), 1) * 1.15;
   const padding = 30;
   const chartHeight = height - padding * 2;

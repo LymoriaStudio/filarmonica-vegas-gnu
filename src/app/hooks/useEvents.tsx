@@ -25,6 +25,7 @@ export interface EventView {
   title: string;
   description: string;
   longDescription: string;
+  rawDate: string;
   date: string;
   time: string;
   location: string;
@@ -71,6 +72,7 @@ function mapEventFromDb(row: EventFromDb, index: number): EventView {
     title: row.title,
     description: row.description,
     longDescription: row.description,
+    rawDate: row.date,
     date: formatDate(row.date),
     time: row.time,
     location: row.venue,

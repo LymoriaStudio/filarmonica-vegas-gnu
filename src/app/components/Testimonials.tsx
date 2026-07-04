@@ -1,4 +1,5 @@
 import { Quote } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 const testimonials = [
   {
@@ -66,10 +67,53 @@ const testimonials = [
   },
 ];
 
+// Detecta quantas colunas estão visíveis (1 mobile, 2 tablet, 3 desktop)
+function useColumns() {
+  const [cols, setCols] = useState(3);
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth < 768) setCols(1);
+      else if (window.innerWidth < 1024) setCols(2);
+      else setCols(3);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return cols;
+}
+
 export function Testimonials() {
+  const cols = useColumns();
+  const total = testimonials.length;
+  const totalPages = Math.ceil(total / cols);
+
+  const [page, setPage] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const next = useCallback(() => {
+    setPage((p) => (p + 1) % totalPages);
+  }, [totalPages]);
+
+  useEffect(() => {
+    if (paused) return;
+    intervalRef.current = setInterval(next, 15000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [paused, next]);
+
+  // Reset page when cols change to avoid out-of-bounds
+  useEffect(() => {
+    setPage(0);
+  }, [cols]);
+
+  const start = page * cols;
+  const visible = testimonials.slice(start, start + cols);
+
   return (
     <section className="bg-gray-50 py-20">
       <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
         <div className="text-center mb-14">
           <span
             className="text-[#ffc300] uppercase tracking-widest"
@@ -90,8 +134,13 @@ export function Testimonials() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {testimonials.map((t) => (
+        {/* Cards */}
+        <div
+          className={`grid gap-6 ${cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3"}`}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          {visible.map((t) => (
             <div
               key={t.id}
               className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col"
@@ -125,6 +174,20 @@ export function Testimonials() {
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+
+        {/* Bullet dots */}
+        <div className="flex justify-center gap-2 mt-8">
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setPage(i)}
+              aria-label={`Página ${i + 1}`}
+              className={`rounded-full transition-all duration-300 ${
+                i === page ? "bg-[#001856] w-8 h-3" : "bg-gray-300 w-3 h-3"
+              }`}
+            />
           ))}
         </div>
       </div>

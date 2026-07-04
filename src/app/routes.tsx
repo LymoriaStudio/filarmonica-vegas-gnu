@@ -6,6 +6,7 @@ import { EventsPage } from "./pages/EventsPage";
 import Painel from "./pages/Painel";
 import LoginPage from './pages/Login';
 import {AdminPage} from './pages/AdminPage';
+import PerfilPage from './pages/PerfilPage';
 
 import { ProtectedRoute } from './auth/ProtectedRoute';
 
@@ -26,6 +27,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <AdminPage />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: "/painel/perfil",
+    element: (
+      <ProtectedRoute>
+        <PerfilPage />
       </ProtectedRoute>
     )
   },

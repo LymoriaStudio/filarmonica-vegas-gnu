@@ -5,8 +5,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Search, Bell, User, ChevronDown, Check, Zap, Sparkles, X,
-  UserCheck, PlusCircle, ShieldAlert, CheckSquare, ListFilter, Play, LogOut
+  Bell, User, ChevronDown, Zap, X,
+  PlusCircle, Play, LogOut
 } from 'lucide-react';
 import { AdminNotification, Student, Professor, OrchestraEvent, NewsArticle } from '../../validations/types';
 import { useCurrentProfile } from '../../hooks/useCurrentProfile';
@@ -181,7 +181,7 @@ export default function Header({
       <div className="flex items-center space-x-4">
         
         {/* 2. Quick Actions Menu Button */}
-        <div className="relative">
+        {/* <div className="relative">
           <button
             type="button"
             onClick={() => {
@@ -219,7 +219,7 @@ export default function Header({
               ))}
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* 3. Real-time Notifications Center */}
 
@@ -314,8 +314,11 @@ export default function Header({
             }}
             className="flex items-center space-x-2.5 p-1.5 px-3 hover:bg-gray-100 rounded-lg text-xs font-medium cursor-pointer transition-all text-gray-700"
           >
-            <div className="w-6 h-6 rounded bg-[#001856] flex items-center justify-center text-[#ffc300] font-bold text-[10px]">
-              {initials}
+            <div className="w-7 h-7 rounded-full bg-[#001856] flex items-center justify-center text-[#ffc300] font-bold text-[10px] overflow-hidden shrink-0">
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                : initials
+              }
             </div>
             <div className="text-left hidden lg:block leading-tight select-none">
               <span className="block font-semibold text-[#001856] text-[11px] max-w-[120px] truncate">{displayName}</span>
@@ -325,25 +328,40 @@ export default function Header({
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50">
-              <div className="p-1 mb-1.5">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#001856] block">Sessão Atual</span>
-                <p className="text-[9px] text-gray-400 mt-0.5 leading-tight">Dados do operador autenticado neste painel.</p>
+            <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+              {/* user info */}
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[#001856] flex items-center justify-center shrink-0 overflow-hidden">
+                  {profile?.avatar_url
+                    ? <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                    : <span className="text-[#ffc300] text-xs font-bold">{initials}</span>
+                  }
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[#001856] font-semibold text-xs truncate">{displayName}</p>
+                  <p className="text-gray-400 text-[10px] truncate">{profile?.email}</p>
+                </div>
               </div>
 
-              <div className="p-2.5 rounded bg-gray-50 border border-gray-100 space-y-1">
-                <div className="text-xs font-semibold text-[#001856]">{displayName}</div>
-                <div className="text-[10px] text-gray-500">{profile?.email}</div>
-                <div className="text-[9px] text-[#ffc300] bg-[#001856] inline-block px-1.5 py-0.5 rounded uppercase font-semibold">{displayRole}</div>
+              {/* actions */}
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowUserMenu(false); navigate('/painel/perfil'); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#001856] transition-colors"
+                >
+                  <User size={14} className="text-gray-400" />
+                  Meu Perfil
+                </button>
               </div>
 
-              <div className="border-t border-gray-100 mt-2 pt-2">
+              <div className="border-t border-gray-100 py-1">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors font-medium"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
                 >
-                  <LogOut size={13} />
+                  <LogOut size={14} />
                   Sair da conta
                 </button>
               </div>

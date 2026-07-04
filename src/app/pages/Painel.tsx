@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useCurrentProfile } from '../hooks/useCurrentProfile';
 import Sidebar from '../components/painel/Sidebar';
 import Header from '../components/painel/Header';
 import DashboardHome from '../components/painel/DashboardHome';
@@ -67,7 +68,14 @@ import {
 
 const EMPTY_NEWS: NewsArticle[] = [];
 
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin:  ['dashboard', 'site', 'pessoas', 'relacionamento', 'financeiro', 'conteudo', 'sistema'],
+  editor: ['dashboard', 'site', 'pessoas', 'relacionamento', 'financeiro', 'conteudo'],
+};
+
 export default function Painel() {
+  const { profile: currentProfile } = useCurrentProfile();
+
   // 1. Core Page Navigation state
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
@@ -260,11 +268,11 @@ const [students, setStudents] = useState<Student[]>([]);
     <div className="flex h-screen w-full bg-gray-50 font-sans overflow-hidden">
       
       {/* Sidebar - sticky side navigation */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        userRole={activeAdminUser.role} 
-        permissions={activeAdminUser.permissions} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        userRole={currentProfile?.role ?? 'editor'}
+        permissions={ROLE_PERMISSIONS[currentProfile?.role ?? 'editor'] ?? ROLE_PERMISSIONS['editor']}
       />
 
       {/* Main Viewport Container */}
@@ -291,18 +299,19 @@ const [students, setStudents] = useState<Student[]>([]);
           
           {/* PAINEL / DASHBOARD */}
           {activeTab === 'dashboard' && (
-            <DashboardHome 
+            <DashboardHome
               students={students}
               professors={professors}
               organizers={organizers}
               supporters={supporters}
               donations={donations}
-              events={orchestraEventsForSearch}   
+              events={orchestraEventsForSearch}
               interests={interests}
               contacts={contacts}
               auditLogs={auditLogs}
               onNavigate={setActiveTab}
               onQuickAction={handleQuickActionTrigger}
+              userRole={currentProfile?.role ?? 'editor'}
             />
           )}
 
@@ -369,7 +378,7 @@ const [students, setStudents] = useState<Student[]>([]);
           )}
 
           {/* CONTEÚDO SECTION */}
-          {(activeTab === 'conteudo-eventos' || activeTab === 'conteudo-noticias' || activeTab === 'conteudo-cursos' || activeTab === 'conteudo-galeria') && (
+          {(activeTab === 'conteudo-eventos' || activeTab === 'conteudo-noticias' || activeTab === 'conteudo-cursos' || activeTab === 'conteudo-galeria' || activeTab === 'conteudo-instrumentos') && (
             <ConteudoCMS
               key={activeTab}
               events={events}

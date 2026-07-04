@@ -387,7 +387,7 @@ export default function RelationshipCMS({
         </div>
 
         <div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
-          {(['interesse', 'apoiar', 'contato'] as const).map((t) => (
+          {(['interesse', 'apoiar'] as const).map((t) => (
             <button
               key={t}
               type="button"

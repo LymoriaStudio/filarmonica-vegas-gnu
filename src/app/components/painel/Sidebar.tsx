@@ -37,7 +37,6 @@ const navGroups = [
     items: [
       { id: 'relacionamento-interesse', label: 'Tenho Interesse', icon: <BookOpen size={14} /> },
       { id: 'relacionamento-apoiar', label: 'Quero Apoiar', icon: <HeartHandshake size={14} /> },
-      { id: 'relacionamento-contato', label: 'Contatos / Ouvidoria', icon: <HelpCircle size={14} /> },
     ],
   },
   {
@@ -56,6 +55,7 @@ const navGroups = [
       { id: 'conteudo-eventos', label: 'Eventos / Concertos', icon: <Calendar size={14} /> },
       { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
       { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> },
+      { id: 'conteudo-instrumentos', label: 'Instrumentos', icon: <ListMusic size={14} /> },
     ],
   },
   {
@@ -82,7 +82,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
   const [isOpenMobile, setIsOpenMobile] = useState(false);
 
   const hasPermission = (key: string) =>
-    userRole === 'super_admin' || permissions.includes(key);
+    userRole === 'super_admin' || userRole === 'admin' || permissions.includes(key);
 
   const navigate = (id: string) => {
     setActiveTab(id);

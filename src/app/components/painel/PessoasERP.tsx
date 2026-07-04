@@ -56,17 +56,21 @@ export default function PessoasERP({
   const [exportModalContent, setExportModalContent] = useState<string | null>(null);
 
   const [studentsLoading, setStudentsLoading] = useState(true);
+  const [studentsError, setStudentsError] = useState('');
   const [pendingStudentPhoto, setPendingStudentPhoto] = useState<File | null>(null);
   const [pendingProfPhoto, setPendingProfPhoto] = useState<File | null>(null);
 
-
-  // useEffect de carregamento — coloque ANTES do useEffect do selectedEntityForEdit
-useEffect(() => {
-  getStudents()
-    .then(setStudents)
-    .catch((err) => console.error('Erro ao carregar alunos:', err))
-    .finally(() => setStudentsLoading(false));
-}, []);
+  useEffect(() => {
+    setStudentsLoading(true);
+    setStudentsError('');
+    getStudents()
+      .then(setStudents)
+      .catch((err: any) => {
+        console.error('Erro ao carregar alunos:', err);
+        setStudentsError(err?.message ?? 'Erro desconhecido ao carregar alunos.');
+      })
+      .finally(() => setStudentsLoading(false));
+  }, []);
   // Catch any external routing redirect (from header)
   useEffect(() => {
     if (selectedEntityForEdit) {
@@ -424,8 +428,13 @@ const handleArchiveStudent = async (id: string, name: string) => {
 
           {/* Real Grid table presentation */}
           {studentsLoading && (
-  <div className="text-center py-8 text-xs text-gray-400 font-mono">Carregando alunos...</div>
-)}
+            <div className="text-center py-8 text-xs text-gray-400 font-mono">Carregando alunos...</div>
+          )}
+          {!studentsLoading && studentsError && (
+            <div className="text-center py-8 text-xs text-red-500 font-mono bg-red-50 rounded-lg px-4">
+              Erro ao carregar alunos: {studentsError}
+            </div>
+          )}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>

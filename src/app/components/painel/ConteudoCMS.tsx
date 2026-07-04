@@ -81,7 +81,7 @@ export default function ConteudoCMS({
   addAuditLog,
   activeTab,
 }: ConteudoCMSProps) {
-  const initialSubTab = activeTab === 'conteudo-cursos' ? 'cursos' : activeTab === 'conteudo-galeria' ? 'galeria' : activeTab === 'conteudo-noticias' ? 'noticias' : 'eventos';
+  const initialSubTab = activeTab === 'conteudo-cursos' ? 'cursos' : activeTab === 'conteudo-galeria' ? 'galeria' : activeTab === 'conteudo-noticias' ? 'noticias' : activeTab === 'conteudo-instrumentos' ? 'instrumentos' : 'eventos';
   const [subTab, setSubTab] = useState<'eventos' | 'noticias' | 'cursos' | 'instrumentos' | 'galeria'>(initialSubTab as any);
 
   // Multi-Mode Gallery Tab status

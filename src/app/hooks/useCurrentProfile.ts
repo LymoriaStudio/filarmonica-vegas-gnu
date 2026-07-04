@@ -11,6 +11,7 @@ export interface CurrentProfile {
   name: string;
   email: string;
   role: string;
+  avatar_url?: string;
 }
 
 export function useCurrentProfile() {
@@ -46,6 +47,7 @@ export function useCurrentProfile() {
         name: profileRow.name,
         email: authData.user.email ?? '',
         role: profileRow.role,
+        avatar_url: authData.user.user_metadata?.avatar_url ?? '',
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar perfil');

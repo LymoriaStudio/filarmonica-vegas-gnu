@@ -3,14 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2, ShieldAlert, Library, Settings, History, Save, Plus, Trash2,
   Edit, Check, AlertTriangle, CloudDownload, Calendar, Lock, Globe, Share2,
-  CheckCircle, FileText, Search, AppWindow, FolderOpen, Play, ToggleLeft, ToggleRight
+  CheckCircle, FileText, Search, AppWindow, FolderOpen, Play, ToggleLeft, ToggleRight,
+  Eye, EyeOff, UserPlus, X as XIcon
 } from 'lucide-react';
 import { SystemUser, LibraryFile, InstitutionConfig, AuditLog, BackupHistory } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
+import { listUsers, createUser, updateUser, deleteUser, type PainelUser, type UserRole } from '../../services/usersService';
 
 interface SistemaConfigProps {
   users: SystemUser[];
@@ -48,52 +50,90 @@ export default function SistemaConfig({
   const [libQuery, setLibQuery] = useState('');
   const [libCategory, setLibCategory] = useState<string>('all');
 
-  // IAM User states
+  // ── Real users from Supabase ──────────────────────────────────────────────
+  const [painelUsers, setPainelUsers] = useState<PainelUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
+
+  // User modal
   const [userModalOpen, setUserModalOpen] = useState(false);
-  const [activeUser, setActiveUser] = useState<Partial<SystemUser> | null>(null);
+  const [editingUser, setEditingUser] = useState<PainelUser | null>(null);
+  const [formName, setFormName]         = useState('');
+  const [formEmail, setFormEmail]       = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [formRole, setFormRole]         = useState<UserRole>('editor');
+  const [showPass, setShowPass]         = useState(false);
+  const [modalSaving, setModalSaving]   = useState(false);
+  const [modalError, setModalError]     = useState('');
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      const data = await listUsers();
+      setPainelUsers(data);
+    } catch (err: any) {
+      setUsersError(err.message);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const openNewUser = () => {
+    setEditingUser(null);
+    setFormName(''); setFormEmail(''); setFormPassword(''); setFormRole('editor');
+    setModalError(''); setUserModalOpen(true);
+  };
+
+  const openEditUser = (u: PainelUser) => {
+    setEditingUser(u);
+    setFormName(u.name); setFormEmail(u.email); setFormPassword(''); setFormRole(u.role);
+    setModalError(''); setUserModalOpen(true);
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModalSaving(true); setModalError('');
+    try {
+      if (editingUser) {
+        await updateUser(editingUser.id, formName, formRole);
+        addAuditLog('Alterou Usuário', 'Sistema', `Atualizou ${formName} → role: ${formRole}`);
+      } else {
+        if (!formPassword || formPassword.length < 6) throw new Error('Senha deve ter ao menos 6 caracteres.');
+        const created = await createUser(formEmail, formPassword, formName, formRole);
+        addAuditLog('Criou Usuário', 'Sistema', `Criou ${formName} (${formEmail}) como ${formRole}`);
+        setPainelUsers(prev => [created, ...prev]);
+        setUserModalOpen(false); return;
+      }
+      await loadUsers();
+      setUserModalOpen(false);
+    } catch (err: any) {
+      setModalError(err.message ?? 'Erro ao salvar usuário.');
+    } finally {
+      setModalSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (u: PainelUser) => {
+    if (!confirm(`Remover o usuário "${u.name}"? Esta ação é irreversível.`)) return;
+    try {
+      await deleteUser(u.id);
+      addAuditLog('Removeu Usuário', 'Sistema', `Deletou ${u.name} (${u.email})`);
+      setPainelUsers(prev => prev.filter(x => x.id !== u.id));
+    } catch (err: any) {
+      alert('Erro ao remover: ' + err.message);
+    }
+  };
 
   // Backup Manual snapshot simulation state
   const [manualBackupSnapshot, setManualBackupSnapshot] = useState<string | null>(null);
 
   // Save institutional config alert
   const [isSavedAlert, setIsSavedAlert] = useState(false);
-
-
-  // ==========================================
-  // IAM STAFF MANAGEMENT
-  // ==========================================
-  const handleOpenUserModal = (user: Partial<SystemUser> | null) => {
-    setActiveUser(user || {
-      id: '',
-      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
-      name: '',
-      email: '',
-      role: 'Editor',
-      status: 'active',
-      scopes: ['news_edit']
-    });
-    setUserModalOpen(true);
-  };
-
-  const handleSaveUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeUser) return;
-
-    if (activeUser.id) {
-      setUsers(prev => prev.map(u => u.id === activeUser.id ? (activeUser as SystemUser) : u));
-      addAuditLog('Alterou Acesso Staff', 'Sistema', `Atualizou credenciais IAM de: ${activeUser.name}`);
-    } else {
-      const newUser = { ...activeUser, id: `user-${Date.now()}` } as SystemUser;
-      setUsers(prev => [...prev, newUser]);
-      addAuditLog('Concedeu Permissão IAM', 'Sistema', `Cadastrou novo staff: ${newUser.name} com perfil ${newUser.role}`);
-    }
-    setUserModalOpen(false);
-  };
-
-  const handleToggleUserStatus = (id: string, name: string, active: boolean) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: active ? 'active' : 'blocked' } : u));
-    addAuditLog(active ? 'Desbloqueou Staff' : 'Sustou Acesso Staff', 'Sistema', `Mudou status de ${name} para ${active ? 'Ativo' : 'Bloqueado'}`);
-  };
 
 
   // ==========================================
@@ -198,7 +238,7 @@ export default function SistemaConfig({
             onClick={() => setSubTab('usuarios')}
             className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'usuarios' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
           >
-            IAM Staffs
+           Usuários
           </button>
 
 
@@ -221,7 +261,7 @@ export default function SistemaConfig({
             onClick={() => setSubTab('auditoria')}
             className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'auditoria' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
           >
-            Logs de Auditoria
+            Auditoria
           </button>
      {    /*
           <button
@@ -239,67 +279,76 @@ export default function SistemaConfig({
           ========================================================== */}
       {subTab === 'usuarios' && (
         <div className="space-y-4">
+          {/* Header */}
           <div className="flex justify-between items-center bg-white border border-gray-200 p-4 rounded-xl flex-wrap gap-2.5">
             <div>
-              <span className="text-[10px] font-mono font-bold uppercase text-amber-500 tracking-wider">Mural staff corporativo</span>
-              <p className="text-xs text-gray-400 mt-0.5">Estipule níveis de visualização do dashboard por cargo de atuação administrativa.</p>
+              <span className="text-[10px] font-mono font-bold uppercase text-[#ffc300] tracking-wider">Controle de Usuários</span>
+              <p className="text-xs text-gray-400 mt-0.5">Gerencie os acessos ao painel administrativo. Dois perfis: Admin (acesso total) e Editor (sem configurações do sistema).</p>
             </div>
-            <button
-              type="button"
-              onClick={() => handleOpenUserModal(null)}
-              className="p-1.5 px-3.5 bg-[#001856] hover:bg-blue-750 text-white rounded text-xs font-semibold cursor-pointer"
-            >
-              + Autorizar Novo Operador
+            <button type="button" onClick={openNewUser}
+              className="flex items-center gap-1.5 p-1.5 px-3.5 bg-[#001856] hover:bg-[#002070] text-white rounded-lg text-xs font-semibold transition-colors">
+              <UserPlus size={13} /> Novo Usuário
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {users.map((item) => (
-              <div key={item.id} className="p-4 bg-white border border-gray-100 rounded-xl relative flex flex-col justify-between">
-                <div className="flex gap-4 items-start pb-4 border-b border-gray-100">
-                  <img
-                    src={item.photo}
-                    alt={item.name}
-                    referrerPolicy="no-referrer"
-                    className="w-12 h-12 object-cover rounded-full border border-gray-200 shrink-0"
-                  />
-                  <div>
-                    <h4 className="text-xs font-bold text-[#001856] font-sans tracking-tight">{item.name}</h4>
-                    <span className="block text-[10px] text-amber-500 font-mono mt-0.5">Perfil: {item.role}</span>
-                    <span className="block text-[10px] text-gray-400 mt-1 font-mono">{item.email}</span>
-                  </div>
-                </div>
+          {/* Error / loading */}
+          {usersError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+              {usersError}
+              {usersError.includes('VITE_SUPABASE_SERVICE_KEY') && (
+                <p className="mt-1 text-xs text-red-400">Adicione <code className="bg-red-100 px-1 rounded">VITE_SUPABASE_SERVICE_KEY=sua_service_role_key</code> ao arquivo <code>.env</code> e reinicie o servidor.</p>
+              )}
+            </div>
+          )}
 
-                <div className="pt-3 flex justify-between items-center text-xs">
-                  <div className="flex items-center space-x-1">
-                    <span className={`w-2.5 h-2.5 rounded-full ${item.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                    <span className="text-[10px] uppercase font-mono font-bold text-neutral-450">
-                      {item.status === 'active' ? 'Staff Ativo' : 'Sustado'}
+          {usersLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-6 h-6 border-2 border-[#001856] border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {painelUsers.length === 0 && (
+                <div className="col-span-3 text-center py-12 text-gray-400 text-sm">
+                  Nenhum usuário cadastrado ainda.
+                </div>
+              )}
+              {painelUsers.map(u => (
+                <div key={u.id} className="p-4 bg-white border border-gray-100 rounded-xl flex flex-col gap-3">
+                  {/* top */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#001856] flex items-center justify-center shrink-0">
+                      <span className="text-[#ffc300] text-xs font-bold">{u.name.substring(0, 2).toUpperCase()}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#001856] truncate">{u.name}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{u.email}</p>
+                    </div>
+                  </div>
+                  {/* role badge */}
+                  <div>
+                    <span className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                      u.role === 'admin'
+                        ? 'bg-[#001856] text-[#ffc300]'
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {u.role === 'admin' ? 'Administrador' : 'Editor'}
                     </span>
                   </div>
-
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleUserStatus(item.id, item.name, item.status !== 'active')}
-                      className={`text-[9.5px] font-mono leading-none p-1 px-2.5 rounded border border-gray-200 ${
-                        item.status === 'active' ? 'bg-gray-50 text-rose-500' : 'bg-emerald-950 text-emerald-400 font-bold'
-                      }`}
-                    >
-                      {item.status === 'active' ? 'Bloquear' : 'Reativar'}
+                  {/* actions */}
+                  <div className="flex gap-2 pt-1 border-t border-gray-100">
+                    <button type="button" onClick={() => openEditUser(u)}
+                      className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-[#001856] bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg py-1.5 transition-colors">
+                      <Edit size={12} /> Editar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenUserModal(item)}
-                      className="p-1 px-2.5 bg-gray-50 rounded text-amber-500 text-[9.5px] border border-gray-200"
-                    >
-                      EDITAR
+                    <button type="button" onClick={() => handleDeleteUser(u)}
+                      className="flex-1 flex items-center justify-center gap-1 text-[11px] font-semibold text-red-500 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg py-1.5 transition-colors">
+                      <Trash2 size={12} /> Remover
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -682,68 +731,103 @@ export default function SistemaConfig({
       {/* ==========================================
           IAM OPERATOR MODAL DETAILS
           ========================================== */}
-      {userModalOpen && activeUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSaveUser}
-            className="w-full max-w-sm bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-[#ffc300] uppercase tracking-widest">DEFINIR PERMISSÕES DO OPERADOR</span>
-              <button type="button" onClick={() => setUserModalOpen(false)} className="text-gray-400">Fechar</button>
+      {userModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <form onSubmit={handleSaveUser}
+            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+            {/* header */}
+            <div className="bg-[#001856] px-5 py-4 flex justify-between items-center">
+              <div>
+                <p className="text-[#ffc300] text-[10px] font-bold uppercase tracking-widest">
+                  {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+                </p>
+                <p className="text-white/60 text-xs mt-0.5">
+                  {editingUser ? 'Altere nome ou perfil de acesso' : 'Crie um acesso ao painel'}
+                </p>
+              </div>
+              <button type="button" onClick={() => setUserModalOpen(false)} className="text-white/40 hover:text-white">
+                <XIcon size={18} />
+              </button>
             </div>
 
-            <div className="p-4 space-y-3.5">
+            <div className="p-5 space-y-4">
+              {/* name */}
               <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1 text-gray-400">Nome do Colaborador Staff</label>
-                <input
-                  type="text"
-                  required
-                  value={activeUser.name || ''}
-                  onChange={(e) => setActiveUser({ ...activeUser, name: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 p-2 text-xs text-[#001856] rounded focus:outline-none"
-                />
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Nome completo</label>
+                <input required value={formName} onChange={e => setFormName(e.target.value)}
+                  placeholder="Ex: Maria Silva"
+                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856]" />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1 text-gray-400">Email Administrativo</label>
-                <input
-                  type="email"
-                  required
-                  value={activeUser.email || ''}
-                  onChange={(e) => setActiveUser({ ...activeUser, email: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 p-2 text-xs text-[#001856] rounded focus:outline-none"
-                  placeholder="empresa@orquestra.com"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              {/* email — only for new */}
+              {!editingUser && (
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Perfil Funcional</label>
-                  <select
-                    value={activeUser.role || 'Editor'}
-                    onChange={(e) => setActiveUser({ ...activeUser, role: e.target.value as any })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-gray-400 p-2 text-xs rounded"
-                  >
-                    <option value="Super Administrador">Super Administrador</option>
-                    <option value="Administrador">Administrador Geral</option>
-                    <option value="Secretaria">Secretaria Executiva</option>
-                    <option value="Financeiro">Tesoureiro / Financeiro</option>
-                    <option value="Editor">Editor Conteúdos</option>
-                  </select>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">E-mail</label>
+                  <input required type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)}
+                    placeholder="usuario@filarmonicademetais.com"
+                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856]" />
                 </div>
-                <div className="flex flex-col justify-end">
-                  <ImageUploader
-                    onUploadSuccess={(url) => setActiveUser({ ...activeUser, photo: url })}
-                  />
+              )}
+
+              {/* password — only for new */}
+              {!editingUser && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Senha inicial</label>
+                  <div className="relative">
+                    <input required type={showPass ? 'text' : 'password'} value={formPassword}
+                      onChange={e => setFormPassword(e.target.value)}
+                      placeholder="mín. 6 caracteres"
+                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 pr-10 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856]" />
+                    <button type="button" onClick={() => setShowPass(!showPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
+              )}
+
+              {/* role */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Perfil de acesso</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['admin', 'editor'] as UserRole[]).map(r => (
+                    <button key={r} type="button" onClick={() => setFormRole(r)}
+                      className={`py-2.5 rounded-lg border text-sm font-semibold transition-all ${
+                        formRole === r
+                          ? 'bg-[#001856] text-[#ffc300] border-[#001856]'
+                          : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                      }`}>
+                      {r === 'admin' ? 'Administrador' : 'Editor'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2">
+                  {formRole === 'admin'
+                    ? 'Admin vê tudo: conteúdo, pessoas, financeiro e configurações do sistema.'
+                    : 'Editor vê conteúdo, pessoas e financeiro. Não acessa configurações do sistema.'}
+                </p>
               </div>
 
+              {modalError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">
+                  {modalError}
+                </div>
+              )}
             </div>
 
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setUserModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Credenciais IAM</button>
+            <div className="border-t border-gray-100 px-5 py-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setUserModalOpen(false)}
+                className="text-xs text-gray-500 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button type="submit" disabled={modalSaving}
+                className="flex items-center gap-1.5 text-xs text-white px-5 py-2 bg-[#001856] hover:bg-[#002070] rounded-lg font-bold transition-colors disabled:opacity-50">
+                {modalSaving
+                  ? <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
+                  : <><Check size={13} /> {editingUser ? 'Salvar' : 'Criar Usuário'}</>
+                }
+              </button>
             </div>
           </form>
         </div>
