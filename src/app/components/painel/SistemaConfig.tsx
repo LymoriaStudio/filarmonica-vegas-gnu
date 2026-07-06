@@ -249,13 +249,13 @@ export default function SistemaConfig({
           >
             Mídia Biblioteca
           </button>} */}
-          <button
+          {/* <button
             type="button"
             onClick={() => setSubTab('instituicao')}
             className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'instituicao' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
           >
             Instituição & SEO
-          </button>
+          </button> */}
           <button
             type="button"
             onClick={() => setSubTab('auditoria')}
@@ -424,7 +424,7 @@ export default function SistemaConfig({
       {/* ==========================================================
           SUBTAB 3: INSTITUTIONAL CMS META CONFIGS
           ========================================================== */}
-      {subTab === 'instituicao' && (
+      {false && subTab === 'instituicao' && (
         <form onSubmit={handleSaveConfig} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 

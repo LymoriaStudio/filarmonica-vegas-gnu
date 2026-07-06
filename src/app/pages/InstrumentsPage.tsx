@@ -3,10 +3,19 @@ import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
-import { instruments, type Instrument } from "../data/instruments";
+import { getInstruments, type Instrument } from "../services/instrumentsService";
 
 export function InstrumentsPage() {
+  const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Instrument | null>(null);
+
+  useEffect(() => {
+    getInstruments()
+      .then(setInstruments)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -64,9 +73,20 @@ export function InstrumentsPage() {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {instruments.map((inst) => {
+            {loading && Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="rounded-2xl overflow-hidden shadow-lg animate-pulse">
+                <div className="h-64 bg-gray-200" />
+                <div className="p-6 bg-white space-y-3">
+                  <div className="h-6 bg-gray-200 rounded w-2/3" />
+                  <div className="h-4 bg-gray-100 rounded w-full" />
+                  <div className="h-4 bg-gray-100 rounded w-4/5" />
+                </div>
+              </div>
+            ))}
+            {!loading && instruments.map((inst) => {
               const isActive = selected?.slug === inst.slug;
               return (
+
                 <button
                   key={inst.slug}
                   onClick={() => setSelected(inst)}

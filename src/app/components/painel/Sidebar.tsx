@@ -64,7 +64,7 @@ const navGroups = [
     permissionKey: 'sistema',
     items: [
       { id: 'sistema-usuarios', label: 'Controle Usuários', icon: <ShieldAlert size={14} /> },
-      { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
+      // { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
       { id: 'sistema-auditoria', label: 'Logs Auditoria', icon: <FileClock size={14} /> },
     ],
   },

@@ -1,44 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router";
-
-const instruments = [
-  {
-    name: "Trompete",
-    description:
-      "O instrumento mais agudo do naipe dos metais. Versátil e brilhante, eternizado no jazz por nomes como Louis Armstrong, Miles Davis e Arturo Sandoval.",
-    image: "https://images.unsplash.com/photo-1627411187044-cc7a4daaca7d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-    color: "#ffc300",
-  },
-  {
-    name: "Trombone",
-    description:
-      "Instrumento bastante antigo, originado no século XV, antes conhecido como sacabuxa. Único entre os metais por usar uma vara deslizante em vez de pistões.",
-    image: "https://images.unsplash.com/photo-1547927168-17021e7ef8c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-    color: "#001856",
-  },
-  {
-    name: "Trompa",
-    description:
-      "Instrumento transpositor afinado em fá, com enorme extensão enrolada sobre si mesma. Permite grande variedade de timbres. O músico que a toca é chamado de trompista.",
-    image: "https://images.unsplash.com/photo-1701748533596-9d5a56a1cfe7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-    color: "#ffc300",
-  },
-  {
-    name: "Bombardino",
-    description:
-      "Também chamado de eufônio — cujo nome vem de Euphonium, \"som bonito\". Timbre escuro, suave e delicado, com extensão semelhante à do trombone.",
-    image: "https://images.unsplash.com/photo-1601333057494-d20abe2098cf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-    color: "#001856",
-  },
-  {
-    name: "Tuba",
-    description:
-      "O instrumento mais recente da família dos metais, surgido no século XIX. A base sonora de qualquer conjunto, presente da música clássica às bandas militares.",
-    image: "https://images.unsplash.com/photo-1776611713652-6ad5a5856237?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=600",
-    color: "#ffc300",
-  },
-];
+import { getInstruments, type Instrument } from "../services/instrumentsService";
 
 const GAP = 24; // gap-6 = 24px
 
@@ -50,9 +13,14 @@ function getVisibleCount(containerWidth: number): number {
 }
 
 export function Instruments() {
+  const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [current, setCurrent] = useState(0);
   const [visibleCount, setVisibleCount] = useState(3);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    getInstruments().then(setInstruments).catch(console.error);
+  }, []);
 
   // Atualiza visibleCount quando o container muda de tamanho
   const updateVisible = useCallback(() => {
