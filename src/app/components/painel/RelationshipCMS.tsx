@@ -379,27 +379,13 @@ export default function RelationshipCMS({
         <div>
           <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
             <HeartHandshake className="mr-2 text-[#ffc300]" size={20} />
-            Central de Atendimento & Ouvidoria (CRM)
+            Relacionamento
           </h2>
           <p className="text-xs text-gray-400 mt-1">
             Responda formulários do site público e converta interessados diretamente no ERP em 1 clique.
           </p>
         </div>
 
-        <div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
-          {(['interesse', 'apoiar'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setSubTab(t)}
-              className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${
-                subTab === t ? 'bg-[#001856] text-white shadow' : 'text-gray-400'
-              }`}
-            >
-              {t === 'interesse' ? 'Tenho Interesse (Bolsas)' : t === 'apoiar' ? 'Quero Apoiar (Parcerias)' : 'Contatos Gerais (Inbox)'}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* ================================================================
@@ -488,9 +474,9 @@ export default function RelationshipCMS({
                     <button
                       type="button"
                       onClick={() => handleOpenEnrollModal(inter)}
-                      className="p-2 px-3 bg-[#001856] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider shadow-lg"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
                     >
-                      <UserPlus size={13} className="mr-1.5" /> Converter em Aluno
+                      <UserPlus size={13} /> Converter em Aluno
                     </button>
                   )}
 
@@ -610,9 +596,9 @@ export default function RelationshipCMS({
                     <button
                       type="button"
                       onClick={() => handlePromoToSupporter(sup)}
-                      className="p-2 px-3 bg-[#001856] hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center tracking-wider"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
                     >
-                      <UserCheck size={13} className="mr-1.5" /> Tornar Apoiador Oficial
+                      <UserCheck size={13} /> Tornar Apoiador Oficial
                     </button>
                   )}
 

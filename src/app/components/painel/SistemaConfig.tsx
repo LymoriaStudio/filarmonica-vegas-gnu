@@ -231,47 +231,6 @@ export default function SistemaConfig({
           </p>
         </div>
 
-        {/* Local micro navigation controls */}
-        <div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
-          <button
-            type="button"
-            onClick={() => setSubTab('usuarios')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'usuarios' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
-          >
-           Usuários
-          </button>
-
-
-   {/* {       <button
-            type="button"
-            onClick={() => setSubTab('biblioteca')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'biblioteca' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
-          >
-            Mídia Biblioteca
-          </button>} */}
-          {/* <button
-            type="button"
-            onClick={() => setSubTab('instituicao')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'instituicao' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
-          >
-            Instituição & SEO
-          </button> */}
-          <button
-            type="button"
-            onClick={() => setSubTab('auditoria')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'auditoria' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
-          >
-            Auditoria
-          </button>
-     {    /*
-          <button
-            type="button"
-            onClick={() => setSubTab('backup')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'backup' ? 'bg-[#001856] text-white' : 'text-gray-400'}`}
-          >
-            Backups Catalunha
-          </button> */}
-        </div>
       </div>
 
       {/* ==========================================================
@@ -286,7 +245,7 @@ export default function SistemaConfig({
               <p className="text-xs text-gray-400 mt-0.5">Gerencie os acessos ao painel administrativo. Dois perfis: Admin (acesso total) e Editor (sem configurações do sistema).</p>
             </div>
             <button type="button" onClick={openNewUser}
-              className="flex items-center gap-1.5 p-1.5 px-3.5 bg-[#001856] hover:bg-[#002070] text-white rounded-lg text-xs font-semibold transition-colors">
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors">
               <UserPlus size={13} /> Novo Usuário
             </button>
           </div>

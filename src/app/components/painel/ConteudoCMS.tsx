@@ -649,38 +649,6 @@ export default function ConteudoCMS({
           </p>
         </div>
 
-        {/* Tab switcher options */}
-        <div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
-          <button
-            type="button"
-            onClick={() => setSubTab('eventos')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'eventos' ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-          >
-            Agenda de Eventos
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSubTab('cursos')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'cursos' ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-          >
-            Oficinas Acadêmicas
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('instrumentos')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'instrumentos' ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-          >
-            Instrumentos
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('galeria')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'galeria' ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-          >
-            Galeria Multimídia
-          </button>
-        </div>
       </div>
 
       {/* ==========================================================
@@ -696,7 +664,7 @@ export default function ConteudoCMS({
             <button
               type="button"
               onClick={() => handleOpenEventModal(null)}
-              className="p-2 px-3 bg-[#001856] hover:bg-blue-750 text-white rounded text-xs font-semibold cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
             >
               + Adicionar Novo Evento
             </button>
@@ -822,7 +790,7 @@ export default function ConteudoCMS({
             <button
               type="button"
               onClick={() => handleOpenCourseModal(null)}
-              className="p-2 px-3 bg-[#001856] text-white text-xs font-semibold rounded cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
             >
               + Lançar Nova Classe / Oficina
             </button>
@@ -892,7 +860,7 @@ export default function ConteudoCMS({
             <button
               type="button"
               onClick={() => handleOpenInstrumentModal(null)}
-              className="p-2 px-3 bg-[#001856] text-white text-xs font-semibold rounded cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
             >
               + Adicionar Instrumento
             </button>
@@ -997,7 +965,7 @@ export default function ConteudoCMS({
               <button
                 type="button"
                 onClick={() => handleOpenPhotoModal(null)}
-                className="p-1.5 px-3 bg-[#001856] hover:bg-blue-750 text-white text-xs font-mono font-bold rounded"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
               >
                 + Registrar Nova Foto
               </button>
@@ -1006,7 +974,7 @@ export default function ConteudoCMS({
               <button
                 type="button"
                 onClick={() => handleOpenVideoModal(null)}
-                className="p-1.5 px-3 bg-[#001856] hover:bg-blue-750 text-white text-xs font-mono font-bold rounded"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
               >
                 + Anexar Link de Vídeo Vimeo/YouTube
               </button>

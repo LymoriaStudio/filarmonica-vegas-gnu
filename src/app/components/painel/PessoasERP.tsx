@@ -339,24 +339,6 @@ const handleArchiveStudent = async (id: string, name: string) => {
           </p>
         </div>
 
-        {/* Local switcher nested */}
-        <div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
-          <button
-            type="button"
-            onClick={() => setSubTab('alunos')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'alunos' ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-          >
-            Alunos Bolsistas
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('professores')}
-            className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === 'professores' ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-          >
-            Corpo de Professores
-          </button>
-  
-        </div>
       </div>
 
       {/* ==========================================================
@@ -364,7 +346,30 @@ const handleArchiveStudent = async (id: string, name: string) => {
           ========================================================== */}
       {subTab === 'alunos' && (
         <div className="space-y-4">
-          
+
+          {/* KPI cards */}
+          {(() => {
+            const total = students?.length ?? 0;
+            const ativos = students?.filter(s => s.status === 'ativo').length ?? 0;
+            const espera = students?.filter(s => s.status === 'trancado').length ?? 0;
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-1">
+                  <span className="text-xs text-gray-400">Total cadastrados</span>
+                  <span className="text-3xl font-bold text-[#001856]">{total}</span>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-1">
+                  <span className="text-xs text-gray-400">Alunos ativos</span>
+                  <span className="text-3xl font-bold text-emerald-500">{ativos}</span>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-1">
+                  <span className="text-xs text-gray-400">Lista de espera</span>
+                  <span className="text-3xl font-bold text-amber-500">{espera}</span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Query, Filter and Action header */}
           <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-xl border border-gray-200">
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -419,9 +424,9 @@ const handleArchiveStudent = async (id: string, name: string) => {
               <button
                 type="button"
                 onClick={() => handleOpenStudentModal(null)}
-                className="p-2 px-3 bg-[#001856] hover:bg-[#001856] text-white rounded text-xs font-semibold cursor-pointer flex items-center"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
               >
-                <UserPlus size={13} className="mr-1.5" /> Novo Aluno
+                <UserPlus size={13} /> Novo Aluno
               </button>
             </div>
           </div>
@@ -494,11 +499,11 @@ const handleArchiveStudent = async (id: string, name: string) => {
                       </td>
                       <td className="p-3">
   <span className={`inline-block p-1 px-2 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-    alu.status === 'ativo'     ? 'bg-emerald-950 text-emerald-400' :
-    alu.status === 'inativo'   ? 'bg-amber-950 text-amber-400' :
-    alu.status === 'formado'   ? 'bg-indigo-950 text-indigo-400' :
-    alu.status === 'trancado'  ? 'bg-violet-950 text-violet-400' :
-    'bg-gray-100 text-gray-400'
+    alu.status === 'ativo'     ? 'bg-emerald-50 text-emerald-700' :
+    alu.status === 'inativo'   ? 'bg-amber-50 text-amber-700' :
+    alu.status === 'formado'   ? 'bg-indigo-50 text-indigo-700' :
+    alu.status === 'trancado'  ? 'bg-violet-50 text-violet-700' :
+    'bg-gray-100 text-gray-500'
   }`}>
     {alu.status === 'ativo'    && 'Ativo'}
     {alu.status === 'inativo'  && 'Inativo'}
@@ -555,7 +560,7 @@ const handleArchiveStudent = async (id: string, name: string) => {
             <button
               type="button"
               onClick={() => handleOpenProfModal(null)}
-              className="p-2 px-3 bg-[#001856] hover:bg-[#001856] text-white text-xs font-semibold rounded cursor-pointer flex items-center"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
             >
               + Adicionar Novo Professor
             </button>
@@ -681,7 +686,7 @@ const handleArchiveStudent = async (id: string, name: string) => {
             <button
               type="button"
               onClick={() => handleOpenOrgModal(null)}
-              className="p-2 px-3 bg-[#001856] text-white text-xs font-semibold rounded cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
             >
               + Adicionar Organizador
             </button>

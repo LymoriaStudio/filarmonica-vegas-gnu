@@ -1,19 +1,38 @@
 import { Buffer } from "buffer";
 window.Buffer = Buffer;
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import * as yup from "yup";
 import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft } from "lucide-react";
-import { QrCodePix } from "qrcode-pix";
-import { QRCodeSVG } from "qrcode.react";
+// import { QrCodePix } from "qrcode-pix"; // geração automática de Pix comentada
+// import { QRCodeSVG } from "qrcode.react"; // geração automática de Pix comentada
 import { schemaInteresse } from "../validations/contactRules";
 import { createInteressado } from "../services/interessadosService";
 import { createApoiador } from "../services/useApoiadores";
-import { createDoacao } from "../services/doacoesService"
+import { createDoacao } from "../services/doacoesService";
+import qrcode100 from "../../images/qrcode-100.png";
+import qrcode300 from "../../images/qrcode-300.png";
+import qrcode1000 from "../../images/qrcode-1000.png";
+import qrcodeDefinir from "../../images/qrcode-definir.png";
 
 type Tab = "interesse" | "apoio" | "doacao";
+type DonorType = "fisica" | "juridica";
 
 const interesseImage = "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
 const apoioImage = "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
+
+const QR_IMAGES: Record<number, string> = {
+  100: qrcode100,
+  300: qrcode300,
+  1000: qrcode1000,
+  0: qrcodeDefinir,
+};
+
+const donationOptions = [
+  { value: 100, label: "R$ 100" },
+  { value: 300, label: "R$ 300" },
+  { value: 1000, label: "R$ 1.000" },
+  { value: 0, label: "A definir" },
+];
 
 export function Contact() {
   const [tab, setTab] = useState<Tab>("interesse");
@@ -21,6 +40,8 @@ export function Contact() {
   const [donationAmount, setDonationAmount] = useState<number | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [loadingDoacao, setLoadingDoacao] = useState(false);
+  const [donorType, setDonorType] = useState<DonorType>("fisica");
+  const [donorForm, setDonorForm] = useState({ nome: "", cpf: "", email: "" });
   const [interesseForm, setInteresseForm] = useState({
     nome: "",
     email: "",
@@ -36,48 +57,22 @@ export function Contact() {
     tipo: "",
     mensagem: "",
   });
-  const [copied, setCopied] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [loadingSubmit, setLoadingSubmit] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(pixPayload).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  const donationOptions = [
-    { value: 100, label: "R$ 100" },
-    { value: 500, label: "R$ 500" },
-    { value: 1000, label: "R$ 1.000" },
-    { value: 0, label: "A definir" },
-  ];
-
-  const pixPayload = useMemo(() => {
-    if (donationAmount === null) return "";
-    try {
-      const pix = QrCodePix({
-        version: "01",
-        key: "45431497855",
-        name: "Filarmonica de Metais",
-        city: "Americana",
-        ...(donationAmount > 0 ? { value: donationAmount } : {}),
-        message: "Doacao",
-      });
-      return pix.payload();
-    } catch (e) {
-      console.error("Erro ao gerar Pix:", e);
-      return "";
-    }
-  }, [donationAmount]);
+  // const pixPayload = ... // geração automática de Pix comentada
 
   const handleDoareAgora = async () => {
     if (donationAmount === null) return;
 
     setLoadingDoacao(true);
     try {
-      await createDoacao({ amount: donationAmount });
+      await createDoacao({
+        amount: donationAmount,
+        donor_name: donorForm.nome || null,
+        donor_type: donorType,
+        donor_cpf: donorForm.cpf || null,
+        donor_email: donorForm.email || null,
+      });
     } catch (err) {
       console.error("Erro ao registrar doação no Supabase:", err);
     } finally {
@@ -200,6 +195,8 @@ export function Contact() {
     setDonationAmount(null);
     setShowQr(false);
     setErros({});
+    setDonorType("fisica");
+    setDonorForm({ nome: "", cpf: "", email: "" });
   };
 
   return (
@@ -355,8 +352,73 @@ export function Contact() {
 
                 {!showQr ? (
                   <>
+                    {/* Identificação do doador */}
                     <p
-                      className="text-white/80 mb-4"
+                      className="text-white/80 mb-3"
+                      style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", fontWeight: 600 }}
+                    >
+                      Identificação do doador:
+                    </p>
+
+                    {/* Toggle Pessoa Física / Jurídica */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setDonorType("fisica")}
+                        className={`py-3 rounded-xl border-2 transition-all ${
+                          donorType === "fisica"
+                            ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
+                            : "border-white/20 text-white hover:border-[#ffc300]/60"
+                        }`}
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "0.9rem" }}
+                      >
+                        Pessoa Física
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDonorType("juridica")}
+                        className={`py-3 rounded-xl border-2 transition-all ${
+                          donorType === "juridica"
+                            ? "bg-[#ffc300] border-[#ffc300] text-[#001856]"
+                            : "border-white/20 text-white hover:border-[#ffc300]/60"
+                        }`}
+                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: "0.9rem" }}
+                      >
+                        Pessoa Jurídica
+                      </button>
+                    </div>
+
+                    {/* Campos do doador */}
+                    <div className="flex flex-col gap-3 mb-5">
+                      <input
+                        type="text"
+                        placeholder="Nome completo *"
+                        value={donorForm.nome}
+                        onChange={(e) => setDonorForm((f) => ({ ...f, nome: e.target.value }))}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
+                      <input
+                        type="text"
+                        placeholder={donorType === "fisica" ? "CPF: 000.000.000-00 *" : "CNPJ: 00.000.000/0000-00 *"}
+                        value={donorForm.cpf}
+                        onChange={(e) => setDonorForm((f) => ({ ...f, cpf: e.target.value }))}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
+                      <input
+                        type="email"
+                        placeholder="E-mail (opcional)"
+                        value={donorForm.email}
+                        onChange={(e) => setDonorForm((f) => ({ ...f, email: e.target.value }))}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:border-[#ffc300] transition-colors"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      />
+                    </div>
+
+                    {/* Valor da doação */}
+                    <p
+                      className="text-white/80 mb-3"
                       style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem", fontWeight: 600 }}
                     >
                       Escolha o valor da sua doação:
@@ -390,7 +452,7 @@ export function Contact() {
                       style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
                     >
                       <QrCode size={18} />
-                      {loadingDoacao ? "Registrando..." : "Doar agora"}
+                      {loadingDoacao ? "Registrando..." : "Gerar QR Code e Doar"}
                     </button>
                   </>
                 ) : (
@@ -417,33 +479,14 @@ export function Contact() {
                         ? "Valor a combinar"
                         : `R$ ${donationAmount?.toLocaleString("pt-BR")},00`}
                     </p>
+                    {/* QR Code estático por valor */}
                     <div className="bg-white p-3 rounded-xl mb-4">
-                      {pixPayload ? (
-                        <QRCodeSVG value={pixPayload} size={208} />
-                      ) : (
-                        <p className="text-gray-400 text-sm w-52 h-52 flex items-center justify-center">
-                          QR Code indisponível
-                        </p>
-                      )}
+                      <img
+                        src={QR_IMAGES[donationAmount ?? 0]}
+                        alt={`QR Code Pix R$ ${donationAmount}`}
+                        className="w-52 h-52 object-contain"
+                      />
                     </div>
-                    {pixPayload && (
-                      <button
-                        type="button"
-                        onClick={handleCopy}
-                        className={`flex items-center gap-2 cursor-pointer px-5 py-2.5 rounded-xl border-2 transition-all mb-4 ${
-                          copied
-                            ? "border-green-400 text-green-400 bg-green-400/10"
-                            : "border-white/20 text-white/70 hover:border-[#ffc300] hover:text-[#ffc300]"
-                        }`}
-                        style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "0.85rem" }}
-                      >
-                        {copied ? (
-                          <><CheckCircle size={15} /> Código copiado!</>
-                        ) : (
-                          <><QrCode size={15} /> Copiar código Pix</>
-                        )}
-                      </button>
-                    )}
                     <p
                       className="text-white/60 max-w-xs"
                       style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.85rem", lineHeight: 1.6 }}

@@ -5,7 +5,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  DollarSign, FileClock, Plus, Award, Trash2, Download, FileSpreadsheet
+  DollarSign, FileClock, Plus, Award, Trash2, Download,
+  Pencil, X, CheckCircle, Clock,
 } from 'lucide-react';
 import { Supporter } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
@@ -13,6 +14,7 @@ import {
   getDoacoes,
   createDoacao,
   updateDoacao,
+  deleteDoacao,
   Doacao,
 } from '../../services/doacoesService';
 
@@ -21,12 +23,22 @@ function toDoacaoView(d: Doacao) {
   return {
     id: d.id ?? '',
     donorName: d.donor_name ?? 'Anônimo',
+    donorType: (d.donor_type ?? 'fisica') as 'fisica' | 'juridica',
+    donorCpf: d.donor_cpf ?? '',
+    donorEmail: d.donor_email ?? '',
     amount: Number(d.amount),
-    date: d.date ? new Date(d.date).toLocaleString('pt-BR') : '',
+    date: d.date ? new Date(d.date).toLocaleDateString('pt-BR') : '',
     status: d.status ?? 'pendente',
   };
 }
 type DoacaoView = ReturnType<typeof toDoacaoView>;
+
+function initials(name: string) {
+  const parts = name.trim().split(' ').filter(Boolean);
+  if (parts.length === 0) return 'A';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 interface FinanceiroERPProps {
   supporters: Supporter[];
@@ -48,20 +60,26 @@ export default function FinanceiroERP({
   const [doacoes, setDoacoes] = useState<DoacaoView[]>([]);
   const [loadingDoacoes, setLoadingDoacoes] = useState(false);
   const [errorDoacoes, setErrorDoacoes] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<'all' | 'fisica' | 'juridica'>('all');
 
-  // Modal nova doação
+  // Modal nova/editar doação
   const [donationModalOpen, setDonationModalOpen] = useState(false);
-  const [activeDonation, setActiveDonation] = useState<{ donorName: string; amount: number } | null>(null);
+  const [activeDonation, setActiveDonation] = useState<{
+    id?: string;
+    donorName: string;
+    donorType: 'fisica' | 'juridica';
+    donorCpf: string;
+    donorEmail: string;
+    amount: number | '';
+  } | null>(null);
   const [savingDonation, setSavingDonation] = useState(false);
 
   // Modal apoiador
   const [supporterModalOpen, setSupporterModalOpen] = useState(false);
   const [activeSupporter, setActiveSupporter] = useState<Partial<Supporter> | null>(null);
 
-  // CSV export
-  const [exportCsvLines, setExportCsvLines] = useState<string | null>(null);
 
-  // ── GET doações ao entrar na aba ──────────────────────────────────────────
+  // ── GET doações ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (subTab !== 'doacoes' && subTab !== 'relatorios') return;
     setLoadingDoacoes(true);
@@ -72,18 +90,49 @@ export default function FinanceiroERP({
       .finally(() => setLoadingDoacoes(false));
   }, [subTab]);
 
-  // ── POST nova doação ───────────────────────────────────────────────────────
+  // ── KPIs ─────────────────────────────────────────────────────────────────
+  const kpis = useMemo(() => {
+    const fisica = doacoes.filter((d) => d.donorType === 'fisica');
+    const juridica = doacoes.filter((d) => d.donorType === 'juridica');
+    const confirmados = doacoes.filter((d) => d.status === 'confirmado' && d.amount > 0);
+    const pendentes = doacoes.filter((d) => d.status !== 'confirmado' && d.amount > 0);
+    const volumeConfirmado = confirmados.reduce((s, d) => s + d.amount, 0);
+    const volumePendente = pendentes.reduce((s, d) => s + d.amount, 0);
+    return { total: doacoes.length, fisica: fisica.length, juridica: juridica.length, volumeConfirmado, volumePendente };
+  }, [doacoes]);
+
+  // ── Lista filtrada ────────────────────────────────────────────────────────
+  const filteredDoacoes = useMemo(() =>
+    filterType === 'all' ? doacoes : doacoes.filter((d) => d.donorType === filterType),
+    [doacoes, filterType]
+  );
+
+  // ── POST / PUT ────────────────────────────────────────────────────────────
   const handleSaveDonation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeDonation) return;
     setSavingDonation(true);
     try {
-      const saved = await createDoacao({
+      const payload = {
         donor_name: activeDonation.donorName || null,
-        amount: activeDonation.amount,
-      });
-      setDoacoes((prev) => [toDoacaoView(saved), ...prev]);
-      addAuditLog('Inseriu Doação', 'Financeiro', `Lançou doação de R$ ${activeDonation.amount} para ${activeDonation.donorName || 'Anônimo'}`);
+        donor_type: activeDonation.donorType,
+        donor_cpf: activeDonation.donorCpf || null,
+        donor_email: activeDonation.donorEmail || null,
+        amount: Number(activeDonation.amount) || 0,
+      };
+      if (activeDonation.id) {
+        await updateDoacao(activeDonation.id, payload);
+        setDoacoes((prev) => prev.map((d) =>
+          d.id === activeDonation.id
+            ? { ...d, ...payload, donorName: payload.donor_name ?? 'Anônimo', donorType: payload.donor_type, donorCpf: payload.donor_cpf ?? '', donorEmail: payload.donor_email ?? '', amount: payload.amount }
+            : d
+        ));
+        addAuditLog('Editou Doação', 'Financeiro', `Editou doação de ${activeDonation.donorName}`);
+      } else {
+        const saved = await createDoacao(payload);
+        setDoacoes((prev) => [toDoacaoView(saved), ...prev]);
+        addAuditLog('Inseriu Doação', 'Financeiro', `Lançou doação de R$ ${payload.amount} de ${payload.donor_name ?? 'Anônimo'}`);
+      }
       setDonationModalOpen(false);
       setActiveDonation(null);
     } catch (err: any) {
@@ -93,36 +142,56 @@ export default function FinanceiroERP({
     }
   };
 
-  // ── PUT confirmar ─────────────────────────────────────────────────────────
-  const handleConfirmDonation = async (id: string, name: string, value: number) => {
+  const handleDeleteDonation = async (id: string, name: string) => {
+    if (!confirm(`Excluir doação de ${name}?`)) return;
     try {
-      await updateDoacao(id, { status: 'confirmado' });
-      setDoacoes((prev) => prev.map((d) => d.id === id ? { ...d, status: 'confirmado' } : d));
-      addAuditLog('Confirmou Lançamento', 'Financeiro', `Confirmou doação de R$ ${value} de ${name}`);
-      alert(`PIX de R$ ${value.toLocaleString()} confirmado!`);
+      await deleteDoacao(id);
+      setDoacoes((prev) => prev.filter((d) => d.id !== id));
+      addAuditLog('Excluiu Doação', 'Financeiro', `Removeu doação de ${name}`);
     } catch (err: any) {
-      alert('Erro ao confirmar: ' + err.message);
+      alert('Erro ao excluir: ' + err.message);
     }
   };
 
-  // ── PUT cancelar ──────────────────────────────────────────────────────────
-  const handleCancelDonation = async (id: string, name: string, value: number) => {
+  const openNewDonation = () => {
+    setActiveDonation({ donorName: '', donorType: 'fisica', donorCpf: '', donorEmail: '', amount: '' });
+    setDonationModalOpen(true);
+  };
+
+  const openEditDonation = (d: DoacaoView) => {
+    setActiveDonation({ id: d.id, donorName: d.donorName, donorType: d.donorType, donorCpf: d.donorCpf, donorEmail: d.donorEmail, amount: d.amount });
+    setDonationModalOpen(true);
+  };
+
+  const handleToggleConfirm = async (d: DoacaoView) => {
+    const newStatus = d.status === 'confirmado' ? 'pendente' : 'confirmado';
     try {
-      await updateDoacao(id, { status: 'cancelado' });
-      setDoacoes((prev) => prev.map((d) => d.id === id ? { ...d, status: 'cancelado' } : d));
-      addAuditLog('Cancelou Lançamento', 'Financeiro', `Estornou doação de R$ ${value} de ${name}`);
+      await updateDoacao(d.id, { status: newStatus });
+      setDoacoes((prev) => prev.map((x) => x.id === d.id ? { ...x, status: newStatus } : x));
+      addAuditLog(
+        newStatus === 'confirmado' ? 'Confirmou Doação' : 'Reverteu Doação',
+        'Financeiro',
+        `${newStatus === 'confirmado' ? 'Confirmou' : 'Reverteu para pendente'} doação de R$ ${d.amount} de ${d.donorName}`
+      );
     } catch (err: any) {
-      alert('Erro ao cancelar: ' + err.message);
+      alert('Erro ao atualizar status: ' + err.message);
     }
   };
 
-  // ── CSV ───────────────────────────────────────────────────────────────────
+  // ── CSV download direto ───────────────────────────────────────────────────
   const handleExportCsv = () => {
-    let csv = 'ID,Doador,Valor,Data,Status\n';
+    const BOM = '﻿'; // BOM para Excel reconhecer UTF-8
+    let csv = 'ID,Doador,Tipo,CPF/CNPJ,E-mail,Valor (R$),Data,Status\n';
     doacoes.forEach((d) => {
-      csv += `"${d.id}","${d.donorName}",${d.amount},"${d.date}","${d.status}"\n`;
+      csv += `"${d.id}","${d.donorName}","${d.donorType === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}","${d.donorCpf}","${d.donorEmail}",${d.amount},"${d.date}","${d.status}"\n`;
     });
-    setExportCsvLines(csv);
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `doacoes_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
     addAuditLog('Exportou Doações', 'Financeiro', 'Emitiu planilha CSV de receitas');
   };
 
@@ -159,23 +228,17 @@ export default function FinanceiroERP({
   const reportTotals = useMemo(() => {
     const confirmed = doacoes.filter((d) => d.status === 'confirmada');
     const grandTotal = confirmed.reduce((s, d) => s + d.amount, 0);
-
     const now = new Date();
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const thisYear = String(now.getFullYear());
     const today = now.toLocaleDateString('pt-BR');
-
-    const dailyTotal = confirmed.filter((d) => d.date.startsWith(today)).reduce((s, d) => s + d.amount, 0);
+    const dailyTotal = confirmed.filter((d) => d.date === today).reduce((s, d) => s + d.amount, 0);
     const monthlyTotal = confirmed.filter((d) => d.date.includes(`/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`)).reduce((s, d) => s + d.amount, 0);
     const annualTotal = confirmed.filter((d) => d.date.includes(`/${now.getFullYear()}`)).reduce((s, d) => s + d.amount, 0);
-
     const rankMap: Record<string, number> = {};
     confirmed.forEach((d) => { rankMap[d.donorName] = (rankMap[d.donorName] || 0) + d.amount; });
     const rankingSorted = Object.entries(rankMap)
       .map(([name, total]) => ({ name, totalGived: total }))
       .sort((a, b) => b.totalGived - a.totalGived)
       .slice(0, 10);
-
     return { grandTotal, dailyTotal, monthlyTotal, annualTotal, rankingSorted };
   }, [doacoes]);
 
@@ -186,129 +249,183 @@ export default function FinanceiroERP({
       {/* Header */}
       <div className="pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
-            <DollarSign className="mr-2 text-emerald-400" size={20} />
-            Tesouraria & Captação Tributária (Financeiro)
+          <h2 className="text-xl font-bold text-[#001856] tracking-tight flex items-center gap-2">
+            <DollarSign className="text-emerald-500" size={20} />
+            Doações Diretas
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Lance doações diretas via PIX, gere planilhas fiscais consolidadas e gerencie patrocinadores.
+            Registros de doações via Pix — para envio à contabilidade
           </p>
         </div>
-
-       { /*<div className="flex bg-gray-100 border border-gray-200 p-0.5 rounded-lg text-xs">
-          {(['doacoes', 'apoiadores', 'relatorios'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setSubTab(t)}
-              className={`p-1.5 px-3 rounded-md font-semibold cursor-pointer transition-all ${subTab === t ? 'bg-[#001856] text-white shadow' : 'text-gray-400'}`}
-            >
-              {t === 'doacoes' ? 'Lançamentos Gerais' : t === 'apoiadores' ? 'Patrocinadores Jurídicos' : 'Relatórios Fiscais'}
-            </button>
-          ))}
-        </div> */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+          >
+            <Download size={13} /> CSV Contabilidade
+          </button>
+          <button
+            type="button"
+            onClick={openNewDonation}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
+          >
+            <Plus size={13} /> Nova doação
+          </button>
+        </div>
       </div>
 
       {/* ================================================================
-          SUBTAB 1 — DOAÇÕES (dados reais do Supabase)
+          SUBTAB — DOAÇÕES
           ================================================================ */}
       {subTab === 'doacoes' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center bg-white border border-gray-200 p-4 rounded-xl">
-            <div>
-              <h3 className="text-xs font-mono font-bold text-[#ffc300] uppercase tracking-wider">Aportes e Despesas Coletivas</h3>
-              <p className="text-[11px] text-gray-400 mt-0.5">Confirme doações para creditar o montante no saldo orquestral.</p>
+        <div className="space-y-5">
+
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-1">
+              <span className="text-xs text-gray-400">Total de doações</span>
+              <span className="text-3xl font-bold text-[#001856]">{kpis.total}</span>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs font-semibold cursor-pointer flex items-center"
-              >
-                <Download size={13} className="mr-1.5" /> Planilha de Receitas
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveDonation({ donorName: '', amount: 100 }); setDonationModalOpen(true); }}
-                className="p-2 px-3 bg-[#001856] hover:bg-blue-700 text-white text-xs font-semibold rounded cursor-pointer"
-              >
-                + Lançar Doação Direta
-              </button>
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-1">
+              <span className="text-xs text-[#001856] font-semibold">Pessoa Física / Jurídica</span>
+              <span className="text-3xl font-bold text-[#001856]">
+                {kpis.fisica} <span className="text-gray-300">/</span> {kpis.juridica}
+              </span>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-3">
+              <span className="text-xs text-gray-400">Volume declarado (R$)</span>
+              <div className="flex items-end gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-2xl font-bold text-emerald-500">
+                    R$ {kpis.volumeConfirmado.toLocaleString('pt-BR')}
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wide">Confirmado</span>
+                </div>
+                <span className="text-gray-200 text-2xl font-light mb-4">/</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-2xl font-bold text-amber-500">
+                    R$ {kpis.volumePendente.toLocaleString('pt-BR')}
+                  </span>
+                  <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide">Pendente</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {loadingDoacoes && <p className="text-gray-400 text-sm text-center py-8">Carregando doações...</p>}
-          {errorDoacoes && <p className="text-red-400 text-sm text-center py-8">{errorDoacoes}</p>}
-          {!loadingDoacoes && !errorDoacoes && doacoes.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8 border border-dashed border-gray-200 rounded-xl">Nenhuma doação registrada ainda.</p>
+          {/* Filtro por tipo */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">TIPO</span>
+            {([
+              { key: 'all', label: `Todos (${kpis.total})` },
+              { key: 'fisica', label: `Pessoa Física (${kpis.fisica})` },
+              { key: 'juridica', label: `Pessoa Jurídica (${kpis.juridica})` },
+            ] as const).map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilterType(f.key)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  filterType === f.key
+                    ? 'bg-[#001856] text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Estado loading / erro / vazio */}
+          {loadingDoacoes && <p className="text-gray-400 text-sm text-center py-10">Carregando doações...</p>}
+          {errorDoacoes && <p className="text-red-400 text-sm text-center py-10">{errorDoacoes}</p>}
+          {!loadingDoacoes && !errorDoacoes && filteredDoacoes.length === 0 && (
+            <p className="text-gray-400 text-sm text-center py-10 border border-dashed border-gray-200 rounded-2xl">
+              Nenhuma doação registrada ainda.
+            </p>
           )}
 
-          {doacoes.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 border-b border-gray-200 text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    <th className="p-3 pl-4">Identificador</th>
-                    <th className="p-3">Doador</th>
-                    <th className="p-3">Valor</th>
-                    <th className="p-3">Data</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-right pr-4">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {doacoes.map((don) => (
-                    <tr key={don.id} className="hover:bg-gray-100 transition-all font-mono">
-                      <td className="p-3 pl-4 text-gray-400 text-[10px]">{don.id.slice(0, 8)}…</td>
-                      <td className="p-3">
-                        <span className="block font-sans font-bold text-gray-800">{don.donorName}</span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-emerald-400 font-bold text-sm">
-                          R$ {don.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </td>
-                      <td className="p-3 text-gray-400">{don.date}</td>
-                      <td className="p-3">
-                        <span className={`inline-block p-1 px-2.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                          don.status === 'confirmado' ? 'bg-emerald-950 text-emerald-400'
-                          : don.status === 'pendente' ? 'bg-amber-900/30 text-amber-500'
-                          : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {don.status === 'confirmado' ? 'CONFIRMADA' : don.status === 'pendente' ? 'PENDENTE' : 'CANCELADA'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right pr-4 space-x-1.5 whitespace-nowrap">
-                        {don.status === 'pendente' && (
-                          <button
-                            type="button"
-                            onClick={() => handleConfirmDonation(don.id, don.donorName, don.amount)}
-                            className="p-1 px-2 bg-emerald-950 hover:bg-emerald-900 rounded text-emerald-400 font-sans font-bold text-[10px] uppercase cursor-pointer"
-                          >
-                            Confirmar
-                          </button>
-                        )}
-                        {don.status !== 'cancelado' && (
-                          <button
-                            type="button"
-                            onClick={() => handleCancelDonation(don.id, don.donorName, don.amount)}
-                            className="p-1 px-2 bg-gray-100 hover:bg-rose-950 text-gray-400 hover:text-rose-200 rounded text-[10px] font-sans cursor-pointer"
-                          >
-                            Anular
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {/* Lista de cards */}
+          <div className="space-y-3">
+            {filteredDoacoes.map((don) => {
+              const isPF = don.donorType === 'fisica';
+              return (
+                <div
+                  key={don.id}
+                  className="bg-white border border-gray-200 rounded-2xl px-5 py-4 flex items-center gap-4"
+                >
+                  {/* Avatar */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold ${
+                    isPF ? 'bg-[#001856] text-white' : 'bg-[#ffc300] text-[#001856]'
+                  }`}>
+                    {isPF ? 'PF' : 'PJ'}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-[#001856] text-sm">{don.donorName}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        isPF
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'bg-amber-50 text-amber-600'
+                      }`}>
+                        {isPF ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                      </span>
+                      <span className="text-emerald-500 font-bold text-sm">
+                        {don.amount === 0
+                          ? 'A definir'
+                          : `R$ ${don.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5 flex flex-wrap gap-x-2">
+                      {don.donorCpf && <span>{don.donorCpf}</span>}
+                      {don.donorEmail && <span>· {don.donorEmail}</span>}
+                      {don.date && <span>· {don.date}</span>}
+                    </div>
+                  </div>
+
+                  {/* Ações */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Botão de confirmação */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleConfirm(don)}
+                      title={don.status === 'confirmado' ? 'Reverter para pendente' : 'Confirmar doação'}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                        don.status === 'confirmado'
+                          ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                          : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                      }`}
+                    >
+                      {don.status === 'confirmado'
+                        ? <><CheckCircle size={13} /> Confirmado</>
+                        : <><Clock size={13} /> Pendente</>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEditDonation(don)}
+                      className="p-2 rounded-lg text-gray-400 hover:text-[#001856] hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDonation(don.id, don.donorName)}
+                      className="p-2 rounded-lg text-gray-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* ================================================================
-          SUBTAB 2 — APOIADORES (local, inalterado)
+          SUBTAB — APOIADORES
           ================================================================ */}
       {subTab === 'apoiadores' && (
         <div className="space-y-4">
@@ -317,7 +434,7 @@ export default function FinanceiroERP({
               <h3 className="text-xs font-mono font-bold text-amber-500 uppercase tracking-widest">Quadro Institucional de Apoio</h3>
               <p className="text-[11px] text-gray-400 mt-0.5">Estipule hierarquias de patrocínio corporativo e configure o site público.</p>
             </div>
-            <button type="button" onClick={() => handleOpenSupporterModal(null)} className="p-2 px-3 bg-[#001856] text-white text-xs font-semibold rounded cursor-pointer">
+            <button type="button" onClick={() => handleOpenSupporterModal(null)} className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors">
               + Adicionar Novo Patrocinador
             </button>
           </div>
@@ -341,7 +458,6 @@ export default function FinanceiroERP({
                     Patrocínio: {sup.sponsorshipLevel}
                   </span>
                 </div>
-
                 <div className="p-4 flex-1 bg-white text-[11px] text-gray-400 leading-snug">
                   <p className="min-h-12">"{sup.description}"</p>
                   <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between font-mono text-[9.5px]">
@@ -349,7 +465,6 @@ export default function FinanceiroERP({
                     <a href={sup.siteUrl} target="_blank" rel="noreferrer" className="text-[#ffc300] hover:underline">Site Corporativo</a>
                   </div>
                 </div>
-
                 <div className="p-2 px-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs">
                   <button
                     type="button"
@@ -370,12 +485,11 @@ export default function FinanceiroERP({
       )}
 
       {/* ================================================================
-          SUBTAB 3 — RELATÓRIOS
+          SUBTAB — RELATÓRIOS
           ================================================================ */}
       {subTab === 'relatorios' && (
         <div className="space-y-6">
           {loadingDoacoes && <p className="text-gray-400 text-sm text-center py-8">Carregando dados...</p>}
-
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
               { label: 'Entrada Diária', value: reportTotals.dailyTotal, color: 'text-[#001856]', sub: 'Somas do dia corrente' },
@@ -390,7 +504,6 @@ export default function FinanceiroERP({
               </div>
             ))}
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="p-5 rounded-xl bg-white border border-gray-200 space-y-4">
               <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
@@ -413,7 +526,6 @@ export default function FinanceiroERP({
                 )}
               </div>
             </div>
-
             <div className="p-5 rounded-xl bg-white border border-gray-200 space-y-4">
               <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
                 <FileClock size={15} className="text-sky-400" />
@@ -436,44 +548,92 @@ export default function FinanceiroERP({
       )}
 
       {/* ================================================================
-          MODAL: NOVA DOAÇÃO
+          MODAL: NOVA / EDITAR DOAÇÃO
           ================================================================ */}
       {donationModalOpen && activeDonation !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form onSubmit={handleSaveDonation} className="w-full max-w-md bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl">
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">Lançamento de Doação Recebida</span>
-              <button type="button" onClick={() => setDonationModalOpen(false)} className="text-gray-400">Fechar</button>
+          <form onSubmit={handleSaveDonation} className="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+              <span className="font-bold text-[#001856] text-sm">
+                {activeDonation.id ? 'Editar doação' : 'Nova doação'}
+              </span>
+              <button type="button" onClick={() => setDonationModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="p-4 space-y-3.5">
+            <div className="p-5 space-y-4">
+              {/* Tipo */}
+              <div className="grid grid-cols-2 gap-2">
+                {(['fisica', 'juridica'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setActiveDonation({ ...activeDonation, donorType: t })}
+                    className={`py-2.5 rounded-xl border-2 text-sm font-semibold transition-all cursor-pointer ${
+                      activeDonation.donorType === t
+                        ? 'bg-[#001856] border-[#001856] text-white'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    {t === 'fisica' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                  </button>
+                ))}
+              </div>
+
               <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Doador / Benfeitor</label>
+                <label className="block text-xs text-gray-500 mb-1 font-medium">Nome completo</label>
                 <input
                   type="text"
                   value={activeDonation.donorName}
                   onChange={(e) => setActiveDonation({ ...activeDonation, donorName: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  placeholder="Nome completo ou empresa (opcional)"
+                  placeholder="Nome do doador"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
                 />
               </div>
+
               <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Valor de Entrada R$</label>
+                <label className="block text-xs text-gray-500 mb-1 font-medium">
+                  {activeDonation.donorType === 'fisica' ? 'CPF' : 'CNPJ'}
+                </label>
+                <input
+                  type="text"
+                  value={activeDonation.donorCpf}
+                  onChange={(e) => setActiveDonation({ ...activeDonation, donorCpf: e.target.value })}
+                  placeholder={activeDonation.donorType === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1 font-medium">E-mail (opcional)</label>
+                <input
+                  type="email"
+                  value={activeDonation.donorEmail}
+                  onChange={(e) => setActiveDonation({ ...activeDonation, donorEmail: e.target.value })}
+                  placeholder="email@exemplo.com"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1 font-medium">Valor (R$)</label>
                 <input
                   type="number"
                   required
-                  min="1"
+                  min="0"
                   value={activeDonation.amount}
-                  onChange={(e) => setActiveDonation({ ...activeDonation, amount: Number(e.target.value) })}
-                  className="w-full bg-gray-50 border border-gray-200 text-emerald-400 p-2 text-xs rounded focus:outline-none font-mono font-bold"
+                  onChange={(e) => setActiveDonation({ ...activeDonation, amount: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="0"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-emerald-600 focus:outline-none focus:border-[#001856]"
                 />
               </div>
             </div>
 
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setDonationModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Voltar</button>
-              <button type="submit" disabled={savingDonation} className="text-xs text-white px-5 py-1 bg-emerald-700 font-bold rounded disabled:opacity-60">
-                {savingDonation ? 'Salvando...' : 'Creditar no Saldo'}
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-2">
+              <button type="button" onClick={() => setDonationModalOpen(false)} className="px-4 py-2 text-sm text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 cursor-pointer">Cancelar</button>
+              <button type="submit" disabled={savingDonation} className="px-6 py-2 text-sm font-bold bg-[#ffc300] text-[#001856] rounded-xl hover:bg-yellow-400 disabled:opacity-60 cursor-pointer">
+                {savingDonation ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </form>
@@ -492,7 +652,6 @@ export default function FinanceiroERP({
               </span>
               <button type="button" onClick={() => setSupporterModalOpen(false)} className="text-gray-400">Fechar</button>
             </div>
-
             <div className="p-4 space-y-3.5 max-h-[420px] overflow-y-auto">
               <div>
                 <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome Fantasia</label>
@@ -530,7 +689,6 @@ export default function FinanceiroERP({
                 <ImageUploader onUploadSuccess={(url) => setActiveSupporter({ ...activeSupporter, logo: url })} />
               </div>
             </div>
-
             <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
               <button type="button" onClick={() => setSupporterModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
               <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Mecenas</button>
@@ -539,32 +697,6 @@ export default function FinanceiroERP({
         </div>
       )}
 
-      {/* ================================================================
-          MODAL: CSV EXPORT
-          ================================================================ */}
-      {exportCsvLines && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-fade-in">
-          <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl">
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-emerald-400 flex items-center">
-                <FileSpreadsheet size={14} className="mr-2" /> DOAÇÕES EXPORTADAS (CSV)
-              </span>
-              <button onClick={() => setExportCsvLines(null)} className="text-gray-400">Fechar</button>
-            </div>
-            <div className="p-4 bg-gray-50 font-mono text-[10px] text-gray-400 overflow-auto max-h-72">
-              <pre>{exportCsvLines}</pre>
-            </div>
-            <div className="p-3 bg-white border-t border-gray-200 text-right">
-              <button
-                onClick={() => { navigator.clipboard.writeText(exportCsvLines); alert('Linhas CSV copiadas!'); setExportCsvLines(null); }}
-                className="p-1 px-4 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-mono font-semibold text-xs cursor-pointer"
-              >
-                Copiar Linhas CSV
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

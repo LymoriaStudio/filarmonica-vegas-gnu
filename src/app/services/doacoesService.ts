@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabase'
 export interface Doacao {
   id?: string
   donor_name?: string | null
+  donor_type?: 'fisica' | 'juridica' | null
+  donor_cpf?: string | null
+  donor_email?: string | null
   amount: number
   date?: string
   status?: string

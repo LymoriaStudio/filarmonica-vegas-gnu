@@ -255,7 +255,7 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
           </div>
         </div>
 
-        <div onClick={() => onNavigate('pessoas-professores')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
+        {/* <div onClick={() => onNavigate('pessoas-professores')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
           <div className="w-10 h-10 rounded-xl bg-[#ffc300] flex items-center justify-center flex-shrink-0">
             <UserCheck size={18} className="text-[#001856]" />
           </div>
@@ -264,7 +264,7 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
             <p className="text-xl font-bold text-[#001856]">{metrics.totalProfs}</p>
             <p className="text-xs text-gray-400">Sopros e Percussão</p>
           </div>
-        </div>
+        </div> */}
 
         <div onClick={() => onNavigate('financeiro-apoiadores')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
           <div className="w-10 h-10 rounded-xl bg-[#001856] flex items-center justify-center flex-shrink-0">

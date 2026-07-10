@@ -14,14 +14,6 @@ interface SidebarProps {
 
 const navGroups = [
   {
-    id: 'site',
-    title: 'Site Institucional',
-    permissionKey: 'site',
-    items: [
-      { id: 'site-banners', label: 'Hero Banners', icon: <Image size={14} /> },
-    ],
-  },
-  {
     id: 'pessoas',
     title: 'Pessoas (ERP)',
     permissionKey: 'pessoas',
@@ -52,6 +44,7 @@ const navGroups = [
     title: 'Conteúdo (CMS)',
     permissionKey: 'conteudo',
     items: [
+      { id: 'site-banners', label: 'Hero Banners', icon: <Image size={14} /> },
       { id: 'conteudo-eventos', label: 'Eventos / Concertos', icon: <Calendar size={14} /> },
       { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
       { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> },
@@ -64,7 +57,6 @@ const navGroups = [
     permissionKey: 'sistema',
     items: [
       { id: 'sistema-usuarios', label: 'Controle Usuários', icon: <ShieldAlert size={14} /> },
-      // { id: 'sistema-configuracoes', label: 'Configurações ERP', icon: <Settings size={14} /> },
       { id: 'sistema-auditoria', label: 'Logs Auditoria', icon: <FileClock size={14} /> },
     ],
   },
@@ -72,7 +64,6 @@ const navGroups = [
 
 export default function Sidebar({ activeTab, setActiveTab, userRole, permissions }: SidebarProps) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    site: true,
     pessoas: true,
     relacionamento: true,
     financeiro: true,

@@ -383,9 +383,9 @@ export default function SiteCMS({
             <button
               type="button"
               onClick={() => handleOpenBannerModal(null)}
-              className="p-2 px-3 bg-gradient-to-r from-[#001856] to-[#001856] text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center shadow-lg"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
             >
-              <Plus size={14} className="mr-1.5" /> Adicionar Banner
+              <Plus size={14} /> Adicionar Banner
             </button>
           </div>
 
@@ -408,9 +408,9 @@ export default function SiteCMS({
                       src={b.imageDesktop} 
                       alt={b.title} 
                       referrerPolicy="no-referrer"
-                      className="absolute inset-0 w-full h-full object-cover opacity-35" 
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/60 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                     <div className="relative p-4 text-center z-10 max-w-sm">
                       <span className="text-[8px] font-mono p-0.5 px-1.5 rounded-full bg-white text-[#ffc300] uppercase tracking-widest font-bold">
                         Slide {b.order} • {b.status}
