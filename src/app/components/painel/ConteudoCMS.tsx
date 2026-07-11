@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FolderLock, Presentation, Calendar, Newspaper, Film, Plus, Trash2, Edit,
-  Copy, Star, Eye, Globe, Sparkles, Image, Play, Check, Clock, CloudUpload, X
+  Copy, Star, Eye, Globe, Sparkles, Image, Play, Check, Clock, CloudUpload, X,
+  Search, LayoutGrid, List, SortAsc, Pencil, Music
 } from 'lucide-react';
 import { InstrumentEvent, NewsArticle, MusicCourse, GalleryPhoto, GalleryVideo, Professor, Instrument } from '../../validations/types';
 import { RichTextEditor, ImageUploader, Toast, uploadFileToSupabase } from './MiniWidgets';
+import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { supabase } from '../../../lib/supabase';
+import { dataCache } from '../../../lib/dataCache';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../../services/coursesServices';
 import { getProfessors } from '../../services/professorsService';
 import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile } from '../../services/storageService';
@@ -84,6 +87,12 @@ export default function ConteudoCMS({
   const initialSubTab = activeTab === 'conteudo-cursos' ? 'cursos' : activeTab === 'conteudo-galeria' ? 'galeria' : activeTab === 'conteudo-noticias' ? 'noticias' : activeTab === 'conteudo-instrumentos' ? 'instrumentos' : 'eventos';
   const [subTab, setSubTab] = useState<'eventos' | 'noticias' | 'cursos' | 'instrumentos' | 'galeria'>(initialSubTab as any);
 
+  // Events view controls
+  const [eventsSearch, setEventsSearch] = useState('');
+  const [eventsStatusFilter, setEventsStatusFilter] = useState<'todos' | 'published' | 'rascunho' | 'arquivado'>('todos');
+  const [eventsSort, setEventsSort] = useState<'recent' | 'oldest' | 'az'>('recent');
+  const [eventsViewMode, setEventsViewMode] = useState<'cards' | 'list'>('cards');
+
   // Multi-Mode Gallery Tab status
   const [galleryMode, setGalleryMode] = useState<'fotos' | 'videos' | 'midia'>('fotos');
 
@@ -131,6 +140,13 @@ export default function ConteudoCMS({
   // ==========================================
   useEffect(() => {
     const fetchEvents = async () => {
+      const cached = dataCache.get<InstrumentEvent[]>('events');
+      if (cached) {
+        setEvents(cached);
+        setEventsLoading(false);
+        return;
+      }
+
       setEventsLoading(true);
       const { data, error } = await supabase
         .from('events')
@@ -143,7 +159,9 @@ export default function ConteudoCMS({
         return;
       }
 
-      setEvents((data || []).map(mapEventFromDb));
+      const mapped = (data || []).map(mapEventFromDb);
+      dataCache.set('events', mapped);
+      setEvents(mapped);
       setEventsLoading(false);
     };
 
@@ -151,19 +169,32 @@ export default function ConteudoCMS({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sync cache when events state changes
   useEffect(() => {
+    if (!eventsLoading) {
+      dataCache.set('events', events);
+    }
+  }, [events, eventsLoading]);
+
+  useEffect(() => {
+    const cached = dataCache.get<MusicCourse[]>('courses');
+    if (cached) { setCourses(cached); setCoursesLoading(false); return; }
     setCoursesLoading(true);
     getCourses()
-      .then(setCourses)
-      .catch((error) => {
-        console.error('Erro ao buscar cursos:', error);
-      })
+      .then(data => { dataCache.set('courses', data); setCourses(data); })
+      .catch((error) => console.error('Erro ao buscar cursos:', error))
       .finally(() => setCoursesLoading(false));
   }, []);
 
   useEffect(() => {
+    if (!coursesLoading) dataCache.set('courses', courses);
+  }, [courses, coursesLoading]);
+
+  useEffect(() => {
+    const cached = dataCache.get<Professor[]>('professors');
+    if (cached) { setProfessorsList(cached); return; }
     getProfessors()
-      .then(setProfessorsList)
+      .then(data => { dataCache.set('professors', data); setProfessorsList(data); })
       .catch((err) => console.error('Erro ao carregar professores:', err));
   }, []);
 
@@ -171,12 +202,18 @@ export default function ConteudoCMS({
   // LOAD INSTRUMENTS FROM SUPABASE
   // ==========================================
   useEffect(() => {
+    const cached = dataCache.get<Instrument[]>('instruments');
+    if (cached) { setInstruments(cached); setInstrumentsLoading(false); return; }
     setInstrumentsLoading(true);
     getInstruments()
-      .then(setInstruments)
+      .then(data => { dataCache.set('instruments', data); setInstruments(data); })
       .catch((err) => console.error('Erro ao carregar instrumentos:', err))
       .finally(() => setInstrumentsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!instrumentsLoading) dataCache.set('instruments', instruments);
+  }, [instruments, instrumentsLoading]);
 
   const fetchMediaLibrary = async () => {
     setMediaLoading(true);
@@ -633,29 +670,31 @@ export default function ConteudoCMS({
     addAuditLog('Ejetou Vídeo Link', 'Conteúdo', `Removeu player de vídeo: ${title}`);
   };
 
+  const filteredEvents = useMemo(() => {
+    let list = [...events];
+    if (eventsSearch.trim()) {
+      const q = eventsSearch.toLowerCase();
+      list = list.filter(e => e.title.toLowerCase().includes(q) || e.location?.toLowerCase().includes(q));
+    }
+    if (eventsStatusFilter !== 'todos') {
+      list = list.filter(e => e.status === eventsStatusFilter);
+    }
+    if (eventsSort === 'recent') list.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+    else if (eventsSort === 'oldest') list.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+    else if (eventsSort === 'az') list.sort((a, b) => a.title.localeCompare(b.title));
+    return list;
+  }, [events, eventsSearch, eventsStatusFilter, eventsSort]);
+
 
   return (
     <div className="space-y-6 p-6 animate-fade-in select-none">
-
-      {/* CMS Header title */}
-      <div className="pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
-            <Presentation className="mr-2 text-sky-450" size={20} />
-            Editor Geral de Conteúdos & Mídia (CMS)
-          </h2>
-          <p className="text-xs text-gray-400 mt-1">
-            Controle concertos ao vivo na agenda, edite comunicados à imprensa com editor gráfico e altere cursos de capacitação técnica.
-          </p>
-        </div>
-
-      </div>
 
       {/* ==========================================================
           SUBTAB 1: EVENTS LIST & DUPLICATION (CMS AGENDA)
           ========================================================== */}
       {subTab === 'eventos' && (
         <div className="space-y-4">
+          {/* Header row */}
           <div className="flex justify-between items-center bg-white border border-gray-200 p-4 rounded-xl">
             <div>
               <span className="text-[10px] uppercase font-mono font-bold text-amber-500 tracking-wider">Mural Orquestral de Apresentações</span>
@@ -670,103 +709,261 @@ export default function ConteudoCMS({
             </button>
           </div>
 
+          {/* Toolbar: search + filters + view toggle */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search */}
+            <div className="relative flex-1 min-w-48">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar evento por nome ou local..."
+                value={eventsSearch}
+                onChange={e => setEventsSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#ffc300] placeholder:text-gray-400"
+              />
+            </div>
+
+            {/* Status filter select */}
+            <select
+              value={eventsStatusFilter}
+              onChange={e => setEventsStatusFilter(e.target.value as typeof eventsStatusFilter)}
+              className="px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#ffc300] cursor-pointer"
+            >
+              <option value="todos">Todos os status</option>
+              <option value="published">Publicado</option>
+              <option value="rascunho">Rascunho</option>
+              <option value="arquivado">Arquivado</option>
+            </select>
+
+            {/* Sort select */}
+            <div className="relative">
+              <SortAsc size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <select
+                value={eventsSort}
+                onChange={e => setEventsSort(e.target.value as typeof eventsSort)}
+                className="pl-7 pr-7 py-1.5 text-[10px] font-mono border border-gray-200 rounded-lg bg-white focus:outline-none cursor-pointer appearance-none"
+              >
+                <option value="recent">Mais recentes</option>
+                <option value="oldest">Mais antigos</option>
+                <option value="az">Nome A→Z</option>
+              </select>
+            </div>
+
+            {/* Card / List toggle */}
+            <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setEventsViewMode('cards')}
+                title="Visualização em cards"
+                className={`p-2 cursor-pointer transition-colors ${eventsViewMode === 'cards' ? 'bg-[#001856] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+              >
+                <LayoutGrid size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEventsViewMode('list')}
+                title="Visualização em lista"
+                className={`p-2 cursor-pointer transition-colors ${eventsViewMode === 'list' ? 'bg-[#001856] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+              >
+                <List size={13} />
+              </button>
+            </div>
+          </div>
+
           {eventsLoading ? (
             <div className="text-center py-12 text-xs text-gray-400 font-mono">Carregando eventos...</div>
-          ) : events.length === 0 ? (
+          ) : filteredEvents.length === 0 ? (
             <div className="text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
-              Nenhum evento cadastrado ainda.
+              {events.length === 0 ? 'Nenhum evento cadastrado ainda.' : 'Nenhum evento encontrado para este filtro.'}
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xxl:grid-cols-3 gap-6">
-              {events.map((evt) => (
+          ) : eventsViewMode === 'cards' ? (
+            /* ── CARD VIEW ── */
+            <div className="grid grid-cols-1 md:grid-cols-2 xxl:grid-cols-3 gap-5">
+              {filteredEvents.map((evt) => (
                 <div
                   key={evt.id}
-                  className="rounded-xl overflow-hidden bg-white border border-gray-100 flex flex-col justify-between hover:border-gray-300 transition"
+                  className="rounded-2xl overflow-hidden bg-white border border-gray-100 flex flex-col hover:border-gray-300 hover:shadow-sm transition-all"
                 >
+                  {/* Cover image */}
                   <div className="relative">
                     <img
                       src={evt.cover}
                       alt={evt.title}
                       referrerPolicy="no-referrer"
-                      className="w-full h-36 object-cover bg-gray-50"
+                      className="w-full h-40 object-cover bg-gray-50"
                     />
-                    {/* Category badging */}
-                    <span className="absolute top-2 left-2 bg-black/75 backdrop-blur-sm text-amber-500 text-[9px] font-mono font-bold uppercase p-1 px-2.5 rounded-full border border-gray-200">
+                    {/* Category badge */}
+                    <span className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm text-amber-400 text-[9px] font-bold uppercase px-2.5 py-1 rounded-full">
                       {evt.category}
                     </span>
-
-                    {/* Featured badge */}
-                    {evt.featured && (
-                      <span className="absolute top-2 right-2 bg-[#ffc300]/95 text-black text-[9px] font-extrabold uppercase p-1 px-2.5 rounded-full flex items-center">
-                        <Star size={10} className="mr-1 fill-black" /> Destaque
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-4 flex-1 space-y-2">
-                    <span className="text-[9.5px] font-mono text-neutral-550 flex items-center">
-                      <Clock size={11} className="mr-1 inline text-[#001856]" />
-                      {evt.date} • {evt.time}
-                    </span>
-                    <h4 className="text-xs font-bold text-[#001856] font-sans tracking-tight leading-snug">{evt.title}</h4>
-                    <p className="text-[11px] text-gray-400 line-clamp-3">{evt.description}</p>
+                    {/* Ticket badge */}
                     {evt.isPaid && evt.ticket != null && (
-                      <span className="inline-block text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/50 p-0.5 px-2 rounded">
-                        Ingresso: R$ {Number(evt.ticket).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      <span className="absolute bottom-3 right-3 bg-emerald-600 text-white text-[9px] font-bold px-2.5 py-1 rounded-full">
+                        R$ {Number(evt.ticket).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {!evt.isPaid && (
+                      <span className="absolute bottom-3 right-3 bg-sky-600 text-white text-[9px] font-bold px-2.5 py-1 rounded-full">
+                        Gratuito
                       </span>
                     )}
                   </div>
 
-                  {/* Additional event lines */}
-                  <div className="p-3.5 bg-gray-50 font-mono text-[9.5px] text-gray-400 border-t border-gray-100 flex justify-between select-none">
-                    <span className="truncate max-w-56">Local: {evt.location}</span>
-                    <span className={`p-0.5 px-2 rounded text-[8px] uppercase font-bold tracking-widest ${
-                      evt.status === 'published' ? 'bg-emerald-950 text-emerald-400' :
-                      evt.status === 'rascunho' ? 'bg-gray-100 text-gray-400' :
-                      'bg-rose-955 text-rose-500'
-                    }`}>
-                      {evt.status === 'published' ? 'Publicado' : evt.status === 'rascunho' ? 'Rascunho' : 'Arquivado'}
-                    </span>
+                  {/* Body */}
+                  <div className="p-4 flex-1 space-y-2.5">
+                    {/* Status + date row */}
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        evt.status === 'published' ? 'bg-emerald-50 text-emerald-700' :
+                        evt.status === 'rascunho' ? 'bg-gray-100 text-gray-500' :
+                        'bg-rose-50 text-rose-600'
+                      }`}>
+                        {evt.status === 'published' ? 'Publicado' : evt.status === 'rascunho' ? 'Rascunho' : 'Arquivado'}
+                      </span>
+                      <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                        <Clock size={10} className="text-[#001856]" />
+                        {evt.date}{evt.time ? ` • ${evt.time}` : ''}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-sm font-bold text-[#001856] leading-snug tracking-tight">{evt.title}</h4>
+
+                    {/* Description */}
+                    <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed">{evt.description}</p>
+
+                    {/* Location */}
+                    {evt.location && (
+                      <p className="text-[10px] text-gray-400 truncate">📍 {evt.location}</p>
+                    )}
                   </div>
 
-                  {/* Event Actions Footer */}
-                  <div className="p-2.5 bg-neutral-955 border-t border-gray-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFeatureEvent(evt.id, evt.title, !evt.featured)}
-                        className={`text-[9px] font-mono font-bold p-1 px-2 rounded cursor-pointer transition-all ${
-                          evt.featured ? 'bg-[#ffc300]/10 text-[#ffc300]' : 'bg-white text-gray-400'
-                        }`}
-                      >
-                        Destaque {evt.featured ? 'Sim' : 'Não'}
-                      </button>
-                      <button
-                        type="button"
-                        title="Duplicar Evento"
-                        onClick={() => handleDuplicateEvent(evt)}
-                        className="p-1.5 bg-white hover:bg-gray-100 rounded text-gray-400 hover:text-[#001856]"
-                      >
-                        <Copy size={11} />
-                      </button>
-                    </div>
+                  {/* Footer: destaque toggle left, actions right */}
+                  <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/60">
+                    {/* Destaque na Home toggle */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFeatureEvent(evt.id, evt.title, !evt.featured)}
+                      className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-all ${
+                        evt.featured
+                          ? 'bg-[#ffc300]/15 text-[#a87d00]'
+                          : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      <Star size={11} className={evt.featured ? 'fill-[#ffc300] text-[#ffc300]' : ''} />
+                      Destaque na Home
+                    </button>
 
-                    <div className="flex space-x-1">
+                    {/* Action icons */}
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => handleOpenEventModal(evt)}
-                        className="p-1 bg-white text-amber-500 rounded cursor-pointer px-2 text-[10.5px] font-mono font-bold"
+                        title="Duplicar"
+                        onClick={() => handleDuplicateEvent(evt)}
+                        className="p-2 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-[#001856] hover:border-gray-300 transition-colors cursor-pointer"
                       >
-                        EDITAR
+                        <Copy size={13} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteEvent(evt.id, evt.title)}
-                        className="p-1 bg-white text-rose-500 rounded cursor-pointer px-2 text-[10.5px] font-mono font-bold"
+                        title="Editar"
+                        onClick={() => handleOpenEventModal(evt)}
+                        className="p-2 rounded-lg bg-white border border-gray-200 text-amber-500 hover:bg-amber-50 hover:border-amber-200 transition-colors cursor-pointer"
                       >
-                        EXCLUIR
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        title="Excluir"
+                        onClick={() => handleDeleteEvent(evt.id, evt.title)}
+                        className="p-2 rounded-lg bg-white border border-gray-200 text-rose-400 hover:bg-rose-50 hover:border-rose-200 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={13} />
                       </button>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* ── LIST VIEW ── */
+            <div className="space-y-2">
+              {filteredEvents.map((evt) => (
+                <div
+                  key={evt.id}
+                  className="flex items-center gap-4 bg-white border border-gray-100 rounded-xl p-3 hover:border-gray-300 hover:shadow-sm transition-all"
+                >
+                  {/* Thumb */}
+                  <img
+                    src={evt.cover}
+                    alt={evt.title}
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 object-cover rounded-lg shrink-0 bg-gray-50"
+                  />
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        evt.status === 'published' ? 'bg-emerald-50 text-emerald-700' :
+                        evt.status === 'rascunho' ? 'bg-gray-100 text-gray-500' :
+                        'bg-rose-50 text-rose-600'
+                      }`}>
+                        {evt.status === 'published' ? 'Publicado' : evt.status === 'rascunho' ? 'Rascunho' : 'Arquivado'}
+                      </span>
+                      <span className="text-[9px] font-mono text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{evt.category}</span>
+                      {evt.featured && (
+                        <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Star size={9} className="fill-amber-500" /> Destaque
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-bold text-[#001856] truncate">{evt.title}</p>
+                    <p className="text-[10px] text-gray-400 flex items-center gap-3">
+                      <span className="flex items-center gap-1"><Clock size={10} />{evt.date}{evt.time ? ` • ${evt.time}` : ''}</span>
+                      {evt.location && <span className="truncate">📍 {evt.location}</span>}
+                      {evt.isPaid && evt.ticket != null && (
+                        <span className="text-emerald-600 font-bold">R$ {Number(evt.ticket).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFeatureEvent(evt.id, evt.title, !evt.featured)}
+                      title="Destaque na Home"
+                      className={`p-2 rounded-lg border cursor-pointer transition-colors ${
+                        evt.featured ? 'bg-amber-50 border-amber-200 text-amber-500' : 'bg-white border-gray-200 text-gray-300 hover:text-amber-400 hover:border-amber-200'
+                      }`}
+                    >
+                      <Star size={13} className={evt.featured ? 'fill-amber-500' : ''} />
+                    </button>
+                    <button
+                      type="button"
+                      title="Duplicar"
+                      onClick={() => handleDuplicateEvent(evt)}
+                      className="p-2 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-[#001856] hover:border-gray-300 cursor-pointer transition-colors"
+                    >
+                      <Copy size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      title="Editar"
+                      onClick={() => handleOpenEventModal(evt)}
+                      className="p-2 rounded-lg bg-white border border-gray-200 text-amber-500 hover:bg-amber-50 hover:border-amber-200 cursor-pointer transition-colors"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      title="Excluir"
+                      onClick={() => handleDeleteEvent(evt.id, evt.title)}
+                      className="p-2 rounded-lg bg-white border border-gray-200 text-rose-400 hover:bg-rose-50 hover:border-rose-200 cursor-pointer transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1115,664 +1312,314 @@ export default function ConteudoCMS({
           MODALS DRAG OVERLAYS
           ========================================================== */}
 
-      {/* Modal A: Event registration */}
-      {eventModalOpen && activeEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSaveEvent}
-            className="w-full max-w-xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">
-                {activeEvent.id ? 'Ajuste da Programação da Agenda' : 'Novo Evento na Agenda'}
-              </span>
-              <button type="button" onClick={() => setEventModalOpen(false)} className="text-gray-400">Fechar</button>
+      {/* Drawer A: Event */}
+      <Drawer
+        open={eventModalOpen && !!activeEvent}
+        onClose={() => setEventModalOpen(false)}
+        title={activeEvent?.id ? 'Editar evento na agenda' : 'Novo evento na agenda'}
+        description="Preencha as informações do evento abaixo."
+        icon={Calendar}
+        iconBg="bg-amber-50"
+        iconColor="text-amber-500"
+        onSubmit={handleSaveEvent}
+        submitLabel={eventSaving ? 'Salvando...' : 'Salvar evento'}
+        submitting={eventSaving}
+      >
+        {activeEvent && (<>
+          <DrawerSection title="Informações Principais">
+            <DrawerField label="Título do concerto / evento" required>
+              <DrawerInput type="text" required value={activeEvent.title || ''} onChange={e => setActiveEvent({ ...activeEvent, title: e.target.value })} placeholder="Ex: Noite de Metais Clássicos – Schubert" />
+            </DrawerField>
+            <DrawerField label="Breve descrição para o card">
+              <DrawerTextarea value={activeEvent.description || ''} onChange={e => setActiveEvent({ ...activeEvent, description: e.target.value })} rows={3} maxLength={200} placeholder="Resumo curto que será exibido no card do evento..." />
+              <p className="text-[10px] text-gray-400 text-right mt-1">{(activeEvent.description || '').length}/200</p>
+            </DrawerField>
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Data de realização" required>
+                <DrawerInput type="date" required value={activeEvent.date || ''} onChange={e => setActiveEvent({ ...activeEvent, date: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Horário de início" required>
+                <DrawerInput type="time" required value={activeEvent.time || ''} onChange={e => setActiveEvent({ ...activeEvent, time: e.target.value })} />
+              </DrawerField>
             </div>
-
-            <div className="p-4 space-y-3.5 max-h-[440px] overflow-y-auto">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Título do Concerto / Evento</label>
-                <input
-                  type="text"
-                  required
-                  value={activeEvent.title || ''}
-                  onChange={(e) => setActiveEvent({ ...activeEvent, title: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  placeholder="Ex: Noite de Metais Clássicos - Schubert"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Breve Descrição para o Card</label>
-                <textarea
-                  required
-                  value={activeEvent.description || ''}
-                  onChange={(e) => setActiveEvent({ ...activeEvent, description: e.target.value })}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Data de Realização</label>
-                  <input
-                    type="date"
-                    required
-                    value={activeEvent.date || ''}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, date: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1">Horário de Início</label>
-                  <input
-                    type="text"
-                    required
-                    value={activeEvent.time || ''}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, time: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                    placeholder="Ex: 19:30"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Local / Palco Principal</label>
-                  <input
-                    type="text"
-                    required
-                    value={activeEvent.location || ''}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, location: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded"
-                    placeholder="Ex: Auditório Externo do Conservatório"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Categoria de Entrada</label>
-                  <input
-                    type="text"
-                    required
-                    value={activeEvent.category || ''}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, category: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Endereço Completo</label>
-                <input
-                  type="text"
-                  required
-                  value={activeEvent.address || ''}
-                  onChange={(e) => setActiveEvent({ ...activeEvent, address: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded"
-                  placeholder="Ex: Pça Ramos de Azevedo, Centro - São Paulo, SP"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Link Google Maps (opcional)</label>
-                  <input
-                    type="text"
-                    value={activeEvent.mapsUrl || ''}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, mapsUrl: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                    placeholder="https://maps.google.com/..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Link Externo (inscrição/ingresso)</label>
-                  <input
-                    type="text"
-                    value={activeEvent.link || ''}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, link: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                    placeholder="https://..."
-                  />
-                </div>
-              </div>
-
-              {/* É pago? */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">É Pago?</label>
-                  <select
-                    value={activeEvent.isPaid ? 'sim' : 'nao'}
-                    onChange={(e) => {
-                      const isPaid = e.target.value === 'sim';
-                      setActiveEvent(prev => prev ? {
-                        ...prev,
-                        isPaid,
-                        ticket: isPaid ? prev.ticket : undefined,
-                      } : prev);
-                    }}
-                    className="w-full bg-gray-50 border border-neutral-820 text-gray-400 p-2 text-xs rounded"
-                  >
-                    <option value="nao">Não (Entrada Gratuita)</option>
-                    <option value="sim">Sim (Evento Pago)</option>
-                  </select>
-                </div>
-
-                {/* Campo de valor só aparece se for pago */}
-                {activeEvent.isPaid && (
-                  <div>
-                    <label className="block text-[10px] font-mono uppercase text-emerald-500 mb-1">Valor do Ingresso (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      value={activeEvent.ticket ?? ''}
-                      onChange={(e) => setActiveEvent({ ...activeEvent, ticket: e.target.value === '' ? undefined : Number(e.target.value) })}
-                      className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                      placeholder="Ex: 25.00"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Status Publicação</label>
-                  <select
-                    value={activeEvent.status || 'rascunho'}
-                    onChange={(e) => setActiveEvent({ ...activeEvent, status: e.target.value as any })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-gray-400 p-2 text-xs rounded"
-                  >
-                    <option value="published">Liberado ao Público (Ativo)</option>
+          </DrawerSection>
+          <DrawerSection title="Localização">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Local / Palco principal" required>
+                <DrawerInput type="text" required value={activeEvent.location || ''} onChange={e => setActiveEvent({ ...activeEvent, location: e.target.value })} placeholder="Theatro Municipal..." />
+              </DrawerField>
+              <DrawerField label="Categoria de entrada" required>
+                <DrawerInput type="text" required value={activeEvent.category || ''} onChange={e => setActiveEvent({ ...activeEvent, category: e.target.value })} placeholder="Concerto, Oficina..." />
+              </DrawerField>
+            </div>
+            <DrawerField label="Endereço completo">
+              <DrawerInput type="text" value={activeEvent.address || ''} onChange={e => setActiveEvent({ ...activeEvent, address: e.target.value })} placeholder="Rua, número, bairro, cidade, estado" />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Links" optional>
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Link Google Maps">
+                <DrawerInput type="text" value={activeEvent.mapsUrl || ''} onChange={e => setActiveEvent({ ...activeEvent, mapsUrl: e.target.value })} placeholder="https://maps.google.com/..." className="font-mono text-xs" />
+              </DrawerField>
+              <DrawerField label="Link externo (ingresso)">
+                <DrawerInput type="text" value={activeEvent.link || ''} onChange={e => setActiveEvent({ ...activeEvent, link: e.target.value })} placeholder="https://..." className="font-mono text-xs" />
+              </DrawerField>
+            </div>
+          </DrawerSection>
+          <DrawerSection title="Configurações">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="É pago?" required>
+                <DrawerSelect value={activeEvent.isPaid ? 'sim' : 'nao'} onChange={e => { const p = e.target.value === 'sim'; setActiveEvent(prev => prev ? { ...prev, isPaid: p, ticket: p ? prev.ticket : undefined } : prev); }}>
+                  <option value="nao">Não (Entrada Gratuita)</option>
+                  <option value="sim">Sim (Evento Pago)</option>
+                </DrawerSelect>
+              </DrawerField>
+              {activeEvent.isPaid ? (
+                <DrawerField label="Valor do ingresso (R$)" required>
+                  <DrawerInput type="number" step="0.01" min="0" required value={activeEvent.ticket ?? ''} onChange={e => setActiveEvent({ ...activeEvent, ticket: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="35,00" />
+                </DrawerField>
+              ) : (
+                <DrawerField label="Status publicação" required>
+                  <DrawerSelect value={activeEvent.status || 'rascunho'} onChange={e => setActiveEvent({ ...activeEvent, status: e.target.value as any })}>
+                    <option value="published">Liberado ao Público</option>
                     <option value="rascunho">Rascunho Interno</option>
                     <option value="arquivado">Arquivado</option>
-                  </select>
-                </div>
-                <div className="flex flex-col justify-end">
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Upload Imagem de Capa</label>
-                  {activeEvent.cover && (
-                    <img
-                      src={activeEvent.cover}
-                      alt="Pré-visualização capa"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-20 object-cover rounded border border-gray-200 mb-2"
-                    />
-                  )}
-                  <ImageUploader
-                    allowedTypes="Imagens (.jpg, .png, .webp)"
-                    onFileSelected={(file, previewUrl) => {
-                      setPendingEventCoverFile(file);
-                      setActiveEvent(prev => prev ? { ...prev, cover: previewUrl } : prev);
-                    }}
-                  />
-                </div>
-              </div>
-
+                  </DrawerSelect>
+                </DrawerField>
+              )}
             </div>
+            {activeEvent.isPaid && (
+              <DrawerField label="Status publicação" required>
+                <DrawerSelect value={activeEvent.status || 'rascunho'} onChange={e => setActiveEvent({ ...activeEvent, status: e.target.value as any })}>
+                  <option value="published">Liberado ao Público</option>
+                  <option value="rascunho">Rascunho Interno</option>
+                  <option value="arquivado">Arquivado</option>
+                </DrawerSelect>
+              </DrawerField>
+            )}
+          </DrawerSection>
+          <DrawerSection title="Imagem de Capa">
+            {activeEvent.cover && (
+              <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                <img src={activeEvent.cover} alt="Capa" referrerPolicy="no-referrer" className="w-full h-36 object-cover" />
+                <button type="button" onClick={() => setActiveEvent(prev => prev ? { ...prev, cover: undefined } : prev)} className="absolute top-2 right-2 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white cursor-pointer"><X size={12} /></button>
+              </div>
+            )}
+            <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingEventCoverFile(file); setActiveEvent(prev => prev ? { ...prev, cover: previewUrl } : prev); }} />
+            <p className="text-[10px] text-gray-400">Formatos: JPG, PNG, WEBP &bull; Máx. 10MB &bull; Recomendado: 16:9</p>
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setEventModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button
-                type="submit"
-                disabled={eventSaving}
-                className="text-xs text-white px-5 py-1 bg-[#001856] rounded disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {eventSaving ? 'Salvando...' : 'Aportar na Agenda'}
-              </button>
+      {/* Drawer B: News */}
+      <Drawer
+        open={newsModalOpen && !!activeNews}
+        onClose={() => setNewsModalOpen(false)}
+        title={activeNews?.id ? 'Editar comunicado' : 'Novo comunicado à imprensa'}
+        description="Redija e publique a matéria no site institucional."
+        icon={Newspaper}
+        iconBg="bg-sky-50"
+        iconColor="text-sky-500"
+        onSubmit={handleSaveNews}
+        submitLabel="Publicar Postagem"
+        width="w-[680px]"
+      >
+        {activeNews && (<>
+          <DrawerSection title="Identificação">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Título da matéria" required>
+                <DrawerInput type="text" required value={activeNews.title || ''} onChange={e => setActiveNews({ ...activeNews, title: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Categoria">
+                <DrawerInput type="text" value={activeNews.category || ''} onChange={e => setActiveNews({ ...activeNews, category: e.target.value })} />
+              </DrawerField>
             </div>
-          </form>
-        </div>
-      )}
-
-
-      {/* Modal B: News article form (Advanced Text Editor inside) */}
-      {newsModalOpen && activeNews && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSaveNews}
-            className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">Editor de Comunicado à Imprensa (CMS)</span>
-              <button type="button" onClick={() => setNewsModalOpen(false)} className="text-gray-400">Fechar</button>
+            <DrawerField label="Resumo / sinopse">
+              <DrawerInput type="text" value={activeNews.summary || ''} onChange={e => setActiveNews({ ...activeNews, summary: e.target.value })} placeholder="Instigue o leitor a clicar no post..." />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Conteúdo">
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+              <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2 font-bold flex items-center">
+                <Sparkles size={11} className="mr-1.5 text-[#ffc300]" /> Editor de texto avançado
+              </label>
+              <RichTextEditor value={activeNews.content || ''} onChange={val => setActiveNews({ ...activeNews, content: val })} />
             </div>
-
-            <div className="p-4 space-y-3.5 max-h-[460px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1">Título da Matéria</label>
-                  <input
-                    type="text"
-                    required
-                    value={activeNews.title || ''}
-                    onChange={(e) => setActiveNews({ ...activeNews, title: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1">Pariado com Categoria</label>
-                  <input
-                    type="text"
-                    value={activeNews.category || ''}
-                    onChange={(e) => setActiveNews({ ...activeNews, category: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-neutral-105 p-2 text-xs rounded"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Resumo Sinopse de Listagem</label>
-                <input
-                  type="text"
-                  value={activeNews.summary || ''}
-                  onChange={(e) => setActiveNews({ ...activeNews, summary: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  placeholder="Instigue o leitor a clicar no post..."
-                />
-              </div>
-
-              {/* Advanced WYSIWYG integration layout */}
-              <div className="bg-neutral-955 p-3 rounded-lg border border-gray-100">
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2 font-bold flex items-center">
-                  <Sparkles size={11} className="mr-1.5 text-[#ffc300]" /> Editor de texto avançado estilo WordPress
-                </label>
-                <RichTextEditor
-                  value={activeNews.content || ''}
-                  onChange={(val) => setActiveNews({ ...activeNews, content: val })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1 font-bold">Autor / Redator</label>
-                  <input
-                    type="text"
-                    value={activeNews.author || ''}
-                    onChange={(e) => setActiveNews({ ...activeNews, author: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded"
-                  />
-                </div>
-                <div className="flex flex-col justify-end">
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Upload Imagem de Capagem</label>
-                  <ImageUploader
-                    onFileSelected={(file, previewUrl) => setActiveNews({ ...activeNews, coverImage: previewUrl })}
-                  />
-                </div>
-              </div>
-
+          </DrawerSection>
+          <DrawerSection title="Autor e Imagem">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Autor / Redator">
+                <DrawerInput type="text" value={activeNews.author || ''} onChange={e => setActiveNews({ ...activeNews, author: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Imagem de capa">
+                <ImageUploader onFileSelected={(file, previewUrl) => setActiveNews({ ...activeNews, coverImage: previewUrl })} />
+              </DrawerField>
             </div>
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setNewsModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Publicar Postagem</button>
+      {/* Drawer C: Course */}
+      <Drawer
+        open={courseModalOpen && !!activeCourse}
+        onClose={() => setCourseModalOpen(false)}
+        title={activeCourse?.id ? 'Editar oficina / classe' : 'Nova oficina / classe'}
+        description="Preencha a ementa curricular da oficina."
+        icon={Music}
+        iconBg="bg-violet-50"
+        iconColor="text-violet-500"
+        onSubmit={handleSaveCourse}
+        submitLabel={courseSaving ? 'Salvando...' : 'Confirmar Ementa'}
+        submitting={courseSaving}
+      >
+        {activeCourse && (<>
+          <DrawerSection title="Identificação">
+            <DrawerField label="Nome da oficina / instrumento" required>
+              <DrawerInput type="text" required value={activeCourse.name || ''} onChange={e => setActiveCourse({ ...activeCourse, name: e.target.value })} placeholder="Ex: Masterclass de Trompa Sinfônica" />
+            </DrawerField>
+            <DrawerField label="Descrição">
+              <DrawerTextarea value={activeCourse.description || ''} onChange={e => setActiveCourse({ ...activeCourse, description: e.target.value })} rows={3} />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Detalhes">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Professor titular">
+                <DrawerSelect value={activeCourse.professorId || ''} onChange={e => { const id = e.target.value; const p = professorsList.find(p => p.id === id); setActiveCourse({ ...activeCourse, professorId: id, responsibleProfessor: p?.name || '' }); }}>
+                  <option value="">Selecione...</option>
+                  {professorsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </DrawerSelect>
+              </DrawerField>
+              <DrawerField label="Carga horária">
+                <DrawerInput type="text" value={activeCourse.duration || ''} onChange={e => setActiveCourse({ ...activeCourse, duration: e.target.value })} placeholder="Ex: 2h/semana" />
+              </DrawerField>
             </div>
-          </form>
-        </div>
-      )}
+            <DrawerField label="Quantidade de vagas">
+              <DrawerInput type="number" value={activeCourse.vagas || 1} onChange={e => setActiveCourse({ ...activeCourse, vagas: Number(e.target.value) })} />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Foto da Oficina">
+            <ImageUploader bg={activeCourse.photo} allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingCoursePhotoFile(file); setActiveCourse(prev => prev ? { ...prev, photo: previewUrl } : prev); }} />
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-      {/* Modal C: Music course form */}
-      {courseModalOpen && activeCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSaveCourse}
-            className="w-full max-w-md bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest font-sans">Ementa Curricular</span>
-              <button type="button" onClick={() => setCourseModalOpen(false)} className="text-gray-400 font-sans cursor-pointer">Fechar</button>
+      {/* Drawer D: Instrument */}
+      <Drawer
+        open={instrumentModalOpen && !!activeInstrument}
+        onClose={() => setInstrumentModalOpen(false)}
+        title={activeInstrument?.id ? 'Editar instrumento' : 'Novo instrumento'}
+        description="Cadastre o instrumento no catálogo da orquestra."
+        icon={Music}
+        iconBg="bg-amber-50"
+        iconColor="text-amber-500"
+        onSubmit={handleSaveInstrument}
+        submitLabel={instrumentSaving ? 'Salvando...' : 'Confirmar Instrumento'}
+        submitting={instrumentSaving}
+      >
+        {activeInstrument && (<>
+          <DrawerSection title="Identificação">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Nome do instrumento" required>
+                <DrawerInput type="text" required value={activeInstrument.name || ''} onChange={e => setActiveInstrument({ ...activeInstrument, name: e.target.value })} placeholder="Ex: Trompete" />
+              </DrawerField>
+              <DrawerField label="Slug">
+                <DrawerInput type="text" value={activeInstrument.slug || ''} onChange={e => setActiveInstrument({ ...activeInstrument, slug: e.target.value })} placeholder="trompete" className="font-mono text-xs" />
+              </DrawerField>
             </div>
-
-            <div className="p-4 space-y-3.5">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome Oficina / Instrumento</label>
-                <input
-                  type="text"
-                  required
-                  value={activeCourse.name || ''}
-                  onChange={(e) => setActiveCourse({ ...activeCourse, name: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  placeholder="Ex: Masterclass de Trompa Sinfônica"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição</label>
-                <textarea
-                  value={activeCourse.description || ''}
-                  onChange={(e) => setActiveCourse({ ...activeCourse, description: e.target.value })}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Professor Titular</label>
-                  <select
-                    value={activeCourse.professorId || ''}
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
-                      const selectedProf = professorsList.find(p => p.id === selectedId);
-                      setActiveCourse({
-                        ...activeCourse,
-                        professorId: selectedId,
-                        responsibleProfessor: selectedProf?.name || ''
-                      });
-                    }}
-                    className="w-full bg-gray-50 border border-neutral-820 text-gray-400 p-2 text-xs rounded"
-                  >
-                    <option value="">Selecione...</option>
-                    {professorsList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Tempo de Carga Horária</label>
-                  <input
-                    type="text"
-                    value={activeCourse.duration || ''}
-                    onChange={(e) => setActiveCourse({ ...activeCourse, duration: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Quantidade de Vagas</label>
-                  <input
-                    type="number"
-                    value={activeCourse.vagas || 1}
-                    onChange={(e) => setActiveCourse({ ...activeCourse, vagas: Number(e.target.value) })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                  />
-                </div>
-                <div className="flex flex-col justify-end">
-                  <ImageUploader
-                    bg={activeCourse.photo && activeCourse.photo}
-                    allowedTypes="Imagens (.jpg, .png, .webp)"
-                    onFileSelected={(file, previewUrl) => {
-                      setPendingCoursePhotoFile(file);
-                      setActiveCourse(prev => prev ? { ...prev, photo: previewUrl } : prev);
-                    }}
-                  />
-                </div>
-              </div>
-
+            <DrawerField label="Descrição curta" required>
+              <DrawerTextarea required value={activeInstrument.description || ''} onChange={e => setActiveInstrument({ ...activeInstrument, description: e.target.value })} rows={2} placeholder="Resumo para o card de listagem..." />
+            </DrawerField>
+            <DrawerField label="Descrição completa" required>
+              <DrawerTextarea required value={activeInstrument.longDescription || ''} onChange={e => setActiveInstrument({ ...activeInstrument, longDescription: e.target.value })} rows={4} placeholder="Texto completo para a página do instrumento..." />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Mídia e Destaque">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Link de vídeo (YouTube/Vimeo)">
+                <DrawerInput type="text" value={activeInstrument.videoUrl || ''} onChange={e => setActiveInstrument({ ...activeInstrument, videoUrl: e.target.value })} placeholder="https://youtube.com/..." className="font-mono text-xs" />
+              </DrawerField>
+              <DrawerField label="Cor de destaque">
+                <input type="color" value={activeInstrument.color || '#0B4DA2'} onChange={e => setActiveInstrument({ ...activeInstrument, color: e.target.value })} className="w-full h-10 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer" />
+              </DrawerField>
             </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setCourseModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button
-                type="submit"
-                disabled={courseSaving}
-                className="text-xs text-white px-5 py-1 bg-[#001856] rounded disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {courseSaving ? 'Salvando...' : 'Confirmar Ementa'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Modal F: Instrument form */}
-      {instrumentModalOpen && activeInstrument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSaveInstrument}
-            className="w-full max-w-xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">
-                {activeInstrument.id ? 'Editar Instrumento' : 'Novo Instrumento'}
-              </span>
-              <button type="button" onClick={() => setInstrumentModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-
-            <div className="p-4 space-y-3.5 max-h-[460px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome do Instrumento</label>
-                  <input
-                    type="text"
-                    required
-                    value={activeInstrument.name || ''}
-                    onChange={(e) => setActiveInstrument({ ...activeInstrument, name: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                    placeholder="Ex: Trompete"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Slug (opcional, gerado automaticamente)</label>
-                  <input
-                    type="text"
-                    value={activeInstrument.slug || ''}
-                    onChange={(e) => setActiveInstrument({ ...activeInstrument, slug: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                    placeholder="trompete"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição Curta</label>
-                <textarea
-                  required
-                  value={activeInstrument.description || ''}
-                  onChange={(e) => setActiveInstrument({ ...activeInstrument, description: e.target.value })}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  placeholder="Resumo para o card de listagem..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição Completa</label>
-                <textarea
-                  required
-                  value={activeInstrument.longDescription || ''}
-                  onChange={(e) => setActiveInstrument({ ...activeInstrument, longDescription: e.target.value })}
-                  rows={4}
-                  className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  placeholder="Texto completo para a página do instrumento..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Link de Vídeo (YouTube/Vimeo)</label>
-                  <input
-                    type="text"
-                    value={activeInstrument.videoUrl || ''}
-                    onChange={(e) => setActiveInstrument({ ...activeInstrument, videoUrl: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 text-[#001856] p-2 text-xs rounded font-mono"
-                    placeholder="https://youtube.com/watch?..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Cor de Destaque</label>
-                  <input
-                    type="color"
-                    value={activeInstrument.color || '#0B4DA2'}
-                    onChange={(e) => setActiveInstrument({ ...activeInstrument, color: e.target.value })}
-                    className="w-full bg-gray-50 border border-neutral-820 h-9 rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col justify-end">
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Imagem Principal</label>
-                {activeInstrument.image && (
-                  <img
-                    src={activeInstrument.image}
-                    alt="Pré-visualização"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-28 object-cover rounded border border-gray-200 mb-2"
-                  />
-                )}
-                <ImageUploader
-                  allowedTypes="Imagens (.jpg, .png, .webp)"
-                  onFileSelected={(file, previewUrl) => {
-                    setPendingInstrumentImageFile(file);
-                    setActiveInstrument(prev => prev ? { ...prev, image: previewUrl } : prev);
-                  }}
-                />
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2 font-bold">Galeria de Fotos</label>
-
-                {activeInstrument.gallery && activeInstrument.gallery.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {activeInstrument.gallery.map((url) => (
-                      <div key={url} className="relative group">
-                        <img
-                          src={url}
-                          alt="Galeria"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-16 object-cover rounded border border-gray-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveGalleryImage(url)}
-                          className="absolute top-0.5 right-0.5 bg-rose-950 text-rose-400 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
+            <DrawerField label="Imagem principal">
+              {activeInstrument.image && <img src={activeInstrument.image} alt="Preview" referrerPolicy="no-referrer" className="w-full h-28 object-cover rounded-lg border border-gray-200 mb-2" />}
+              <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingInstrumentImageFile(file); setActiveInstrument(prev => prev ? { ...prev, image: previewUrl } : prev); }} />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Galeria de Fotos">
+            {activeInstrument.gallery && activeInstrument.gallery.length > 0 && (
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {activeInstrument.gallery.map(url => (
+                  <div key={url} className="relative group">
+                    <img src={url} alt="Galeria" referrerPolicy="no-referrer" className="w-full h-16 object-cover rounded border border-gray-200" />
+                    <button type="button" onClick={() => handleRemoveGalleryImage(url)} className="absolute top-0.5 right-0.5 bg-rose-950 text-rose-400 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-all"><X size={10} /></button>
                   </div>
-                )}
-
-                <label className="block text-[9px] font-mono uppercase text-gray-400 mb-1">Adicionar foto à galeria (1 por vez, salva ao confirmar)</label>
-                <ImageUploader
-                  allowedTypes="Imagens (.jpg, .png, .webp)"
-                  onFileSelected={(file) => setPendingGalleryFile(file)}
-                />
-                {pendingGalleryFile && (
-                  <p className="text-[9px] text-emerald-400 font-mono mt-1">Pronta para envio: {pendingGalleryFile.name}</p>
-                )}
+                ))}
               </div>
+            )}
+            <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={file => setPendingGalleryFile(file)} />
+            {pendingGalleryFile && <p className="text-[9px] text-emerald-500 font-mono mt-1">Pronta para envio: {pendingGalleryFile.name}</p>}
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-            </div>
+      {/* Drawer E: Photo */}
+      <Drawer
+        open={photoModalOpen && !!activePhoto}
+        onClose={() => setPhotoModalOpen(false)}
+        title="Registrar foto no álbum"
+        description="Adicione uma foto à galeria de mídia."
+        icon={Image}
+        iconBg="bg-emerald-50"
+        iconColor="text-emerald-500"
+        onSubmit={handleSavePhoto}
+        submitLabel="Gravar Imagem"
+        width="w-[480px]"
+      >
+        {activePhoto && (<>
+          <DrawerSection title="Detalhes">
+            <DrawerField label="Álbum de origem" required>
+              <DrawerSelect value={activePhoto.album || ''} onChange={e => setActivePhoto({ ...activePhoto, album: e.target.value })}>
+                <option value="Concertos 2026">Concertos Metálicos 2026</option>
+                <option value="Ensaios Gerais">Ensaios e Bastidores</option>
+                <option value="Formatura Solene">Formatura Alunos Solene Nova</option>
+              </DrawerSelect>
+            </DrawerField>
+            <DrawerField label="Legenda explicativa" required>
+              <DrawerInput type="text" required value={activePhoto.caption || ''} onChange={e => setActivePhoto({ ...activePhoto, caption: e.target.value })} />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Arquivo">
+            <ImageUploader onFileSelected={(file, previewUrl) => setActivePhoto({ ...activePhoto, url: previewUrl })} />
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setInstrumentModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button
-                type="submit"
-                disabled={instrumentSaving}
-                className="text-xs text-white px-5 py-1 bg-[#001856] rounded disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {instrumentSaving ? 'Salvando...' : 'Confirmar Instrumento'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-
-      {/* Modal D: Photo registry */}
-      {photoModalOpen && activePhoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSavePhoto}
-            className="w-full max-w-sm bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs font-mono text-amber-500">
-              <span>REGISTRAR FOTO NO ÁLBUM</span>
-              <button type="button" onClick={() => setPhotoModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Álbum de Origem</label>
-                <select
-                  value={activePhoto.album || ''}
-                  onChange={(e) => setActivePhoto({ ...activePhoto, album: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-825 text-gray-400 p-2 text-xs rounded focus:outline-none"
-                >
-                  <option value="Concertos 2026">Concertos Metálicos 2026</option>
-                  <option value="Ensaios Gerais">Ensaios e Bastidores</option>
-                  <option value="Formatura Solene">Formatura Alunos Solene Nova</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Legenda Explicativa</label>
-                <input
-                  type="text"
-                  required
-                  value={activePhoto.caption || ''}
-                  onChange={(e) => setActivePhoto({ ...activePhoto, caption: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 p-2 text-xs text-[#001856] rounded focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Upload de arquivo</label>
-                <ImageUploader
-                  onFileSelected={(file, previewUrl) => setActivePhoto({ ...activePhoto, url: previewUrl })}
-                />
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-1.5">
-              <button type="button" onClick={() => setPhotoModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Gravar Imagem</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-
-      {/* Modal E: Video Link */}
-      {videoModalOpen && activeVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form
-            onSubmit={handleSaveVideo}
-            className="w-full max-w-sm bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs font-mono text-sky-450">
-              <span>VÍDEO LINK PLAYBACK</span>
-              <button type="button" onClick={() => setVideoModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1">Título do Vídeo Filmado</label>
-                <input
-                  type="text"
-                  required
-                  value={activeVideo.title || ''}
-                  onChange={(e) => setActiveVideo({ ...activeVideo, title: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 p-2 text-xs text-[#001856] rounded focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-neutral-505 mb-1">Link Completo YouTube / Vimeo</label>
-                <input
-                  type="text"
-                  required
-                  value={activeVideo.youtubeUrl || ''}
-                  onChange={(e) => setActiveVideo({ ...activeVideo, youtubeUrl: e.target.value })}
-                  className="w-full bg-gray-50 border border-neutral-820 p-2 text-xs text-[#001856] rounded focus:outline-none font-mono"
-                  placeholder="https://www.youtube.com/watch?..."
-                />
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-1.5">
-              <button type="button" onClick={() => setVideoModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Anexar Playback</button>
-            </div>
-          </form>
-        </div>
-      )}
-
+      {/* Drawer F: Video */}
+      <Drawer
+        open={videoModalOpen && !!activeVideo}
+        onClose={() => setVideoModalOpen(false)}
+        title="Adicionar vídeo"
+        description="Anexe um link de vídeo do YouTube ou Vimeo."
+        icon={Film}
+        iconBg="bg-rose-50"
+        iconColor="text-rose-500"
+        onSubmit={handleSaveVideo}
+        submitLabel="Anexar Playback"
+        width="w-[480px]"
+      >
+        {activeVideo && (<>
+          <DrawerSection title="Identificação">
+            <DrawerField label="Título do vídeo" required>
+              <DrawerInput type="text" required value={activeVideo.title || ''} onChange={e => setActiveVideo({ ...activeVideo, title: e.target.value })} />
+            </DrawerField>
+            <DrawerField label="Link YouTube / Vimeo" required>
+              <DrawerInput type="text" required value={activeVideo.youtubeUrl || ''} onChange={e => setActiveVideo({ ...activeVideo, youtubeUrl: e.target.value })} placeholder="https://www.youtube.com/watch?..." className="font-mono text-xs" />
+            </DrawerField>
+          </DrawerSection>
+        </>)}
+      </Drawer>
     </div>
   );
 }

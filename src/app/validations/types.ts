@@ -16,7 +16,7 @@ export interface Banner {
   secondaryBtnText: string;
   secondaryBtnLink: string;
   order: number;
-  status: 'active' | 'draft' | 'scheduled';
+  status: 'ativo' | 'rascunho' | 'agendado';
   scheduledDate?: string;
 }
 

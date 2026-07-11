@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SystemUser, LibraryFile, InstitutionConfig, AuditLog, BackupHistory } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
+import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { listUsers, createUser, updateUser, deleteUser, type PainelUser, type UserRole } from '../../services/usersService';
 
 interface SistemaConfigProps {
@@ -688,109 +689,91 @@ export default function SistemaConfig({
 
 
       {/* ==========================================
-          IAM OPERATOR MODAL DETAILS
+          DRAWER: IAM OPERATOR
           ========================================== */}
-      {userModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={handleSaveUser}
-            className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <Drawer
+        open={userModalOpen}
+        onClose={() => setUserModalOpen(false)}
+        title={editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+        description={editingUser ? 'Altere nome ou perfil de acesso' : 'Crie um acesso ao painel administrativo'}
+        icon={UserPlus}
+        iconBg="bg-[#001856]/10"
+        iconColor="text-[#001856]"
+        onSubmit={handleSaveUser}
+        submitLabel={modalSaving ? 'Salvando...' : (editingUser ? 'Salvar' : 'Criar Usuário')}
+        submitting={modalSaving}
+      >
+        <DrawerSection title="Dados do usuário">
+          <DrawerField label="Nome completo" required>
+            <DrawerInput
+              required
+              value={formName}
+              onChange={e => setFormName(e.target.value)}
+              placeholder="Ex: Maria Silva"
+            />
+          </DrawerField>
 
-            {/* header */}
-            <div className="bg-[#001856] px-5 py-4 flex justify-between items-center">
-              <div>
-                <p className="text-[#ffc300] text-[10px] font-bold uppercase tracking-widest">
-                  {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
-                </p>
-                <p className="text-white/60 text-xs mt-0.5">
-                  {editingUser ? 'Altere nome ou perfil de acesso' : 'Crie um acesso ao painel'}
-                </p>
+          {!editingUser && (
+            <DrawerField label="E-mail" required>
+              <DrawerInput
+                required
+                type="email"
+                value={formEmail}
+                onChange={e => setFormEmail(e.target.value)}
+                placeholder="usuario@filarmonicademetais.com"
+              />
+            </DrawerField>
+          )}
+
+          {!editingUser && (
+            <DrawerField label="Senha inicial" required>
+              <div className="relative">
+                <DrawerInput
+                  required
+                  type={showPass ? 'text' : 'password'}
+                  value={formPassword}
+                  onChange={e => setFormPassword(e.target.value)}
+                  placeholder="mín. 6 caracteres"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
               </div>
-              <button type="button" onClick={() => setUserModalOpen(false)} className="text-white/40 hover:text-white">
-                <XIcon size={18} />
+            </DrawerField>
+          )}
+        </DrawerSection>
+
+        <DrawerSection title="Perfil de acesso">
+          <div className="grid grid-cols-2 gap-2">
+            {(['admin', 'editor'] as UserRole[]).map(r => (
+              <button key={r} type="button" onClick={() => setFormRole(r)}
+                className={`py-2.5 rounded-lg border text-sm font-semibold transition-all cursor-pointer ${
+                  formRole === r
+                    ? 'bg-[#001856] text-[#ffc300] border-[#001856]'
+                    : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
+                }`}>
+                {r === 'admin' ? 'Administrador' : 'Editor'}
               </button>
-            </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-2">
+            {formRole === 'admin'
+              ? 'Admin vê tudo: conteúdo, pessoas, financeiro e configurações do sistema.'
+              : 'Editor vê conteúdo, pessoas e financeiro. Não acessa configurações do sistema.'}
+          </p>
+        </DrawerSection>
 
-            <div className="p-5 space-y-4">
-              {/* name */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Nome completo</label>
-                <input required value={formName} onChange={e => setFormName(e.target.value)}
-                  placeholder="Ex: Maria Silva"
-                  className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856]" />
-              </div>
-
-              {/* email — only for new */}
-              {!editingUser && (
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">E-mail</label>
-                  <input required type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)}
-                    placeholder="usuario@filarmonicademetais.com"
-                    className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856]" />
-                </div>
-              )}
-
-              {/* password — only for new */}
-              {!editingUser && (
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Senha inicial</label>
-                  <div className="relative">
-                    <input required type={showPass ? 'text' : 'password'} value={formPassword}
-                      onChange={e => setFormPassword(e.target.value)}
-                      placeholder="mín. 6 caracteres"
-                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 pr-10 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856]" />
-                    <button type="button" onClick={() => setShowPass(!showPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* role */}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Perfil de acesso</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['admin', 'editor'] as UserRole[]).map(r => (
-                    <button key={r} type="button" onClick={() => setFormRole(r)}
-                      className={`py-2.5 rounded-lg border text-sm font-semibold transition-all ${
-                        formRole === r
-                          ? 'bg-[#001856] text-[#ffc300] border-[#001856]'
-                          : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'
-                      }`}>
-                      {r === 'admin' ? 'Administrador' : 'Editor'}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2">
-                  {formRole === 'admin'
-                    ? 'Admin vê tudo: conteúdo, pessoas, financeiro e configurações do sistema.'
-                    : 'Editor vê conteúdo, pessoas e financeiro. Não acessa configurações do sistema.'}
-                </p>
-              </div>
-
-              {modalError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">
-                  {modalError}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-gray-100 px-5 py-3 flex justify-end gap-2">
-              <button type="button" onClick={() => setUserModalOpen(false)}
-                className="text-xs text-gray-500 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-                Cancelar
-              </button>
-              <button type="submit" disabled={modalSaving}
-                className="flex items-center gap-1.5 text-xs text-white px-5 py-2 bg-[#001856] hover:bg-[#002070] rounded-lg font-bold transition-colors disabled:opacity-50">
-                {modalSaving
-                  ? <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
-                  : <><Check size={13} /> {editingUser ? 'Salvar' : 'Criar Usuário'}</>
-                }
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        {modalError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">
+            {modalError}
+          </div>
+        )}
+      </Drawer>
 
     </div>
   );

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, UserCheck, ShieldAlert, Plus, Search, Filter, Mail, Phone, MapPin, 
-  Trash2, Edit, Check, Star, Download, Archive, ArrowUp, ArrowDown, UserPlus, 
-  Instagram, Facebook, Youtube, Linkedin, MessageCircle, FileSpreadsheet, X
+  Users, UserCheck, ShieldAlert, Plus, Search, Filter, Mail, Phone, MapPin,
+  Trash2, Edit, Check, Star, Download, Archive, ArrowUp, ArrowDown, UserPlus,
+  Instagram, Facebook, Youtube, Linkedin, MessageCircle, FileSpreadsheet, X, Calendar, Music2
 } from 'lucide-react';
 import { Professor, Student, Organizer, AuditLog } from '../../validations/types';
 import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
 import { getStudents, createStudent, updateStudent, updateStudentStatus, deleteStudent } from '../../services/studentsService';
+import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { getProfessors, createProfessor, updateProfessor, updateProfessorHighlight, updateProfessorOrder, deleteProfessor } from '../../services/professorsService';
 
 interface PessoasERPProps {
@@ -51,6 +52,8 @@ export default function PessoasERP({
 
   const [orgModalOpen, setOrgModalOpen] = useState(false);
   const [activeOrg, setActiveOrg] = useState<Partial<Organizer> | null>(null);
+
+  const [viewStudent, setViewStudent] = useState<Student | null>(null);
 
   // Simulated export to CSV modal
   const [exportModalContent, setExportModalContent] = useState<string | null>(null);
@@ -327,19 +330,6 @@ const handleArchiveStudent = async (id: string, name: string) => {
   return (
     <div className="space-y-6 p-6 animate-fade-in select-none">
       
-      {/* Top bar header */}
-      <div className="pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-[#001856] font-sans tracking-tight flex items-center">
-            <Users className="mr-2 text-[#ffc300]" size={20} />
-            Gestão Integrada de Pessoas (SaaS ERP)
-          </h2>
-          <p className="text-xs text-gray-400 mt-1">
-            Cadastre professores titulares do corpo docente, emita matrículas escolares e regule credenciais da diretoria.
-          </p>
-        </div>
-
-      </div>
 
       {/* ==========================================================
           SUBTAB 1: STUDENTS DIRECTORY TABLE (ERP INTRICATE)
@@ -460,21 +450,18 @@ const handleArchiveStudent = async (id: string, name: string) => {
                   </tr>
                 ) : (
                   filteredStudents?.map((alu) => (
-                    <tr key={alu.id} className="hover:bg-gray-50 transition-all">
+                    <tr key={alu.id} className="hover:bg-gray-50 transition-all cursor-pointer" onClick={() => setViewStudent(alu)}>
                       <td className="p-3 pl-4 flex items-center space-x-2.5">
-                        <img 
-                          src={alu.photo} 
-                          alt={alu.name} 
+                        <img
+                          src={alu.photo}
+                          alt={alu.name}
                           onError={(e) => {
-                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(alu.name)}&background=0B4DA2&color=fff&size=64`;
-                                      }}
+                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(alu.name)}&background=0B4DA2&color=fff&size=64`;
+                          }}
                           referrerPolicy="no-referrer"
                           className="w-7 h-7 rounded-full object-cover border border-gray-100 shrink-0"
                         />
-                        <div>
-                          <span className="block font-bold text-gray-800">{alu.name}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">ID: {alu.id}</span>
-                        </div>
+                        <span className="font-bold text-gray-800">{alu.name}</span>
                       </td>
                       <td className="p-3">
                         <span className="bg-gray-100 text-gray-600 p-0.5 px-1.5 rounded text-[10px]">
@@ -512,31 +499,33 @@ const handleArchiveStudent = async (id: string, name: string) => {
     {alu.status === 'arquivado' && 'Arquivado'}
   </span>
 </td>
-                      <td className="p-3 text-right pr-4 space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStudentModal(alu)}
-                          className="p-1 px-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 hover:text-[#001856] transition-all cursor-pointer"
-                        >
-                          <Edit size={11} />
-                        </button>
-                        {alu.status !== 'archived' && (
+                      <td className="p-3 pr-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 justify-end">
                           <button
                             type="button"
-                            title="Arquivar no ERP"
-                            onClick={() => handleArchiveStudent(alu.id, alu.name)}
-                            className="p-1 px-1.5 bg-gray-100 hover:bg-amber-950 rounded text-amber-500 hover:text-amber-200 transition-all cursor-pointer"
+                            onClick={() => handleOpenStudentModal(alu)}
+                            className="p-1 px-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-600 hover:text-[#001856] transition-all cursor-pointer"
                           >
-                            <Archive size={11} />
+                            <Edit size={11} />
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteStudent(alu.id, alu.name)}
-                          className="p-1 px-1.5 bg-gray-100 hover:bg-rose-950 rounded text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
-                        >
-                          <Trash2 size={11} />
-                        </button>
+                          {alu.status !== 'archived' && (
+                            <button
+                              type="button"
+                              title="Arquivar no ERP"
+                              onClick={() => handleArchiveStudent(alu.id, alu.name)}
+                              className="p-1 px-1.5 bg-gray-100 hover:bg-amber-950 rounded text-amber-500 hover:text-amber-200 transition-all cursor-pointer"
+                            >
+                              <Archive size={11} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStudent(alu.id, alu.name)}
+                            className="p-1 px-1.5 bg-gray-100 hover:bg-rose-950 rounded text-rose-400 hover:text-rose-200 transition-all cursor-pointer"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -734,544 +723,523 @@ const handleArchiveStudent = async (id: string, name: string) => {
       )}
 
 
+      {/* ── Modal: Visualizar Aluno ── */}
+      {viewStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setViewStudent(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            style={{ animation: 'fadeInScale .18s ease' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-[#001856] px-6 py-5 flex items-center gap-4">
+              <img
+                src={viewStudent.photo}
+                alt={viewStudent.name}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(viewStudent.name)}&background=0B4DA2&color=fff&size=128`;
+                }}
+                referrerPolicy="no-referrer"
+                className="w-14 h-14 rounded-full object-cover border-2 border-[#ffc300] shrink-0"
+              />
+              <div className="min-w-0">
+                <h3 className="text-white font-bold text-lg leading-tight truncate">{viewStudent.name}</h3>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  <span className="text-[10px] font-bold bg-[#ffc300] text-[#001856] px-2 py-0.5 rounded-full uppercase tracking-wide">{viewStudent.classroom}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${
+                    viewStudent.status === 'ativo' ? 'bg-emerald-500 text-white' :
+                    viewStudent.status === 'inativo' ? 'bg-amber-500 text-white' :
+                    viewStudent.status === 'formado' ? 'bg-indigo-500 text-white' :
+                    'bg-gray-500 text-white'
+                  }`}>{viewStudent.status}</span>
+                </div>
+              </div>
+              <button onClick={() => setViewStudent(null)} className="ml-auto p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Instrumento</p>
+                  <p className="text-sm font-bold text-[#ffc300]">{viewStudent.instrument || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Data de Nascimento</p>
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1"><Calendar size={12} className="text-gray-400" />{viewStudent.birthDate || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Telefone</p>
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1"><Phone size={12} className="text-gray-400" />{viewStudent.phone || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">E-mail</p>
+                  <p className="text-sm font-semibold text-gray-800 flex items-center gap-1 truncate"><Mail size={12} className="text-gray-400 shrink-0" />{viewStudent.email || '—'}</p>
+                </div>
+                {viewStudent.guardian && (
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Responsável Legal</p>
+                    <p className="text-sm font-semibold text-gray-800">{viewStudent.guardian}</p>
+                  </div>
+                )}
+                {viewStudent.address && (
+                  <div className="col-span-2">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Endereço</p>
+                    <p className="text-sm font-semibold text-gray-800 flex items-start gap-1"><MapPin size={12} className="text-gray-400 mt-0.5 shrink-0" />{viewStudent.address}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-5 flex justify-between">
+              <button onClick={() => setViewStudent(null)} className="px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                Fechar
+              </button>
+              <button
+                onClick={() => { handleOpenStudentModal(viewStudent); setViewStudent(null); }}
+                className="px-4 py-2 text-xs font-bold bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg transition-colors"
+              >
+                Editar Aluno
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==========================================
           MODALS ENGINES
           ========================================== */}
-      
+
       {/* Modal A: Student CRUD form */}
-      {studentModalOpen && activeStudent && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
-  <form 
-    onSubmit={handleSaveStudent}
-    className="w-full max-w-xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-  >
-    <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-      <h3 className="text-xs font-mono font-bold text-[#ffc300] uppercase tracking-widest">
-        {activeStudent.id ? 'Alterar Ficha do Aluno' : 'Cadastrar Novo Aluno'}
-      </h3>
-      <button type="button" onClick={() => setStudentModalOpen(false)} className="text-gray-400 hover:text-[#001856]">Fechar</button>
-    </div>
+      <Drawer
+        open={studentModalOpen && !!activeStudent}
+        onClose={() => setStudentModalOpen(false)}
+        title={activeStudent?.id ? 'Editar Aluno' : 'Novo Aluno'}
+        description="Cadastre ou edite um aluno da filarmônica."
+        icon={Users}
+        iconBg="bg-blue-50"
+        iconColor="text-blue-600"
+        onSubmit={handleSaveStudent}
+        submitLabel="Salvar Aluno"
+        width="w-[600px]"
+      >
+        {activeStudent && (<>
+          <DrawerSection title="Dados Pessoais">
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Nome Completo" required>
+                <DrawerInput
+                  type="text"
+                  required
+                  value={activeStudent.name || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, name: e.target.value })}
+                />
+              </DrawerField>
+              <DrawerField label="Data de Nascimento">
+                <DrawerInput
+                  type="date"
+                  value={activeStudent.birthDate || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, birthDate: e.target.value })}
+                />
+              </DrawerField>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Telefone/Celular">
+                <DrawerInput
+                  type="text"
+                  value={activeStudent.phone || ''}
+                  onChange={(e) => {
+                    const masked = e.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 11)
+                      .replace(/^(\d{2})(\d)/, '($1) $2')
+                      .replace(/(\d{5})(\d)/, '$1-$2');
+                    setActiveStudent({ ...activeStudent, phone: masked });
+                  }}
+                  placeholder="(11) 99999-9999"
+                />
+              </DrawerField>
+              <DrawerField label="Responsável (se menor)">
+                <DrawerInput
+                  type="text"
+                  value={activeStudent.guardian || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, guardian: e.target.value })}
+                  placeholder="Nome do Pai/Mãe..."
+                />
+              </DrawerField>
+            </div>
+            <DrawerField label="E-mail" required>
+              <DrawerInput
+                type="email"
+                required
+                value={activeStudent.email || ''}
+                onChange={(e) => setActiveStudent({ ...activeStudent, email: e.target.value })}
+              />
+            </DrawerField>
+          </DrawerSection>
 
-    <div className="p-5 space-y-3.5 max-h-[500px] overflow-y-auto">
+          <DrawerSection title="Formação Musical">
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Instrumento Principal">
+                <DrawerSelect
+                  value={activeStudent.instrument || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, instrument: e.target.value })}
+                >
+                  <option value="">Selecione Instrumento...</option>
+                  <option value="Trompete Bb">Trompete Bb</option>
+                  <option value="Trombone de Vara">Trombone de Vara</option>
+                  <option value="Trompa Solista">Trompa Solista</option>
+                  <option value="Tuba Grave">Tuba Grave</option>
+                  <option value="Bombardino Bb">Bombardino Bb</option>
+                  <option value="Percussão Sinfônica">Percussão Sinfônica</option>
+                </DrawerSelect>
+              </DrawerField>
+              <DrawerField label="Turma de Admissão">
+                <DrawerSelect
+                  value={activeStudent.classroom || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, classroom: e.target.value })}
+                >
+                  <option value="Iniciante">Iniciante</option>
+                  <option value="Intermediário">Intermediário</option>
+                  <option value="Avançado">Avançado</option>
+                  <option value="Formado">Formado</option>
+                </DrawerSelect>
+              </DrawerField>
+            </div>
+            <DrawerField label="Status Atribuição">
+              <DrawerSelect
+                value={activeStudent.status || 'ativo'}
+                onChange={(e) => setActiveStudent({ ...activeStudent, status: e.target.value as any })}
+              >
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativo</option>
+                <option value="trancado">Trancado</option>
+                <option value="formado">Formado</option>
+                <option value="arquivado">Arquivado</option>
+              </DrawerSelect>
+            </DrawerField>
+          </DrawerSection>
 
-      {/* Nome + Data nascimento */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome Completo</label>
-          <input
-            type="text"
-            required
-            value={activeStudent.name || ''}
-            onChange={(e) => setActiveStudent({ ...activeStudent, name: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Data de Nascimento</label>
-          <input
-            type="date"
-            value={activeStudent.birthDate || ''}
-            onChange={(e) => setActiveStudent({ ...activeStudent, birthDate: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none font-mono"
-          />
-        </div>
-      </div>
+          <DrawerSection title="Endereço">
+            <div className="grid grid-cols-3 gap-3">
+              <DrawerField label="CEP">
+                <DrawerInput
+                  type="text"
+                  value={activeStudent.zipCode || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, zipCode: e.target.value })}
+                  onBlur={async (e) => {
+                    const cep = e.target.value.replace(/\D/g, '');
+                    if (cep.length !== 8) return;
+                    try {
+                      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                      const data = await res.json();
+                      if (!data.erro) {
+                        setActiveStudent(prev => prev ? {
+                          ...prev,
+                          street: data.logradouro || prev.street,
+                          neighborhood: data.bairro || prev.neighborhood,
+                          city: data.localidade || prev.city,
+                          uf: data.uf || prev.uf,
+                        } : prev);
+                      }
+                    } catch {}
+                  }}
+                  placeholder="00000-000"
+                  maxLength={9}
+                />
+              </DrawerField>
+              <div className="col-span-2">
+                <DrawerField label="Rua / Logradouro">
+                  <DrawerInput
+                    type="text"
+                    value={activeStudent.street || ''}
+                    onChange={(e) => setActiveStudent({ ...activeStudent, street: e.target.value })}
+                    placeholder="Ex: Rua das Flores"
+                  />
+                </DrawerField>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <DrawerField label="Número">
+                <DrawerInput
+                  type="text"
+                  value={activeStudent.number || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, number: e.target.value })}
+                  placeholder="Ex: 123"
+                />
+              </DrawerField>
+              <div className="col-span-2">
+                <DrawerField label="Complemento">
+                  <DrawerInput
+                    type="text"
+                    value={activeStudent.complement || ''}
+                    onChange={(e) => setActiveStudent({ ...activeStudent, complement: e.target.value })}
+                    placeholder="Ex: Apto 12, Bloco B"
+                  />
+                </DrawerField>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <DrawerField label="Bairro">
+                <DrawerInput
+                  type="text"
+                  value={activeStudent.neighborhood || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, neighborhood: e.target.value })}
+                  placeholder="Ex: Centro"
+                />
+              </DrawerField>
+              <DrawerField label="Cidade">
+                <DrawerInput
+                  type="text"
+                  value={activeStudent.city || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, city: e.target.value })}
+                  placeholder="Ex: Americana"
+                />
+              </DrawerField>
+              <DrawerField label="UF">
+                <DrawerSelect
+                  value={activeStudent.uf || ''}
+                  onChange={(e) => setActiveStudent({ ...activeStudent, uf: e.target.value })}
+                >
+                  <option value="">--</option>
+                  {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf => (
+                    <option key={uf} value={uf}>{uf}</option>
+                  ))}
+                </DrawerSelect>
+              </DrawerField>
+            </div>
+          </DrawerSection>
 
-      {/* Instrumento + Turma */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Instrumento Principal</label>
-          <select
-            value={activeStudent.instrument || ''}
-            onChange={(e) => setActiveStudent({ ...activeStudent, instrument: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
-          >
-            <option value="">Selecione Instrumento...</option>
-            <option value="Trompete Bb">Trompete Bb</option>
-            <option value="Trombone de Vara">Trombone de Vara</option>
-            <option value="Trompa Solista">Trompa Solista</option>
-            <option value="Tuba Grave">Tuba Grave</option>
-            <option value="Bombardino Bb">Bombardino Bb</option>
-            <option value="Percussão Sinfônica">Percussão Sinfônica</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Turma de Admissão</label>
-          <select
-            value={activeStudent.classroom || ''}
-            onChange={(e) => setActiveStudent({ ...activeStudent, classroom: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
-          >
-            <option value="Iniciante">Iniciante</option>
-            <option value="Intermediário">Intermediário</option>
-            <option value="Avançado">Avançado</option>
-            <option value="Formado">Formado</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Telefone + Responsável */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Telefone/Celular</label>
-          <input
-            type="text"
-            value={activeStudent.phone || ''}
-            onChange={(e) => {
-              const masked = e.target.value
-                .replace(/\D/g, '')
-                .slice(0, 11)
-                .replace(/^(\d{2})(\d)/, '($1) $2')
-                .replace(/(\d{5})(\d)/, '$1-$2');
-              setActiveStudent({ ...activeStudent, phone: masked });
-            }}
-            className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-            placeholder="(11) 99999-9999"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Responsável (se menor)</label>
-          <input
-            type="text"
-            value={activeStudent.guardian || ''}
-            onChange={(e) => setActiveStudent({ ...activeStudent, guardian: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded"
-            placeholder="Nome do Pai/Mãe..."
-          />
-        </div>
-      </div>
-
-      {/* E-mail */}
-      <div>
-        <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">E-mail</label>
-        <input
-          type="email"
-          required
-          value={activeStudent.email || ''}
-          onChange={(e) => setActiveStudent({ ...activeStudent, email: e.target.value })}
-          className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-        />
-      </div>
-
-      {/* Endereço estruturado */}
-      <div className="space-y-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
-        <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 font-bold">
-          Endereço
-        </label>
-
-        {/* CEP + Rua */}
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">CEP</label>
-            <input
-              type="text"
-              value={activeStudent.zipCode || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, zipCode: e.target.value })}
-              onBlur={async (e) => {
-                const cep = e.target.value.replace(/\D/g, '');
-                if (cep.length !== 8) return;
-                try {
-                  const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-                  const data = await res.json();
-                  if (!data.erro) {
-                    setActiveStudent(prev => prev ? {
-                      ...prev,
-                      street: data.logradouro || prev.street,
-                      neighborhood: data.bairro || prev.neighborhood,
-                      city: data.localidade || prev.city,
-                      uf: data.uf || prev.uf,
-                    } : prev);
-                  }
-                } catch {}
+          <DrawerSection title="Foto" optional>
+            <ImageUploader
+              allowedTypes="Imagens (.jpg, .png, .webp)"
+              onFileSelected={(file, previewUrl) => {
+                setPendingStudentPhoto(file);
+                setActiveStudent(prev => prev ? { ...prev, photo: previewUrl } : prev);
               }}
-              className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded font-mono focus:outline-none"
-              placeholder="00000-000"
-              maxLength={9}
             />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Rua / Logradouro</label>
-            <input
-              type="text"
-              value={activeStudent.street || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, street: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-              placeholder="Ex: Rua das Flores"
-            />
-          </div>
-        </div>
-
-        {/* Número + Complemento */}
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Número</label>
-            <input
-              type="text"
-              value={activeStudent.number || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, number: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded font-mono focus:outline-none"
-              placeholder="Ex: 123"
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Complemento</label>
-            <input
-              type="text"
-              value={activeStudent.complement || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, complement: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-              placeholder="Ex: Apto 12, Bloco B"
-            />
-          </div>
-        </div>
-
-        {/* Bairro + Cidade + UF */}
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Bairro</label>
-            <input
-              type="text"
-              value={activeStudent.neighborhood || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, neighborhood: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-              placeholder="Ex: Centro"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Cidade</label>
-            <input
-              type="text"
-              value={activeStudent.city || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, city: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-              placeholder="Ex: Americana"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">UF</label>
-            <select
-              value={activeStudent.uf || ''}
-              onChange={(e) => setActiveStudent({ ...activeStudent, uf: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded font-mono focus:outline-none"
-            >
-              <option value="">--</option>
-              {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf => (
-                <option key={uf} value={uf}>{uf}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Status + Foto */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Status Atribuição</label>
-          <select
-            value={activeStudent.status || 'ativo'}
-            onChange={(e) => setActiveStudent({ ...activeStudent, status: e.target.value as any })}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none font-bold"
-          >
-            <option value="ativo">Ativo</option>
-            <option value="inativo">Inativo</option>
-            <option value="trancado">Trancado</option>
-            <option value="formado">Formado</option>
-            <option value="arquivado">Arquivado</option>
-          </select>
-        </div>
-        <div className="flex flex-col justify-end">
-          <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Inserção de Foto</label>
-            {/* Preview da foto atual */}
-
-          <ImageUploader
-            allowedTypes="Imagens (.jpg, .png, .webp)"
-            bg={activeStudent.photo && activeStudent.photo}
-            onFileSelected={(file, previewUrl) => {
-              setPendingStudentPhoto(file);
-              setActiveStudent(prev => prev ? { ...prev, photo: previewUrl } : prev);
-            }}
-          />
-        </div>
-      </div>
-
-    </div>
-
-    <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-      <button type="button" onClick={() => setStudentModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded">Cancelar</button>
-      <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Confirmar Ficha Aluno</button>
-    </div>
-  </form>
-</div>
-      )}
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
       {/* Modal B: Professor CRUD form */}
-      {profModalOpen && activeProf && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 animate-fade-in">
-          <form 
-            onSubmit={handleSaveProf}
-            className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold text-[#ffc300] uppercase tracking-wider">
-                {activeProf.id ? 'Alterar Cadastro Professor' : 'Registrar Novo Docente'}
-              </h3>
-              <button type="button" onClick={() => setProfModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-
-            <div className="p-4 space-y-3.5 max-h-[460px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome Completo</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={activeProf.name || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, name: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Papel / Cargo Titular</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={activeProf.role || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, role: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                    placeholder="Ex: Chefe de Naipe de Trombones"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Especialidade Teórica</label>
-                  <input 
-                    type="text" 
-                    value={activeProf.specialty || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, specialty: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded"
-                    placeholder="Ex: Metais graves e o bocal amplo"
-                  />
-                </div>
-           <div>
-  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Telefone Fone</label>
-  <input
-    type="text"
-    value={activeProf.phone || ''}
-    onChange={(e) => {
-      const masked = e.target.value
-        .replace(/\D/g, '')
-        .slice(0, 11)
-        .replace(/^(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{5})(\d)/, '$1-$2');
-      setActiveProf({ ...activeProf, phone: masked });
-    }}
-    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded"
-    placeholder="(11) 98888-8888"
-  />
-</div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Breve Bio (Para Sinopse Home)</label>
-                  <input 
-                    type="text" 
-                    value={activeProf.miniBio || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, miniBio: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                    placeholder="Frase de efeito sobre a formação..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">E-mail para Recados</label>
-                  <input 
-                    type="email" 
-                    value={activeProf.email || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, email: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Biografia Completa de Retrospecto</label>
-                <textarea 
-                  value={activeProf.fullBio || ''}
-                  onChange={(e) => setActiveProf({ ...activeProf, fullBio: e.target.value })}
-                  rows={3}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
+      <Drawer
+        open={profModalOpen && !!activeProf}
+        onClose={() => setProfModalOpen(false)}
+        title={activeProf?.id ? 'Editar Professor' : 'Novo Professor'}
+        description="Cadastre ou edite um professor da filarmônica."
+        icon={UserCheck}
+        iconBg="bg-amber-50"
+        iconColor="text-amber-600"
+        onSubmit={handleSaveProf}
+        submitLabel="Salvar Professor"
+        width="w-[620px]"
+      >
+        {activeProf && (<>
+          <DrawerSection title="Dados do Docente">
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Nome Completo" required>
+                <DrawerInput
+                  type="text"
+                  required
+                  value={activeProf.name || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, name: e.target.value })}
                 />
-              </div>
-
-              {/* Social networks urls */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-[8px] font-mono uppercase text-gray-400 mb-1">Instagram</label>
-                  <input 
-                    type="text" 
-                    value={activeProf.socialInstagram || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, socialInstagram: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-1 text-[11px] rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[8px] font-mono uppercase text-gray-400 mb-1">WhatsApp direto</label>
-                  <input 
-                    type="text" 
-                    value={activeProf.socialWhatsapp || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, socialWhatsapp: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-1 text-[11px] rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[8px] font-mono uppercase text-gray-400 mb-1">YouTube Channel</label>
-                  <input 
-                    type="text" 
-                    value={activeProf.socialYoutube || ''}
-                    onChange={(e) => setActiveProf({ ...activeProf, socialYoutube: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-1 text-[11px] rounded"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    id="highlighted"
-                    checked={activeProf.highlighted || false}
-                    onChange={(e) => setActiveProf({ ...activeProf, highlighted: e.target.checked })}
-                    className="w-4 h-4 bg-gray-50 border border-gray-200 rounded checked:bg-[#ffc300]"
-                  />
-                  <label htmlFor="highlighted" className="text-[10px] font-mono uppercase text-gray-400">Destacar na Capa</label>
-                </div>
-           <div>
-  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Instrumento</label>
-  <select
-    value={activeProf.instrument || ''}
-    onChange={(e) => setActiveProf({ ...activeProf, instrument: e.target.value })}
-    className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
-  >
-    <option value="">Selecione...</option>
-    <option value="Trompete">Trompete</option>
-    <option value="Trombone">Trombone</option>
-    <option value="Trompa">Trompa</option>
-    <option value="Tuba">Tuba</option>
-    <option value="Bombardino">Bombardino</option>
-    <option value="Percussão">Percussão</option>
-    <option value="Regência">Regência</option>
-  </select>
-</div>
-
-{/* mini_bio e full_bio são NOT NULL — marque como required */}
-
-
-{/* ImageUploader — troque onUploadSuccess pelo padrão onFileSelected */}
-<div className="flex flex-col justify-end">
-  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Foto do Professor</label>
-
-  <ImageUploader
-  bg={activeProf.photo && activeProf.photo}
-    allowedTypes="Imagens (.jpg, .png, .webp)"
-    onFileSelected={(file, previewUrl) => {
-      setPendingProfPhoto(file);
-      setActiveProf(prev => prev ? { ...prev, photo: previewUrl } : prev);
-    }}
-  />
-</div>
-              </div>
-
+              </DrawerField>
+              <DrawerField label="Papel / Cargo Titular" required>
+                <DrawerInput
+                  type="text"
+                  required
+                  value={activeProf.role || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, role: e.target.value })}
+                  placeholder="Ex: Chefe de Naipe de Trombones"
+                />
+              </DrawerField>
             </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setProfModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Confirmar Registro Docente</button>
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Especialidade Teórica">
+                <DrawerInput
+                  type="text"
+                  value={activeProf.specialty || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, specialty: e.target.value })}
+                  placeholder="Ex: Metais graves e o bocal amplo"
+                />
+              </DrawerField>
+              <DrawerField label="Telefone">
+                <DrawerInput
+                  type="text"
+                  value={activeProf.phone || ''}
+                  onChange={(e) => {
+                    const masked = e.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 11)
+                      .replace(/^(\d{2})(\d)/, '($1) $2')
+                      .replace(/(\d{5})(\d)/, '$1-$2');
+                    setActiveProf({ ...activeProf, phone: masked });
+                  }}
+                  placeholder="(11) 98888-8888"
+                />
+              </DrawerField>
             </div>
-          </form>
-        </div>
-      )}
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Instrumento">
+                <DrawerSelect
+                  value={activeProf.instrument || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, instrument: e.target.value })}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="Trompete">Trompete</option>
+                  <option value="Trombone">Trombone</option>
+                  <option value="Trompa">Trompa</option>
+                  <option value="Tuba">Tuba</option>
+                  <option value="Bombardino">Bombardino</option>
+                  <option value="Percussão">Percussão</option>
+                  <option value="Regência">Regência</option>
+                </DrawerSelect>
+              </DrawerField>
+              <DrawerField label="E-mail para Recados">
+                <DrawerInput
+                  type="email"
+                  value={activeProf.email || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, email: e.target.value })}
+                />
+              </DrawerField>
+            </div>
+          </DrawerSection>
+
+          <DrawerSection title="Biografia">
+            <DrawerField label="Breve Bio (Para Sinopse Home)">
+              <DrawerInput
+                type="text"
+                value={activeProf.miniBio || ''}
+                onChange={(e) => setActiveProf({ ...activeProf, miniBio: e.target.value })}
+                placeholder="Frase de efeito sobre a formação..."
+              />
+            </DrawerField>
+            <DrawerField label="Biografia Completa de Retrospecto">
+              <DrawerTextarea
+                value={activeProf.fullBio || ''}
+                onChange={(e) => setActiveProf({ ...activeProf, fullBio: e.target.value })}
+                rows={3}
+              />
+            </DrawerField>
+          </DrawerSection>
+
+          <DrawerSection title="Redes Sociais" optional>
+            <div className="grid grid-cols-3 gap-3">
+              <DrawerField label="Instagram">
+                <DrawerInput
+                  type="text"
+                  value={activeProf.socialInstagram || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, socialInstagram: e.target.value })}
+                />
+              </DrawerField>
+              <DrawerField label="WhatsApp">
+                <DrawerInput
+                  type="text"
+                  value={activeProf.socialWhatsapp || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, socialWhatsapp: e.target.value })}
+                />
+              </DrawerField>
+              <DrawerField label="YouTube Channel">
+                <DrawerInput
+                  type="text"
+                  value={activeProf.socialYoutube || ''}
+                  onChange={(e) => setActiveProf({ ...activeProf, socialYoutube: e.target.value })}
+                />
+              </DrawerField>
+            </div>
+          </DrawerSection>
+
+          <DrawerSection title="Configurações">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="highlighted"
+                checked={activeProf.highlighted || false}
+                onChange={(e) => setActiveProf({ ...activeProf, highlighted: e.target.checked })}
+                className="w-4 h-4 bg-gray-50 border border-gray-200 rounded checked:bg-[#ffc300]"
+              />
+              <label htmlFor="highlighted" className="text-xs font-semibold text-gray-700">Destacar na Capa</label>
+            </div>
+          </DrawerSection>
+
+          <DrawerSection title="Foto" optional>
+            <ImageUploader
+              bg={activeProf.photo && activeProf.photo}
+              allowedTypes="Imagens (.jpg, .png, .webp)"
+              onFileSelected={(file, previewUrl) => {
+                setPendingProfPhoto(file);
+                setActiveProf(prev => prev ? { ...prev, photo: previewUrl } : prev);
+              }}
+            />
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
       {/* Modal C: Organizer CRUD Form */}
-      {orgModalOpen && activeOrg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form 
-            onSubmit={handleSaveOrg}
-            className="w-full max-w-md bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold text-[#ffc300] uppercase tracking-wider">
-                {activeOrg.id ? 'Alterar Dados Administrativo' : 'Adicionar Novo Organizador'}
-              </h3>
-              <button type="button" onClick={() => setOrgModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome Completo</label>
-                <input 
-                  type="text" 
-                  required
-                  value={activeOrg.name || ''}
-                  onChange={(e) => setActiveOrg({ ...activeOrg, name: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 p-2 text-xs text-[#001856] rounded focus:outline-none"
+      <Drawer
+        open={orgModalOpen && !!activeOrg}
+        onClose={() => setOrgModalOpen(false)}
+        title={activeOrg?.id ? 'Editar Organizador' : 'Novo Organizador'}
+        description="Cadastre ou edite um membro administrativo da filarmônica."
+        icon={ShieldAlert}
+        iconBg="bg-rose-50"
+        iconColor="text-rose-600"
+        onSubmit={handleSaveOrg}
+        submitLabel="Salvar Organizador"
+        width="w-[520px]"
+      >
+        {activeOrg && (<>
+          <DrawerSection title="Dados do Organizador">
+            <DrawerField label="Nome Completo" required>
+              <DrawerInput
+                type="text"
+                required
+                value={activeOrg.name || ''}
+                onChange={(e) => setActiveOrg({ ...activeOrg, name: e.target.value })}
+              />
+            </DrawerField>
+            <DrawerField label="Cargo de Atuação" required>
+              <DrawerInput
+                type="text"
+                required
+                value={activeOrg.role || ''}
+                onChange={(e) => setActiveOrg({ ...activeOrg, role: e.target.value })}
+                placeholder="Ex: Coordenador Fiscal e Transparência"
+              />
+            </DrawerField>
+            <DrawerField label="Mini Bio">
+              <DrawerTextarea
+                value={activeOrg.bio || ''}
+                onChange={(e) => setActiveOrg({ ...activeOrg, bio: e.target.value })}
+                rows={2}
+              />
+            </DrawerField>
+            <div className="grid grid-cols-2 gap-4">
+              <DrawerField label="Telefone Celular">
+                <DrawerInput
+                  type="text"
+                  value={activeOrg.phone || ''}
+                  onChange={(e) => setActiveOrg({ ...activeOrg, phone: e.target.value })}
+                  placeholder="(11) 97777-6666"
                 />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Cargo de Atuação</label>
-                <input 
-                  type="text" 
-                  required
-                  value={activeOrg.role || ''}
-                  onChange={(e) => setActiveOrg({ ...activeOrg, role: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 p-2 text-xs text-[#001856] rounded focus:outline-none whitespace-normal"
-                  placeholder="Ex: Coordenador Fiscal e Transparência"
+              </DrawerField>
+              <DrawerField label="E-mail Corporativo">
+                <DrawerInput
+                  type="email"
+                  value={activeOrg.email || ''}
+                  onChange={(e) => setActiveOrg({ ...activeOrg, email: e.target.value })}
+                  placeholder="empresa@orquestra.com"
                 />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Mini Bio</label>
-                <textarea 
-                  value={activeOrg.bio || ''}
-                  onChange={(e) => setActiveOrg({ ...activeOrg, bio: e.target.value })}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 p-2 text-xs text-[#001856] rounded focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Telefone Celular</label>
-                  <input 
-                    type="text" 
-                    value={activeOrg.phone || ''}
-                    onChange={(e) => setActiveOrg({ ...activeOrg, phone: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 p-2 text-xs text-[#001856] rounded"
-                    placeholder="(11) 97777-6666"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">E-mail Corporativo</label>
-                  <input 
-                    type="email" 
-                    value={activeOrg.email || ''}
-                    onChange={(e) => setActiveOrg({ ...activeOrg, email: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 p-2 text-xs text-[#ffc300] rounded font-mono"
-                    placeholder="empresa@orquestra.com"
-                  />
-                </div>
-              </div>
+              </DrawerField>
             </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setOrgModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded select-none cursor-pointer">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded select-none cursor-pointer">Salvar Organizador</button>
-            </div>
-          </form>
-        </div>
-      )}
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
 
       {/* Modal D: Simulated Exporter visual outcome */}

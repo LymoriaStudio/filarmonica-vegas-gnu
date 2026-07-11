@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Edit2, Trash2, ArrowUp, ArrowDown, Copy, Calendar, Eye, Image, 
-  HelpCircle, AlignLeft, BarChart3, Star, Sparkles, Check, CheckSquare, Globe
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Plus, Edit2, Trash2, ArrowUp, ArrowDown, Copy, Calendar, Eye, Image,
+  HelpCircle, AlignLeft, BarChart3, Star, Sparkles, Check, CheckSquare, Globe, Search
 } from 'lucide-react';
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
 import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
+import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { supabase } from '../../../lib/supabase';
+import { dataCache } from '../../../lib/dataCache';
 
 interface SiteCMSProps {
   banners: Banner[];
@@ -77,6 +79,9 @@ export default function SiteCMS({
 
   // Arquivos pendentes selecionados no modal de banner, cujo upload
   // para o Supabase só ocorre ao clicar em "Confirmar e Salvar"
+  const [bannerSearch, setBannerSearch] = useState('');
+  const [bannerStatusFilter, setBannerStatusFilter] = useState<'all' | 'ativo' | 'rascunho' | 'agendado'>('all');
+
   const [pendingDesktopFile, setPendingDesktopFile] = useState<File | null>(null);
   const [pendingMobileFile, setPendingMobileFile] = useState<File | null>(null);
 
@@ -92,6 +97,13 @@ export default function SiteCMS({
   // ==========================================
   useEffect(() => {
     const fetchBanners = async () => {
+      const cached = dataCache.get<Banner[]>('banners');
+      if (cached) {
+        setBanners(cached);
+        setBannersLoading(false);
+        return;
+      }
+
       setBannersLoading(true);
       const { data, error } = await supabase
         .from('banners')
@@ -104,7 +116,9 @@ export default function SiteCMS({
         return;
       }
 
-      setBanners((data || []).map(mapBannerFromDb));
+      const mapped = (data || []).map(mapBannerFromDb);
+      dataCache.set('banners', mapped);
+      setBanners(mapped);
       setBannersLoading(false);
     };
 
@@ -290,9 +304,24 @@ export default function SiteCMS({
     addAuditLog('Reordenou Banners', 'Site Banners', 'Alterou a disposição dos banners no carrossel institucional');
   };
 
+  // Sync cache whenever banners state changes after load
+  useEffect(() => {
+    if (!bannersLoading) {
+      dataCache.set('banners', banners);
+    }
+  }, [banners, bannersLoading]);
+
   const BannersSorted = () => {
     return [...banners].sort((a,b) => a.order - b.order);
   };
+
+  const filteredBanners = useMemo(() => {
+    return BannersSorted().filter(b => {
+      const matchesSearch = !bannerSearch || b.title.toLowerCase().includes(bannerSearch.toLowerCase()) || b.subtitle?.toLowerCase().includes(bannerSearch.toLowerCase());
+      const matchesStatus = bannerStatusFilter === 'all' || b.status === bannerStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [banners, bannerSearch, bannerStatusFilter]);
 
 
   // ==========================================
@@ -356,18 +385,26 @@ export default function SiteCMS({
     <div className="space-y-6 p-6 animate-fade-in select-none">
       
       {/* CMS Site Top Section Header */}
-      <div className="pb-4 border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
             <Globe className="mr-2 text-[#001856]" size={20} />
-            Editor CMS do Site Institucional
+            Banners
           </h2>
           <p className="text-xs text-gray-400 mt-1">
             Controle todo o conteúdo visível na página pública oficial sem precisar digitar uma única linha de código.
           </p>
         </div>
 
-    
+        {subTab === 'banners' && (
+          <button
+            type="button"
+            onClick={() => handleOpenBannerModal(null)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors shrink-0"
+          >
+            <Plus size={14} /> Adicionar Banner
+          </button>
+        )}
       </div>
 
       {/* ==========================================================
@@ -375,29 +412,40 @@ export default function SiteCMS({
           ========================================================== */}
       {subTab === 'banners' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-white p-4 border border-gray-200 rounded-xl">
-            <div>
-              <h3 className="text-sm font-bold text-gray-800">Banners Rotativos Principais</h3>
-              <p className="text-[11px] text-gray-400 mt-0.5">Disposição sequencial de imagens na capa do site público.</p>
+
+          {/* Toolbar de filtros */}
+          <div className="flex flex-col sm:flex-row gap-2 mb-2">
+            <div className="relative flex-1">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Pesquisar por título ou subtítulo..."
+                value={bannerSearch}
+                onChange={e => setBannerSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#001856]/20"
+              />
             </div>
-            <button
-              type="button"
-              onClick={() => handleOpenBannerModal(null)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
+            <select
+              value={bannerStatusFilter}
+              onChange={e => setBannerStatusFilter(e.target.value as any)}
+              className="px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#001856]/20 cursor-pointer"
             >
-              <Plus size={14} /> Adicionar Banner
-            </button>
+              <option value="all">Todos os status</option>
+              <option value="ativo">Ativo</option>
+              <option value="rascunho">Rascunho</option>
+              <option value="agendado">Agendado</option>
+            </select>
           </div>
 
           {bannersLoading ? (
             <div className="text-center py-12 text-xs text-gray-400 font-mono">Carregando banners...</div>
-          ) : BannersSorted().length === 0 ? (
+          ) : filteredBanners.length === 0 ? (
             <div className="text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
-              Nenhum banner cadastrado ainda.
+              {bannerSearch || bannerStatusFilter !== 'all' ? 'Nenhum banner encontrado para os filtros aplicados.' : 'Nenhum banner cadastrado ainda.'}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {BannersSorted().map((b, idx) => (
+              {filteredBanners.map((b, idx) => (
                 <div 
                   key={b.id} 
                   className="rounded-xl overflow-hidden bg-white border border-gray-200 flex flex-col justify-between"
@@ -433,7 +481,7 @@ export default function SiteCMS({
                       </button>
                       <button
                         type="button"
-                        disabled={idx === BannersSorted().length - 1}
+                        disabled={idx === filteredBanners.length - 1}
                         onClick={() => handleMoveBanner(idx, 'down')}
                         className="p-1.5 bg-gray-100 hover:bg-gray-200 rounded text-gray-400 hover:text-[#001856] disabled:opacity-30 disabled:pointer-events-none"
                       >
@@ -472,330 +520,148 @@ export default function SiteCMS({
         </div>
       )}
 
-
-      {bannerModalOpen && activeBanner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 animate-fade-in">
-          <form 
-            onSubmit={handleSaveBanner}
-            className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl flex flex-col"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#ffc300]">
-                {activeBanner.id ? 'Modificar Banner Existente' : 'Adicionar Novo Slider Capa'}
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setBannerModalOpen(false)} 
-                className="text-gray-400 hover:text-[#001856]"
-              >
-                Fechar
-              </button>
+      {/* Drawer 1: Banner */}
+      <Drawer
+        open={bannerModalOpen && !!activeBanner}
+        onClose={() => setBannerModalOpen(false)}
+        title={activeBanner?.id ? 'Modificar banner existente' : 'Adicionar novo banner'}
+        description="Configure o slide de capa do site."
+        icon={Image}
+        iconBg="bg-amber-50"
+        iconColor="text-amber-500"
+        onSubmit={handleSaveBanner}
+        submitLabel={bannerSaving ? 'Salvando...' : 'Confirmar e Salvar'}
+        submitting={bannerSaving}
+      >
+        {activeBanner && (<>
+          <DrawerSection title="Textos">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Título do banner" required>
+                <DrawerInput type="text" required value={activeBanner.title || ''} onChange={e => setActiveBanner({ ...activeBanner, title: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Subtítulo">
+                <DrawerInput type="text" value={activeBanner.subtitle || ''} onChange={e => setActiveBanner({ ...activeBanner, subtitle: e.target.value })} />
+              </DrawerField>
             </div>
+            <DrawerField label="Tag">
+              <DrawerInput type="text" value={activeBanner.tag || ''} onChange={e => setActiveBanner({ ...activeBanner, tag: e.target.value })} placeholder="ex: projeto social musical" />
+            </DrawerField>
+            <DrawerField label="Corpo do texto principal">
+              <DrawerTextarea value={activeBanner.text || ''} onChange={e => setActiveBanner({ ...activeBanner, text: e.target.value })} rows={2} />
+            </DrawerField>
+          </DrawerSection>
 
-            <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Título do Banner</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={activeBanner.title || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, title: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Subtítulo (Destaque Médio)</label>
-                  <input 
-                    type="text" 
-                    value={activeBanner.subtitle || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, subtitle: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Tag (opcional)</label>
-                  <input 
-                    type="text" 
-                    value={activeBanner.tag || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, tag: e.target.value })}
-                    placeholder="ex: projeto social musical"
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Corpo do Texto Principal (Breve Resumo)</label>
-                <textarea 
-                  value={activeBanner.text || ''} 
-                  onChange={(e) => setActiveBanner({ ...activeBanner, text: e.target.value })}
-                  rows={2}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none focus:border-[#ffc300]"
-                />
-              </div>
-
-              {/* Image desktop and mobile uploads */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400">Imagem Desktop</label>
-                  {activeBanner.imageDesktop && (
-                    <img
-                      src={activeBanner.imageDesktop}
-                      alt="Pré-visualização desktop"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-24 object-cover rounded border border-gray-200"
-                    />
-                  )}
-                  <ImageUploader
-                    allowedTypes="Imagens (.jpg, .png, .webp)"
-                    onFileSelected={(file, previewUrl) => {
-                      setPendingDesktopFile(file);
-                      setActiveBanner(prev => prev ? { ...prev, imageDesktop: previewUrl } : prev);
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400">Imagem Mobile</label>
-                  {activeBanner.imageMobile && (
-                    <img
-                      src={activeBanner.imageMobile}
-                      alt="Pré-visualização mobile"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-24 object-cover rounded border border-gray-200"
-                    />
-                  )}
-                  <ImageUploader
-                    allowedTypes="Imagens (.jpg, .png, .webp)"
-                    onFileSelected={(file, previewUrl) => {
-                      setPendingMobileFile(file);
-                      setActiveBanner(prev => prev ? { ...prev, imageMobile: previewUrl } : prev);
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Action buttons and links */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-[#001856] mb-1">Rótulo Botão Primário</label>
-                  <input 
-                    type="text" 
-                    value={activeBanner.primaryBtnText || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, primaryBtnText: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-[#001856] mb-1">Link Botão Primário</label>
-                  <input 
-                    type="text" 
-                    value={activeBanner.primaryBtnLink || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, primaryBtnLink: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Rótulo Botão Secundário</label>
-                  <input 
-                    type="text" 
-                    value={activeBanner.secondaryBtnText || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, secondaryBtnText: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Link Botão Secundário</label>
-                  <input 
-                    type="text" 
-                    value={activeBanner.secondaryBtnLink || ''} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, secondaryBtnLink: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Disposição de Ordem</label>
-                  <input 
-                    type="number" 
-                    value={activeBanner.order || 0} 
-                    onChange={(e) => setActiveBanner({ ...activeBanner, order: Number(e.target.value) })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1">Status de Publicação</label>
-                  <select
-                    value={activeBanner.status || 'rascunho'}
-                    onChange={(e) => setActiveBanner({ ...activeBanner, status: e.target.value as any })}
-                    className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none"
-                  >
-                    <option value="ativo">Ativo</option>
-                    <option value="rascunho">Rascunho</option>
-                  </select>
-                </div>
-              </div>
-
+          <DrawerSection title="Imagens">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Imagem Desktop">
+                {activeBanner.imageDesktop && <img src={activeBanner.imageDesktop} alt="Desktop" referrerPolicy="no-referrer" className="w-full h-20 object-cover rounded border border-gray-200 mb-2" />}
+                <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingDesktopFile(file); setActiveBanner(prev => prev ? { ...prev, imageDesktop: previewUrl } : prev); }} />
+              </DrawerField>
+              <DrawerField label="Imagem Mobile">
+                {activeBanner.imageMobile && <img src={activeBanner.imageMobile} alt="Mobile" referrerPolicy="no-referrer" className="w-full h-20 object-cover rounded border border-gray-200 mb-2" />}
+                <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingMobileFile(file); setActiveBanner(prev => prev ? { ...prev, imageMobile: previewUrl } : prev); }} />
+              </DrawerField>
             </div>
+          </DrawerSection>
 
-            <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setBannerModalOpen(false)}
-                className="p-1.5 px-4 bg-gray-100 text-xs rounded hover:bg-gray-200 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={bannerSaving}
-                className="p-1.5 px-6 bg-[#001856] text-xs font-semibold text-white rounded hover:bg-[#001856] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {bannerSaving ? 'Salvando...' : 'Confirmar e Salvar'}
-              </button>
+          <DrawerSection title="Botões de Ação" optional>
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Rótulo botão primário">
+                <DrawerInput type="text" value={activeBanner.primaryBtnText || ''} onChange={e => setActiveBanner({ ...activeBanner, primaryBtnText: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Link botão primário">
+                <DrawerInput type="text" value={activeBanner.primaryBtnLink || ''} onChange={e => setActiveBanner({ ...activeBanner, primaryBtnLink: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Rótulo botão secundário">
+                <DrawerInput type="text" value={activeBanner.secondaryBtnText || ''} onChange={e => setActiveBanner({ ...activeBanner, secondaryBtnText: e.target.value })} />
+              </DrawerField>
+              <DrawerField label="Link botão secundário">
+                <DrawerInput type="text" value={activeBanner.secondaryBtnLink || ''} onChange={e => setActiveBanner({ ...activeBanner, secondaryBtnLink: e.target.value })} />
+              </DrawerField>
             </div>
-          </form>
-        </div>
-      )}
+          </DrawerSection>
 
-      {/* Modal 2: Values Items Add/Edit */}
-      {valueModalOpen && activeValue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form 
-            onSubmit={handleSaveValue}
-            className="w-full max-w-md bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold uppercase text-[#ffc300] tracking-wider">
-                {activeValue.id ? 'Alterar Valor' : 'Adicionar Novo Valor'}
-              </h3>
-              <button type="button" onClick={() => setValueModalOpen(false)} className="text-gray-400">Fechar</button>
+          <DrawerSection title="Configurações">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Ordem">
+                <DrawerInput type="number" value={activeBanner.order || 0} onChange={e => setActiveBanner({ ...activeBanner, order: Number(e.target.value) })} />
+              </DrawerField>
+              <DrawerField label="Status de publicação">
+                <DrawerSelect value={activeBanner.status || 'rascunho'} onChange={e => setActiveBanner({ ...activeBanner, status: e.target.value as any })}>
+                  <option value="ativo">Ativo</option>
+                  <option value="rascunho">Rascunho</option>
+                </DrawerSelect>
+              </DrawerField>
             </div>
-            
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome do Valor</label>
-                <input 
-                  type="text" 
-                  required
-                  value={activeValue.title || ''}
-                  onChange={(e) => setActiveValue({ ...activeValue, title: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                />
-              </div>
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição Explicativa</label>
-                <textarea 
-                  value={activeValue.description || ''}
-                  onChange={(e) => setActiveValue({ ...activeValue, description: e.target.value })}
-                  rows={3}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                />
-              </div>
+      {/* Drawer 2: Values */}
+      <Drawer
+        open={valueModalOpen && !!activeValue}
+        onClose={() => setValueModalOpen(false)}
+        title={activeValue?.id ? 'Alterar valor' : 'Adicionar novo valor'}
+        description="Defina um valor institucional da organização."
+        icon={Star}
+        iconBg="bg-amber-50"
+        iconColor="text-amber-500"
+        onSubmit={handleSaveValue}
+        submitLabel="Salvar Valor"
+        width="w-[480px]"
+      >
+        {activeValue && (<>
+          <DrawerSection title="Identificação">
+            <DrawerField label="Nome do valor" required>
+              <DrawerInput type="text" required value={activeValue.title || ''} onChange={e => setActiveValue({ ...activeValue, title: e.target.value })} />
+            </DrawerField>
+            <DrawerField label="Descrição explicativa">
+              <DrawerTextarea value={activeValue.description || ''} onChange={e => setActiveValue({ ...activeValue, description: e.target.value })} rows={3} />
+            </DrawerField>
+            <DrawerField label="Ordem">
+              <DrawerInput type="number" value={activeValue.order || 0} onChange={e => setActiveValue({ ...activeValue, order: Number(e.target.value) })} />
+            </DrawerField>
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Ordem</label>
-                <input 
-                  type="number" 
-                  value={activeValue.order || 0}
-                  onChange={(e) => setActiveValue({ ...activeValue, order: Number(e.target.value) })}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                />
-              </div>
+      {/* Drawer 3: Timeline */}
+      <Drawer
+        open={timelineModalOpen && !!activeTimeline}
+        onClose={() => setTimelineModalOpen(false)}
+        title={activeTimeline?.id ? 'Alterar marco histórico' : 'Adicionar novo marco'}
+        description="Registre um evento marcante na linha do tempo."
+        icon={Calendar}
+        iconBg="bg-blue-50"
+        iconColor="text-blue-500"
+        onSubmit={handleSaveTimeline}
+        submitLabel="Salvar Marco"
+        width="w-[520px]"
+      >
+        {activeTimeline && (<>
+          <DrawerSection title="Identificação">
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerField label="Ano do marco" required>
+                <DrawerInput type="text" required value={activeTimeline.year || ''} onChange={e => setActiveTimeline({ ...activeTimeline, year: e.target.value })} placeholder="2012" className="font-mono font-bold" />
+              </DrawerField>
+              <DrawerField label="Título do evento" required>
+                <DrawerInput type="text" required value={activeTimeline.title || ''} onChange={e => setActiveTimeline({ ...activeTimeline, title: e.target.value })} />
+              </DrawerField>
             </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setValueModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Valor</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Modal 3: Timeline Marks Create/Update */}
-      {timelineModalOpen && activeTimeline && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form 
-            onSubmit={handleSaveTimeline}
-            className="w-full max-w-lg bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl space-y-4"
-          >
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-xs font-mono font-bold uppercase text-[#ffc300] tracking-wider">
-                {activeTimeline.id ? 'Alterar Marco Histórico' : 'Adicionar Novo Ano'}
-              </h3>
-              <button type="button" onClick={() => setTimelineModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Ano do Marco (Ex: 2012)</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={activeTimeline.year || ''}
-                    onChange={(e) => setActiveTimeline({ ...activeTimeline, year: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none font-mono font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Título do Evento</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={activeTimeline.title || ''}
-                    onChange={(e) => setActiveTimeline({ ...activeTimeline, title: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Descrição do Fato Marcante</label>
-                <textarea 
-                  value={activeTimeline.description || ''}
-                  onChange={(e) => setActiveTimeline({ ...activeTimeline, description: e.target.value })}
-                  rows={3}
-                  className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Upload ou Img Link</label>
-                  <input 
-                    type="text" 
-                    value={activeTimeline.image || ''}
-                    onChange={(e) => setActiveTimeline({ ...activeTimeline, image: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded focus:outline-none font-mono"
-                    placeholder="Link da imagem..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Upload Expresso</label>
-                  <ImageUploader 
-                    onFileSelected={(file, previewUrl) => {
-                      setPendingTimelineFile(file);
-                      setActiveTimeline(prev => prev ? { ...prev, image: previewUrl } : prev);
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setTimelineModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-gray-100 rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Marco</button>
-            </div>
-          </form>
-        </div>
-      )}
+            <DrawerField label="Descrição do fato marcante">
+              <DrawerTextarea value={activeTimeline.description || ''} onChange={e => setActiveTimeline({ ...activeTimeline, description: e.target.value })} rows={3} />
+            </DrawerField>
+          </DrawerSection>
+          <DrawerSection title="Imagem" optional>
+            <DrawerField label="Link da imagem">
+              <DrawerInput type="text" value={activeTimeline.image || ''} onChange={e => setActiveTimeline({ ...activeTimeline, image: e.target.value })} placeholder="https://..." className="font-mono text-xs" />
+            </DrawerField>
+            <DrawerField label="Upload de arquivo">
+              <ImageUploader onFileSelected={(file, previewUrl) => { setPendingTimelineFile(file); setActiveTimeline(prev => prev ? { ...prev, image: previewUrl } : prev); }} />
+            </DrawerField>
+          </DrawerSection>
+        </>)}
+      </Drawer>
 
     </div>
   );

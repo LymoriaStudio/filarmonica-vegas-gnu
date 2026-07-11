@@ -126,6 +126,8 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    font-style: normal;
   }
 
   /**

@@ -18,11 +18,38 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
+const PAGE_LABELS: Record<string, string> = {
+  'dashboard': 'Dashboard',
+  'pessoas-professores': 'Professores',
+  'pessoas-alunos': 'Alunos',
+  'pessoas-organizadores': 'Organizadores',
+  'relacionamento-interesse': 'Tenho Interesse',
+  'relacionamento-apoiar': 'Quero Apoiar',
+  'relacionamento-contato': 'Fale Conosco',
+  'financeiro-doacoes': 'Doações Diretas',
+  'financeiro-apoiadores': 'Apoiadores',
+  'financeiro-relatorios': 'Relatórios',
+  'site-banners': 'Hero Banners',
+  'site-sobre': 'Sobre',
+  'site-timeline': 'Timeline',
+  'conteudo-eventos': 'Eventos',
+  'conteudo-noticias': 'Notícias',
+  'conteudo-cursos': 'Cursos e Oficinas',
+  'conteudo-galeria': 'Galeria Mídia',
+  'conteudo-instrumentos': 'Instrumentos',
+  'sistema-usuarios': 'Controle de Usuários',
+  'sistema-auditoria': 'Logs de Auditoria',
+  'sistema-configuracoes': 'Configurações',
+  'sistema-backup': 'Backup',
+  'sistema-biblioteca': 'Biblioteca',
+};
+
 interface HeaderProps {
   notifications: AdminNotification[];
   setNotifications: React.Dispatch<React.SetStateAction<AdminNotification[]>>;
   onQuickAction: (actionKey: string) => void;
-  
+  activeTab?: string;
+
   // Data for global search
   students: Student[];
   professors: Professor[];
@@ -36,6 +63,7 @@ export default function Header({
   notifications,
   setNotifications,
   onQuickAction,
+  activeTab,
   students,
   professors,
   events,
@@ -173,7 +201,7 @@ export default function Header({
       <div>
         <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Filarmônica de Metais</p>
         <h2 className="text-base font-bold text-[#001856]" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
-          Olá, {displayName}
+          {activeTab && PAGE_LABELS[activeTab] ? PAGE_LABELS[activeTab] : `Olá, ${displayName}`}
         </h2>
       </div>
 

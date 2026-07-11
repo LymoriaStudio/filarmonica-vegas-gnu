@@ -537,8 +537,8 @@ export function ImageUploader({
       <div
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
           isDrag
-            ? 'border-[#F2C94C] bg-amber-500/5'
-            : 'border-neutral-700 hover:border-[#0B4DA2] bg-neutral-900/50 hover:bg-neutral-900'
+            ? 'border-[#ffc300] bg-amber-50'
+            : 'border-[#001856] hover:border-[#001856] bg-blue-50 hover:bg-blue-100/70'
         }`}
         onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }}
         onDragLeave={() => setIsDrag(false)}
@@ -563,13 +563,13 @@ export function ImageUploader({
 
         {!selectedFilename ? (
           <div className="z-10 flex flex-col items-center justify-center space-y-2">
-            <div className="p-3 bg-neutral-800 rounded-full text-amber-500 hover:scale-105 transition-all">
+            <div className="p-3 bg-[#ffc300] rounded-full text-[#001856] hover:scale-105 transition-all">
               <Upload size={24} />
             </div>
-            <div className="text-sm font-medium text-neutral-200">
-              Arraste arquivos de mídia para cá ou <span className="text-amber-400 font-bold underline">navegue</span>
+            <div className="text-sm font-medium text-[#001856]">
+              Arraste arquivos de mídia ou <span className="text-[#ffc300] font-bold underline">navegue</span>
             </div>
-            <p className="text-[11px] text-neutral-500 font-mono">
+            <p className="text-[11px] text-[#001856]/60 font-mono">
               Formatos suportados: {allowedTypes} • Max {maxSizeMB}MB por arquivo
             </p>
           </div>

@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   HeartHandshake, BookOpen, HelpCircle, Check, Archive, Trash2, Mail, Phone,
   UserPlus, UserCheck, MessageSquare, ExternalLink, Calendar, CheckCircle2,
-  Play, Send, Share2, Eye, X, GraduationCap
+  Play, Send, Share2, Eye, X, GraduationCap, Search, SortAsc
 } from 'lucide-react';
 import {
   getInteressados,
@@ -18,6 +18,7 @@ import {
 import { SupportFormResponse, ContactMessage, Student, Supporter } from '../../validations/types';
 import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
 import { supabase } from '../../../lib/supabase';
+import { dataCache } from '../../../lib/dataCache';
 
 // ── Tipo local derivado da tabela Supabase ────────────────────────────────────
 function toInterestView(i: Interessado) {
@@ -126,6 +127,12 @@ export default function RelationshipCMS({
   const [interests, setInterests] = useState<InterestView[]>([]);
   const [loadingInterests, setLoadingInterests] = useState(false);
   const [errorInterests, setErrorInterests] = useState<string | null>(null);
+  const [interestSearch, setInterestSearch] = useState('');
+  const [interestSort, setInterestSort] = useState<'recent' | 'oldest' | 'az'>('recent');
+  const [viewInterest, setViewInterest] = useState<InterestView | null>(null);
+  const [supportSearch, setSupportSearch] = useState('');
+  const [supportSort, setSupportSort] = useState<'recent' | 'oldest' | 'az'>('recent');
+  const [viewSupport, setViewSupport] = useState<SupportFormResponse | null>(null);
 
   // ── Estado local dos apoiadores (Supabase) ────────────────────────────────
   const [loadingSupports, setLoadingSupports] = useState(false);
@@ -144,21 +151,66 @@ export default function RelationshipCMS({
   const [enrollSaving, setEnrollSaving] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
 
+  const filteredSupports = useMemo(() => {
+    let list = [...supports];
+    if (supportSearch.trim()) {
+      const q = supportSearch.toLowerCase();
+      list = list.filter(s =>
+        s.name?.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q) ||
+        s.company?.toLowerCase().includes(q) ||
+        s.supportType?.toLowerCase().includes(q)
+      );
+    }
+    if (supportSort === 'recent') list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    else if (supportSort === 'oldest') list.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    else list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    return list;
+  }, [supports, supportSearch, supportSort]);
+
+  const filteredInterests = useMemo(() => {
+    let list = [...interests];
+    if (interestSearch.trim()) {
+      const q = interestSearch.toLowerCase();
+      list = list.filter(i =>
+        i.name?.toLowerCase().includes(q) ||
+        i.email?.toLowerCase().includes(q) ||
+        i.instrumentOfInterest?.toLowerCase().includes(q)
+      );
+    }
+    if (interestSort === 'recent') list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    else if (interestSort === 'oldest') list.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    else list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    return list;
+  }, [interests, interestSearch, interestSort]);
+
   // ── GET interessados ──────────────────────────────────────────────────────
   useEffect(() => {
     if (subTab !== 'interesse') return;
+    const cached = dataCache.get<InterestView[]>('interessados');
+    if (cached) { setInterests(cached); setLoadingInterests(false); return; }
     setLoadingInterests(true);
     setErrorInterests(null);
 
     getInteressados()
-      .then((data) => setInterests(data.map(toInterestView)))
+      .then((data) => {
+        const mapped = data.map(toInterestView);
+        dataCache.set('interessados', mapped);
+        setInterests(mapped);
+      })
       .catch((err) => setErrorInterests('Erro ao carregar interessados: ' + err.message))
       .finally(() => setLoadingInterests(false));
   }, [subTab]);
 
+  useEffect(() => {
+    if (!loadingInterests && interests.length > 0) dataCache.set('interessados', interests);
+  }, [interests, loadingInterests]);
+
   // ── GET apoiadores da tabela quero_apoiar ─────────────────────────────────
   useEffect(() => {
     if (subTab !== 'apoiar') return;
+    const cached = dataCache.get<SupportFormResponse[]>('quero_apoiar');
+    if (cached) { setSupports(cached); setLoadingSupports(false); return; }
     setLoadingSupports(true);
     setErrorSupports(null);
 
@@ -170,11 +222,17 @@ export default function RelationshipCMS({
         if (error) {
           setErrorSupports('Erro ao carregar apoiadores: ' + error.message);
         } else {
-          setSupports((data ?? []).map(toSupportView));
+          const mapped = (data ?? []).map(toSupportView);
+          dataCache.set('quero_apoiar', mapped);
+          setSupports(mapped);
         }
       })
       .finally(() => setLoadingSupports(false));
   }, [subTab]);
+
+  useEffect(() => {
+    if (!loadingSupports && supports.length > 0) dataCache.set('quero_apoiar', supports);
+  }, [supports, loadingSupports]);
 
   // ── ABRE FICHA DE MATRÍCULA ───────────────────────────────────────────────
   const handleOpenEnrollModal = (item: InterestView) => {
@@ -393,8 +451,31 @@ export default function RelationshipCMS({
           ================================================================ */}
       {subTab === 'interesse' && (
         <div className="space-y-4">
-          <div className="text-xs text-gray-400 italic p-3 bg-white border border-gray-200 rounded-lg">
-            🚨 <strong>Painel Inteligente</strong>: Clique em <strong>"Converter em Aluno"</strong> para injetar o registro na lista acadêmica e gerar matrícula no ERP.
+
+          {/* Toolbar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={interestSearch}
+                onChange={e => setInterestSearch(e.target.value)}
+                placeholder="Buscar por nome, e-mail ou instrumento..."
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-[#001856] focus:outline-none focus:border-[#ffc300] focus:ring-1 focus:ring-[#ffc300]/30 placeholder:text-gray-400"
+              />
+            </div>
+            <div className="relative">
+              <SortAsc size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <select
+                value={interestSort}
+                onChange={e => setInterestSort(e.target.value as any)}
+                className="pl-9 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg text-[#001856] focus:outline-none focus:border-[#ffc300] focus:ring-1 focus:ring-[#ffc300]/30 cursor-pointer"
+              >
+                <option value="recent">Mais recentes</option>
+                <option value="oldest">Mais antigos</option>
+                <option value="az">A–Z</option>
+              </select>
+            </div>
           </div>
 
           {loadingInterests && (
@@ -403,120 +484,187 @@ export default function RelationshipCMS({
           {errorInterests && (
             <p className="text-red-400 text-sm text-center py-8">{errorInterests}</p>
           )}
-          {!loadingInterests && !errorInterests && interests.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8">Nenhum interessado cadastrado ainda.</p>
+          {!loadingInterests && !errorInterests && filteredInterests.length === 0 && (
+            <p className="text-gray-400 text-sm text-center py-8">Nenhum interessado encontrado.</p>
           )}
 
-          <div className="space-y-4">
-            {interests.map((inter) => (
-              <div
-                key={inter.id}
-                className={`p-4 rounded-xl border flex flex-col md:flex-row gap-4 justify-between items-start transition-all ${
-                  inter.status === 'convertido'
-                    ? 'border-emerald-600/30 bg-emerald-950/10'
-                    : inter.status === 'arquivado'
-                    ? 'border-gray-200 bg-gray-50 opacity-55'
-                    : inter.status === 'contacted'
-                    ? 'border-sky-600/30 bg-sky-950/10'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[#ffc300] font-mono text-xs font-bold bg-amber-500/10 p-0.5 px-2 rounded">
-                      Instrumento: {inter.instrumentOfInterest}
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-mono">{inter.date}</span>
-                    {inter.status === 'convertido' && (
-                      <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
-                        CONVERTIDO EM ALUNO
-                      </span>
-                    )}
-                    {inter.status === 'contacted' && (
-                      <span className="bg-sky-950 text-sky-400 border border-sky-800 p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
-                        CONTACTADO
-                      </span>
-                    )}
-                    {inter.status === 'novo' && (
-                      <span className="bg-amber-500 text-black p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
-                        NOVO
-                      </span>
-                    )}
-                    {inter.status === 'arquivado' && (
-                      <span className="bg-gray-100 text-gray-400 border border-gray-300 p-0.5 px-2 rounded-full text-[9px] font-bold font-mono">
-                        ARQUIVADO
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold text-[#001856] flex items-center">
-                      {inter.name}
-                      {inter.age > 0 && (
-                        <span className="text-gray-400 font-mono text-[10px] ml-1.5">• {inter.age} anos</span>
-                      )}
-                    </h4>
-                    {inter.message && (
-                      <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed bg-gray-50 p-3 rounded-lg font-serif">
-                        "{inter.message}"
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-gray-400 pt-1">
-                    <span className="flex items-center"><Mail size={10} className="mr-1 text-amber-500" /> {inter.email}</span>
-                    <span className="flex items-center"><Phone size={10} className="mr-1 text-[#001856]" /> {inter.phone}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
-                  {inter.status !== 'convertido' && inter.status !== 'arquivado' && (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEnrollModal(inter)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
-                    >
-                      <UserPlus size={13} /> Converter em Aluno
-                    </button>
-                  )}
-
-                  <div className="flex space-x-1.5">
-             {      /* <button
-                      type="button"
-                      onClick={() => {
-                        handleMarkContacted(inter.id);
-                        handleOpenSimMail(inter.email, 'interesse', inter);
-                      }}
-                      className="p-1 px-3 bg-gray-100 hover:bg-neutral-750 text-[#ffc300] text-[10.5px] rounded border border-neutral-750 font-mono flex-1 text-center cursor-pointer"
-                    >
-                      Contatar Candidato
-                    </button> */}
-
-                    {inter.status !== 'arquivado' && inter.status !== 'convertido' && (
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveInterest(inter.id, inter.name)}
-                        className="p-1 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-400 rounded border border-gray-200"
-                        title="Arquivar"
-                      >
-                        <Archive size={11} />
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteInterest(inter.id, inter.name)}
-                      className="p-1 px-2.5 bg-gray-100 hover:bg-rose-950 text-rose-500 rounded border border-gray-200 transition-all cursor-pointer"
-                      title="Excluir permanentemente"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                </div>
+          {!loadingInterests && filteredInterests.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="text-sm" style={{ minWidth: '700px', width: '100%' }}>
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ width: '160px', maxWidth: '160px' }}>Nome</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '190px' }}>E-mail</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '150px' }}>Telefone</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '120px' }}>Instrumento</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '100px' }}>Data</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '90px' }}>Status</th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right bg-white sticky right-0 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]" style={{ minWidth: '160px' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredInterests.map((inter) => (
+                    <tr key={inter.id} onClick={() => setViewInterest(inter)} className={`hover:bg-gray-50 transition-colors cursor-pointer ${inter.status === 'arquivado' ? 'opacity-50' : ''}`}>
+                      <td className="px-4 py-3" style={{ width: '160px', maxWidth: '160px' }}>
+                        <p className="font-semibold text-[#001856] text-xs truncate" title={inter.name}>{inter.name}</p>
+                        {inter.message && <p className="text-[10px] text-gray-400 truncate mt-0.5">{inter.message}</p>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-gray-500 flex items-center gap-1"><Mail size={10} className="text-amber-500 shrink-0" />{inter.email}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-gray-600 flex items-center gap-1.5 whitespace-nowrap"><Phone size={11} className="text-[#001856] shrink-0" />{inter.phone}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-semibold text-[#ffc300] bg-amber-50 px-2 py-0.5 rounded whitespace-nowrap">{inter.instrumentOfInterest}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-gray-400 font-mono whitespace-nowrap">{inter.date}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {inter.status === 'convertido' && <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">Convertido</span>}
+                        {inter.status === 'contacted' && <span className="text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-full whitespace-nowrap">Contactado</span>}
+                        {inter.status === 'novo' && <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full whitespace-nowrap">Novo</span>}
+                        {inter.status === 'arquivado' && <span className="text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full whitespace-nowrap">Arquivado</span>}
+                      </td>
+                      <td className="px-4 py-3 bg-white sticky right-0 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {inter.status !== 'convertido' && inter.status !== 'arquivado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEnrollModal(inter)}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-[10px] font-bold cursor-pointer transition-colors whitespace-nowrap"
+                              title="Converter em Aluno"
+                            >
+                              <UserPlus size={11} /> Converter
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setViewInterest(inter)}
+                            className="p-1.5 bg-gray-100 hover:bg-[#001856]/10 text-[#001856] rounded-lg border border-gray-200 cursor-pointer transition-colors"
+                            title="Visualizar"
+                          >
+                            <Eye size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInterest(inter.id, inter.name)}
+                            className="p-1.5 bg-gray-100 hover:bg-rose-50 text-rose-500 rounded-lg border border-gray-200 cursor-pointer transition-colors"
+                            title="Excluir permanentemente"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Modal: visualizar interesse */}
+      {viewInterest && (
+        <>
+          <style>{`
+            @keyframes fadeInScale { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+          `}</style>
+          <div
+            className="fixed top-0 left-0 w-screen h-screen z-40 bg-black/60"
+            onClick={() => setViewInterest(null)}
+          />
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+            style={{ animation: 'fadeInScale 0.18s cubic-bezier(0.22, 1, 0.36, 1) both' }}
+          >
+            {/* Header */}
+            <div className="flex items-start gap-3 px-6 py-5 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-[#001856] flex items-center justify-center shrink-0">
+                <BookOpen size={16} className="text-[#ffc300]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold text-[#001856] leading-tight">{viewInterest.name}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Ficha de interesse — {viewInterest.date}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewInterest(null)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer shrink-0"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5">
+              {/* Status badge */}
+              <div className="flex items-center gap-2">
+                {viewInterest.status === 'convertido' && <span className="text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-full">Convertido em Aluno</span>}
+                {viewInterest.status === 'contacted' && <span className="text-xs font-bold bg-sky-50 text-sky-600 border border-sky-200 px-3 py-1 rounded-full">Contactado</span>}
+                {viewInterest.status === 'novo' && <span className="text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200 px-3 py-1 rounded-full">Novo</span>}
+                {viewInterest.status === 'arquivado' && <span className="text-xs font-bold bg-gray-100 text-gray-400 border border-gray-200 px-3 py-1 rounded-full">Arquivado</span>}
+                <span className="text-xs font-semibold text-[#ffc300] bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">{viewInterest.instrumentOfInterest}</span>
+              </div>
+
+              {/* Info grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">E-mail</p>
+                  <p className="text-sm text-[#001856] font-medium flex items-center gap-1.5"><Mail size={12} className="text-amber-500 shrink-0" />{viewInterest.email}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Telefone</p>
+                  <p className="text-sm text-[#001856] font-medium flex items-center gap-1.5"><Phone size={12} className="text-[#001856] shrink-0" />{viewInterest.phone}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Data de envio</p>
+                  <p className="text-sm text-[#001856] font-medium flex items-center gap-1.5"><Calendar size={12} className="text-[#001856] shrink-0" />{viewInterest.date}</p>
+                </div>
+                {viewInterest.age > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Idade</p>
+                    <p className="text-sm text-[#001856] font-medium">{viewInterest.age} anos</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Mensagem */}
+              {viewInterest.message && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Mensagem</p>
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                    <p className="text-sm text-gray-700 leading-relaxed">"{viewInterest.message}"</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setViewInterest(null)}
+                className="px-5 py-2.5 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+              >
+                Fechar
+              </button>
+              {viewInterest.status !== 'convertido' && viewInterest.status !== 'arquivado' && (
+                <button
+                  type="button"
+                  onClick={() => { handleOpenEnrollModal(viewInterest); setViewInterest(null); }}
+                  className="px-5 py-2.5 text-sm font-bold bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <UserPlus size={14} /> Converter em Aluno
+                </button>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* ================================================================
@@ -524,113 +672,205 @@ export default function RelationshipCMS({
           ================================================================ */}
       {subTab === 'apoiar' && (
         <div className="space-y-4">
-          <div className="text-xs text-gray-400 italic p-3 bg-white border border-gray-200 rounded-lg">
-            💸 <strong>Painel Patrocinador</strong>: Clique em <strong>"Tornar Apoiador Oficial"</strong> para incluir a logomarca no hall dos mecenas da Home.
+
+          {/* Toolbar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={supportSearch}
+                onChange={e => setSupportSearch(e.target.value)}
+                placeholder="Buscar por nome, e-mail, empresa ou tipo..."
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg text-[#001856] focus:outline-none focus:border-[#ffc300] focus:ring-1 focus:ring-[#ffc300]/30 placeholder:text-gray-400"
+              />
+            </div>
+            <div className="relative">
+              <SortAsc size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <select
+                value={supportSort}
+                onChange={e => setSupportSort(e.target.value as any)}
+                className="pl-9 pr-8 py-2 text-sm bg-white border border-gray-200 rounded-lg text-[#001856] focus:outline-none focus:border-[#ffc300] focus:ring-1 focus:ring-[#ffc300]/30 cursor-pointer"
+              >
+                <option value="recent">Mais recentes</option>
+                <option value="oldest">Mais antigos</option>
+                <option value="az">A–Z</option>
+              </select>
+            </div>
           </div>
 
-          {loadingSupports && (
-            <p className="text-gray-400 text-sm text-center py-8">Carregando apoiadores...</p>
-          )}
-          {errorSupports && (
-            <p className="text-red-400 text-sm text-center py-8">{errorSupports}</p>
-          )}
-          {!loadingSupports && !errorSupports && supports.length === 0 && (
-            <p className="text-gray-400 text-sm text-center py-8">Nenhuma proposta de apoio recebida ainda.</p>
+          {loadingSupports && <p className="text-gray-400 text-sm text-center py-8">Carregando apoiadores...</p>}
+          {errorSupports && <p className="text-red-400 text-sm text-center py-8">{errorSupports}</p>}
+          {!loadingSupports && !errorSupports && filteredSupports.length === 0 && (
+            <p className="text-gray-400 text-sm text-center py-8">Nenhuma proposta de apoio encontrada.</p>
           )}
 
-          <div className="space-y-4">
-            {supports.map((sup) => (
-              <div
-                key={sup.id}
-                className={`p-4 rounded-xl border flex flex-col md:flex-row gap-4 justify-between items-start transition-all ${
-                  sup.status === 'aprovado'
-                    ? 'border-emerald-600/30 bg-emerald-950/10'
-                    : sup.status === 'arquivado'
-                    ? 'border-gray-200 bg-gray-50 opacity-55'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center space-x-2.5 text-[10px] font-mono">
-                    <span className="bg-[#001856]/10 text-sky-400 p-1 px-2 rounded-md font-bold uppercase tracking-wider text-[9px]">
-                      Apoio: {sup.supportType}
-                    </span>
-                    <span className="text-gray-400">{sup.date}</span>
-                    {sup.status === 'aprovado' && (
-                      <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 p-0.5 px-2 rounded-full font-bold">
-                        APOIADOR APROVADO
-                      </span>
-                    )}
-                    {sup.status === 'pendente' && (
-                      <span className="bg-amber-500 text-black p-0.5 px-2 rounded-full text-[9px] font-bold">
-                        PENDENTE
-                      </span>
-                    )}
-                    {sup.status === 'arquivado' && (
-                      <span className="bg-gray-100 text-gray-400 border border-gray-300 p-0.5 px-2 rounded-full text-[9px] font-bold">
-                        ARQUIVADO
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold text-[#001856] flex items-center">
-                      {sup.name}
-                      {sup.company && <span className="text-amber-500 ml-1.5 font-sans">• {sup.company}</span>}
-                    </h4>
-                    {sup.message && (
-                      <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed bg-gray-50 p-3 rounded-lg">
-                        "{sup.message}"
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-gray-400">
-                    <span className="flex items-center"><Mail size={10} className="mr-1 text-amber-500" /> {sup.email}</span>
-                    <span className="flex items-center"><Phone size={10} className="mr-1 text-[#001856]" /> {sup.phone}</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
-                  {sup.status !== 'aprovado' && sup.status !== 'arquivado' && (
-                    <button
-                      type="button"
-                      onClick={() => handlePromoToSupporter(sup)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-xs font-bold cursor-pointer transition-colors"
-                    >
-                      <UserCheck size={13} /> Tornar Apoiador Oficial
-                    </button>
-                  )}
-
-                  <div className="flex space-x-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSupports((prev) =>
-                          prev.map((s) => (s.id === sup.id ? { ...s, status: 'contacted' } : s))
-                        );
-                        handleOpenSimMail(sup.email, 'apoiar', sup);
-                      }}
-                      className="p-1 px-3 bg-gray-100 hover:bg-gray-200 text-[#ffc300] text-[10.5px] rounded border border-gray-200 font-mono flex-1 text-center cursor-pointer"
-                    >
-                      Enviar Negociação
-                    </button>
-                    {sup.status !== 'arquivado' && (
-                      <button
-                        type="button"
-                        onClick={() => handleArchiveSupport(sup.id, sup.name)}
-                        className="p-1 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-400 rounded border border-gray-200"
-                        title="Arquivar"
+          {!loadingSupports && filteredSupports.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="text-sm" style={{ minWidth: '780px', width: '100%' }}>
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ width: '160px', maxWidth: '160px' }}>Nome</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '160px' }}>Empresa</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '190px' }}>E-mail</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '150px' }}>Telefone</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '110px' }}>Tipo de apoio</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '100px' }}>Data</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '90px' }}>Status</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right bg-white sticky right-0 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]" style={{ minWidth: '180px' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredSupports.map((sup) => (
+                      <tr
+                        key={sup.id}
+                        onClick={() => setViewSupport(sup)}
+                        className={`hover:bg-gray-50 transition-colors cursor-pointer ${sup.status === 'arquivado' ? 'opacity-50' : ''}`}
                       >
-                        <Archive size={11} />
-                      </button>
-                    )}
+                        <td className="px-4 py-3" style={{ width: '160px', maxWidth: '160px' }}>
+                          <p className="font-semibold text-[#001856] text-xs truncate" title={sup.name}>{sup.name}</p>
+                          {sup.message && <p className="text-[10px] text-gray-400 truncate mt-0.5">{sup.message}</p>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-600 truncate">{sup.company || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-500 flex items-center gap-1"><Mail size={10} className="text-amber-500 shrink-0" />{sup.email}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-600 flex items-center gap-1.5 whitespace-nowrap"><Phone size={11} className="text-[#001856] shrink-0" />{sup.phone}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded whitespace-nowrap">{sup.supportType}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-400 font-mono whitespace-nowrap">{sup.date}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {sup.status === 'aprovado' && <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">Aprovado</span>}
+                          {sup.status === 'pendente' && <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full whitespace-nowrap">Pendente</span>}
+                          {sup.status === 'arquivado' && <span className="text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full whitespace-nowrap">Arquivado</span>}
+                          {sup.status === 'contacted' && <span className="text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-full whitespace-nowrap">Contactado</span>}
+                        </td>
+                        <td className="px-4 py-3 bg-white sticky right-0 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {sup.status !== 'aprovado' && sup.status !== 'arquivado' && (
+                              <button
+                                type="button"
+                                onClick={() => handlePromoToSupporter(sup)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-[10px] font-bold cursor-pointer transition-colors whitespace-nowrap"
+                              >
+                                <UserCheck size={11} /> Tornar Oficial
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setViewSupport(sup)}
+                              className="p-1.5 bg-gray-100 hover:bg-[#001856]/10 text-[#001856] rounded-lg border border-gray-200 cursor-pointer transition-colors"
+                              title="Visualizar"
+                            >
+                              <Eye size={12} />
+                            </button>
+                            {sup.status !== 'arquivado' && (
+                              <button
+                                type="button"
+                                onClick={() => handleArchiveSupport(sup.id, sup.name)}
+                                className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-400 rounded-lg border border-gray-200 cursor-pointer transition-colors"
+                                title="Arquivar"
+                              >
+                                <Archive size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal: visualizar apoiador */}
+      {viewSupport && (
+        <>
+          <div className="fixed top-0 left-0 w-screen h-screen z-40 bg-black/60" onClick={() => setViewSupport(null)} />
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+            style={{ animation: 'fadeInScale 0.18s cubic-bezier(0.22, 1, 0.36, 1) both' }}
+          >
+            <div className="flex items-start gap-3 px-6 py-5 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-xl bg-[#001856] flex items-center justify-center shrink-0">
+                <HeartHandshake size={16} className="text-[#ffc300]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold text-[#001856] leading-tight">{viewSupport.name}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Proposta de apoio — {viewSupport.date}</p>
+              </div>
+              <button type="button" onClick={() => setViewSupport(null)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer shrink-0">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              <div className="flex flex-wrap items-center gap-2">
+                {viewSupport.status === 'aprovado' && <span className="text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-full">Apoiador Aprovado</span>}
+                {viewSupport.status === 'pendente' && <span className="text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200 px-3 py-1 rounded-full">Pendente</span>}
+                {viewSupport.status === 'contacted' && <span className="text-xs font-bold bg-sky-50 text-sky-600 border border-sky-200 px-3 py-1 rounded-full">Contactado</span>}
+                {viewSupport.status === 'arquivado' && <span className="text-xs font-bold bg-gray-100 text-gray-400 border border-gray-200 px-3 py-1 rounded-full">Arquivado</span>}
+                <span className="text-xs font-semibold text-sky-600 bg-sky-50 border border-sky-200 px-3 py-1 rounded-full">{viewSupport.supportType}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {viewSupport.company && (
+                  <div className="bg-gray-50 rounded-xl p-3 col-span-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Empresa</p>
+                    <p className="text-sm text-[#001856] font-medium">{viewSupport.company}</p>
                   </div>
+                )}
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">E-mail</p>
+                  <p className="text-sm text-[#001856] font-medium flex items-center gap-1.5"><Mail size={12} className="text-amber-500 shrink-0" />{viewSupport.email}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Telefone</p>
+                  <p className="text-sm text-[#001856] font-medium flex items-center gap-1.5"><Phone size={12} className="text-[#001856] shrink-0" />{viewSupport.phone}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Data de envio</p>
+                  <p className="text-sm text-[#001856] font-medium flex items-center gap-1.5"><Calendar size={12} className="text-[#001856] shrink-0" />{viewSupport.date}</p>
                 </div>
               </div>
-            ))}
+
+              {viewSupport.message && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Mensagem</p>
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                    <p className="text-sm text-gray-700 leading-relaxed">"{viewSupport.message}"</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+              <button type="button" onClick={() => setViewSupport(null)} className="px-5 py-2.5 text-sm font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer">
+                Fechar
+              </button>
+              {viewSupport.status !== 'aprovado' && viewSupport.status !== 'arquivado' && (
+                <button
+                  type="button"
+                  onClick={() => { handlePromoToSupporter(viewSupport); setViewSupport(null); }}
+                  className="px-5 py-2.5 text-sm font-bold bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <UserCheck size={14} /> Tornar Apoiador Oficial
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ================================================================

@@ -3,12 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
-  Users, UserCheck, Heart, DollarSign, Calendar, ArrowUpRight, Clock, MapPin,
-  CheckCircle2, Filter, X
+  Users, Heart, DollarSign, Calendar, Clock, MapPin,
+  CheckCircle2, ChevronDown, X, RefreshCw
 } from 'lucide-react';
+import { StatCard, StatCardDef } from './StatCard';
+import { DayPicker } from 'react-day-picker';
+import type { DateRange } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
 import { supabase } from '../../../lib/supabase';
+import { dataCache } from '../../../lib/dataCache';
 import { getProfessors } from '../../services/professorsService';
 import { getDoacoes } from '../../services/doacoesService';
 import { useEvents } from '../../hooks/useEvents';
@@ -50,70 +55,110 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
   const { events, loading: eventsLoading } = useEvents({ onlyPublished: true });
 
   useEffect(() => {
-    supabase.from('students').select('id, created_at')
-      .then(({ data }) => setStudents(data ?? []));
+    const cachedStudents = dataCache.get<StudentRow[]>('dashboard_students');
+    if (cachedStudents) { setStudents(cachedStudents); }
+    else {
+      supabase.from('students').select('id, created_at')
+        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_students', d); setStudents(d); });
+    }
 
-    getProfessors().then(setProfessors).catch(console.error);
+    const cachedProfs = dataCache.get<ProfessorRow[]>('professors');
+    if (cachedProfs) { setProfessors(cachedProfs); }
+    else { getProfessors().then(d => { dataCache.set('professors', d); setProfessors(d); }).catch(console.error); }
 
-    supabase.from('quero_apoiar').select('id, status, created_at').eq('status', 'aprovado')
-      .then(({ data }) => setSupporters(data ?? []));
+    const cachedSupporters = dataCache.get<SupporterRow[]>('dashboard_supporters');
+    if (cachedSupporters) { setSupporters(cachedSupporters); }
+    else {
+      supabase.from('quero_apoiar').select('id, status, created_at').eq('status', 'aprovado')
+        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_supporters', d); setSupporters(d); });
+    }
 
-    getDoacoes()
-      .then(all => setDonations(all.filter((d: DoacaoRow) => d.status === 'confirmado')))
-      .catch(console.error);
+    const cachedDonations = dataCache.get<DoacaoRow[]>('dashboard_donations');
+    if (cachedDonations) { setDonations(cachedDonations); }
+    else {
+      getDoacoes()
+        .then(all => { const confirmed = all.filter((d: DoacaoRow) => d.status === 'confirmado'); dataCache.set('dashboard_donations', confirmed); setDonations(confirmed); })
+        .catch(console.error);
+    }
   }, []);
 
-  // ── Filter state ──────────────────────────────────────────────────────────
-  const [filterYear,  setFilterYear]  = useState<number | null>(null);
-  const [filterMonth, setFilterMonth] = useState<number | null>(null);
-  const [filterDay,   setFilterDay]   = useState<number | null>(null);
+  // ── Date range filter state ───────────────────────────────────────────────
+  const [range,       setRange]       = useState<DateRange>({ from: undefined, to: undefined });
+  const [pickerOpen,  setPickerOpen]  = useState(false);
+  const [draftRange,  setDraftRange]  = useState<DateRange>({ from: undefined, to: undefined });
+  const [activePreset, setActivePreset] = useState('Todos os períodos');
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-  const hasFilter = filterYear !== null || filterMonth !== null || filterDay !== null;
+  // close on outside click
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
-  function clearFilter() { setFilterYear(null); setFilterMonth(null); setFilterDay(null); }
+  function startOfDay(d: Date) { const r = new Date(d); r.setHours(0,0,0,0); return r; }
+  function endOfDay(d: Date)   { const r = new Date(d); r.setHours(23,59,59,999); return r; }
+  function subDays(d: Date, n: number) { const r = new Date(d); r.setDate(r.getDate() - n); return r; }
+  function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function endOfMonth(d: Date)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+  function startOfYear(d: Date)  { return new Date(d.getFullYear(), 0, 1); }
 
-  function handleYearChange(v: string) {
-    setFilterYear(v ? Number(v) : null);
-    setFilterMonth(null);
-    setFilterDay(null);
+  const PRESETS = [
+    { label: 'Hoje',            range: () => { const t = new Date(); return { from: startOfDay(t), to: endOfDay(t) }; } },
+    { label: 'Ontem',           range: () => { const t = subDays(new Date(), 1); return { from: startOfDay(t), to: endOfDay(t) }; } },
+    { label: 'Últimos 7 dias',  range: () => ({ from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) }) },
+    { label: 'Últimos 30 dias', range: () => ({ from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) }) },
+    { label: 'Este mês',        range: () => ({ from: startOfMonth(new Date()), to: endOfDay(new Date()) }) },
+    { label: 'Mês passado',     range: () => { const p = new Date(); p.setMonth(p.getMonth()-1); return { from: startOfMonth(p), to: endOfMonth(p) }; } },
+    { label: 'Este trimestre',  range: () => { const m = new Date().getMonth(); const s = Math.floor(m/3)*3; const t = new Date(); t.setMonth(s,1); return { from: startOfDay(t), to: endOfDay(new Date()) }; } },
+    { label: 'Este ano',        range: () => ({ from: startOfYear(new Date()), to: endOfDay(new Date()) }) },
+  ];
+
+  function applyPreset(label: string, r: DateRange) {
+    setRange(r);
+    setDraftRange(r);
+    setActivePreset(label);
+    setPickerOpen(false);
   }
-  function handleMonthChange(v: string) {
-    setFilterMonth(v ? Number(v) : null);
-    setFilterDay(null);
+
+  function applyCustom() {
+    if (draftRange.from) {
+      setRange(draftRange);
+      const fmt = (d?: Date) => d ? d.toLocaleDateString('pt-BR') : '';
+      setActivePreset(draftRange.to ? `${fmt(draftRange.from)} → ${fmt(draftRange.to)}` : fmt(draftRange.from));
+    }
+    setPickerOpen(false);
   }
 
-  // ── Available year/month/day options derived from ALL data ─────────────────
-  const currentYear = new Date().getFullYear();
-  const availableYears = Array.from({ length: currentYear - 2023 + 1 }, (_, i) => currentYear - i);
-  const availableMonths = Array.from({ length: 12 }, (_, i) => i + 1);
-  const availableDays = useMemo(() => {
-    // dias do mês selecionado (ou 31 se nenhum mês escolhido)
-    const daysInMonth = filterYear && filterMonth
-      ? new Date(filterYear, filterMonth, 0).getDate()
-      : 31;
-    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  }, [filterYear, filterMonth]);
+  function clearFilter() {
+    setRange({ from: undefined, to: undefined });
+    setDraftRange({ from: undefined, to: undefined });
+    setActivePreset('Todos os períodos');
+  }
+
+  const hasFilter = !!(range.from || range.to);
 
   // ── Filter helper ─────────────────────────────────────────────────────────
   function matchesFilter(dateStr: string | null | undefined): boolean {
-    if (!filterYear && !filterMonth && !filterDay) return true;
+    if (!range.from && !range.to) return true;
     const d = toDate(dateStr);
     if (!d) return false;
-    if (filterYear  && d.getFullYear()   !== filterYear)  return false;
-    if (filterMonth && d.getMonth() + 1  !== filterMonth) return false;
-    if (filterDay   && d.getDate()        !== filterDay)   return false;
+    if (range.from && d < range.from) return false;
+    if (range.to   && d > range.to)   return false;
     return true;
   }
 
   // ── Filtered slices ────────────────────────────────────────────────────────
-  const filteredStudents   = useMemo(() => students.filter(s   => matchesFilter(s.created_at)),     [students,   filterYear, filterMonth, filterDay]);
-  const filteredDonations  = useMemo(() => donations.filter(d  => matchesFilter(d.date)),            [donations,  filterYear, filterMonth, filterDay]);
-  const filteredSupporters = useMemo(() => supporters.filter(s => matchesFilter(s.created_at)),      [supporters, filterYear, filterMonth, filterDay]);
-  const filteredEvents     = useMemo(() => events.filter(e     => matchesFilter(e.rawDate)),         [events,     filterYear, filterMonth, filterDay]);
+  const filteredStudents   = useMemo(() => students.filter(s   => matchesFilter(s.created_at)),     [students,   range]);
+  const filteredDonations  = useMemo(() => donations.filter(d  => matchesFilter(d.date)),            [donations,  range]);
+  const filteredSupporters = useMemo(() => supporters.filter(s => matchesFilter(s.created_at)),      [supporters, range]);
+  const filteredEvents     = useMemo(() => events.filter(e     => matchesFilter(e.rawDate)),         [events,     range]);
   const filteredInterests  = useMemo(() => {
     if (!hasFilter) return interests;
     return interests.filter((i: any) => matchesFilter(i.submittedAt ?? i.createdAt ?? i.created_at ?? null));
-  }, [interests, filterYear, filterMonth, filterDay, hasFilter]);
+  }, [interests, range, hasFilter]);
 
   // ── Metrics ────────────────────────────────────────────────────────────────
   const metrics = useMemo(() => ({
@@ -161,163 +206,211 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
     });
   }, [filteredDonations]);
 
-  // ── Filter label ──────────────────────────────────────────────────────────
-  const filterLabel = useMemo(() => {
-    const parts = [];
-    if (filterYear)  parts.push(String(filterYear));
-    if (filterMonth) parts.push(MONTH_NAMES[filterMonth - 1]);
-    if (filterDay)   parts.push(`dia ${filterDay}`);
-    return parts.length ? parts.join(' · ') : 'Todos os períodos';
-  }, [filterYear, filterMonth, filterDay]);
-
-  const selectClass = "bg-white border border-gray-200 rounded-xl text-sm text-[#001856] font-medium px-3 py-2 pr-8 appearance-none cursor-pointer hover:border-[#001856]/40 focus:outline-none focus:ring-2 focus:ring-[#001856]/20 focus:border-[#001856] transition-all";
-
   return (
     <div className="space-y-6 p-8 min-h-screen">
 
       {/* ── FILTRO DE PERÍODO ─────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-[#001856]">
-            <Filter size={15} className="text-[#ffc300]" />
-            <span className="text-sm font-semibold">Filtrar período</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 flex-1">
-            {/* Ano */}
-            <div className="relative">
-              <select
-                value={filterYear ?? ''}
-                onChange={e => handleYearChange(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Todos os anos</option>
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
-            </div>
-
-            {/* Mês */}
-            <div className="relative">
-              <select
-                value={filterMonth ?? ''}
-                onChange={e => handleMonthChange(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Todos os meses</option>
-                {availableMonths.map(m => <option key={m} value={m}>{MONTH_NAMES[m - 1]}</option>)}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
-            </div>
-
-            {/* Dia */}
-            <div className="relative">
-              <select
-                value={filterDay ?? ''}
-                onChange={e => setFilterDay(e.target.value ? Number(e.target.value) : null)}
-                className={selectClass}
-              >
-                <option value="">Todos os dias</option>
-                {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
-            </div>
-
-            {/* Label ativo */}
-            <span className={`text-xs px-3 py-1.5 rounded-lg font-medium ${hasFilter ? 'bg-[#001856] text-[#ffc300]' : 'bg-gray-100 text-gray-400'}`}>
-              {filterLabel}
-            </span>
-
-            {/* Limpar */}
-            {hasFilter && (
-              <button
-                onClick={clearFilter}
-                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-3 py-1.5 transition-colors"
-              >
-                <X size={12} /> Limpar filtro
-              </button>
-            )}
-          </div>
+      <div className="bg-white border border-gray-100 rounded-xl shadow-sm px-5 py-3 flex items-center gap-4 flex-wrap">
+        {/* Label "Período" */}
+        <div className="flex items-center gap-2 text-[#001856]">
+          <Calendar size={15} className="text-[#ffc300]" />
+          <span className="text-sm font-semibold">Período</span>
         </div>
+
+        {/* Trigger button */}
+        <div className="relative" ref={pickerRef}>
+          <button
+            onClick={() => { setDraftRange(range); setPickerOpen(v => !v); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+              hasFilter
+                ? 'bg-[#001856] text-[#ffc300] border-[#001856]'
+                : 'bg-white text-[#001856] border-gray-200 hover:border-[#001856]/40'
+            }`}
+          >
+            <Calendar size={14} />
+            {activePreset}
+            <ChevronDown size={14} className={`transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Dropdown */}
+          {pickerOpen && (
+            <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden min-w-max">
+
+              {/* Presets sidebar */}
+              <div className="bg-gray-50 border-r border-gray-100 p-3 flex flex-col gap-0.5 min-w-[170px]">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-2 py-1">Períodos rápidos</p>
+                {PRESETS.map(p => (
+                  <button
+                    key={p.label}
+                    onClick={() => applyPreset(p.label, p.range())}
+                    className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                      activePreset === p.label
+                        ? 'bg-[#001856] text-white font-semibold'
+                        : 'text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <div className="border-t border-gray-200 my-1" />
+                <button
+                  onClick={() => setActivePreset('Personalizado')}
+                  className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    activePreset === 'Personalizado'
+                      ? 'bg-[#001856] text-white font-semibold'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Personalizado
+                </button>
+              </div>
+
+              {/* Calendar + custom inputs */}
+              <div className="p-4 flex flex-col gap-4">
+                <DayPicker
+                  mode="range"
+                  numberOfMonths={2}
+                  selected={draftRange}
+                  onSelect={(r) => setDraftRange(r ?? { from: undefined, to: undefined })}
+                  locale={undefined}
+                  styles={{
+                    months: { gap: '1rem' },
+                  }}
+                  classNames={{
+                    day_selected: '!bg-[#001856] !text-white rounded-full',
+                    day_range_middle: '!bg-[#001856]/10 !text-[#001856] rounded-none',
+                    day_range_start: '!bg-[#001856] !text-white rounded-full',
+                    day_range_end: '!bg-[#001856] !text-white rounded-full',
+                    day_today: 'font-bold border border-[#ffc300] rounded-full',
+                  }}
+                />
+
+                {/* Intervalo personalizado */}
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Intervalo personalizado</p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">De</label>
+                      <input
+                        type="date"
+                        value={draftRange.from ? draftRange.from.toISOString().slice(0,10) : ''}
+                        onChange={e => setDraftRange(r => ({ ...r, from: e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined }))}
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-500">Até</label>
+                      <input
+                        type="date"
+                        value={draftRange.to ? draftRange.to.toISOString().slice(0,10) : ''}
+                        onChange={e => setDraftRange(r => ({ ...r, to: e.target.value ? new Date(e.target.value + 'T23:59:59') : undefined }))}
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2 mt-4">
+                      <button
+                        onClick={() => setPickerOpen(false)}
+                        className="px-4 py-2 text-sm text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={applyCustom}
+                        className="px-5 py-2 text-sm font-bold bg-[#001856] text-white rounded-lg hover:bg-[#001856]/90 transition-colors"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Atualizar / limpar */}
+        {hasFilter && (
+          <button
+            onClick={clearFilter}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors"
+          >
+            <X size={13} /> Limpar
+          </button>
+        )}
+        <button
+          onClick={() => window.location.reload()}
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          <RefreshCw size={13} /> Atualizar
+        </button>
       </div>
 
       {/* ── KPI CARDS ───────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {(() => {
+        const cards: (StatCardDef & { value: number | string })[] = [
+          {
+            id: 'alunos',
+            label: 'Total de Alunos',
+            sublabel: `Matrículas${hasFilter ? ' no período' : ' gerais'}`,
+            icon: Users,
+            iconBg: 'bg-[#001856]',
+            iconColor: 'text-[#ffc300]',
+            navigateTo: 'pessoas-alunos',
+            value: metrics.totalStudents,
+          },
+          {
+            id: 'apoiadores',
+            label: 'Total de Apoiadores',
+            sublabel: 'Empresas Incentivadas',
+            icon: Heart,
+            iconBg: 'bg-[#001856]',
+            iconColor: 'text-[#ffc300]',
+            navigateTo: 'financeiro-apoiadores',
+            value: metrics.totalSups,
+          },
+          {
+            id: 'doacoes',
+            label: 'Total de Doações',
+            sublabel: 'PIX, Boleto e Crédito',
+            icon: DollarSign,
+            iconBg: 'bg-[#ffc300]',
+            iconColor: 'text-[#001856]',
+            navigateTo: 'financeiro-doacoes',
+            value: metrics.totalDonationsCount,
+          },
+          {
+            id: 'eventos',
+            label: 'Eventos na Agenda',
+            sublabel: 'Concertos e Oficinas',
+            icon: Calendar,
+            iconBg: 'bg-[#001856]',
+            iconColor: 'text-[#ffc300]',
+            navigateTo: 'conteudo-eventos',
+            value: metrics.scheduledEventsCount,
+          },
+          {
+            id: 'interessados',
+            label: 'Novos Interessados Cadastrados',
+            sublabel: 'Via formulário "Tenho Interesse" do site público',
+            icon: Users,
+            iconBg: 'bg-[#ffc300]',
+            iconColor: 'text-[#001856]',
+            navigateTo: 'relacionamento-interesse',
+            wide: true,
+            ctaLabel: 'Visualizar',
+            valueSuffix: 'Interessados',
+            value: metrics.totalInterestsCount,
+          },
+        ];
 
-        <div onClick={() => onNavigate('pessoas-alunos')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-[#001856] flex items-center justify-center flex-shrink-0">
-            <Users size={18} className="text-[#ffc300]" />
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {cards.map(({ value, ...def }) => (
+              <StatCard key={def.id} {...def} value={value} onNavigate={onNavigate} />
+            ))}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 truncate">Total de Alunos</p>
-            <p className="text-xl font-bold text-[#001856]">{metrics.totalStudents}</p>
-            <p className="text-xs text-gray-400">Matrículas{hasFilter ? ' no período' : ' gerais'}</p>
-          </div>
-        </div>
-
-        {/* <div onClick={() => onNavigate('pessoas-professores')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-[#ffc300] flex items-center justify-center flex-shrink-0">
-            <UserCheck size={18} className="text-[#001856]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 truncate">Total de Professores</p>
-            <p className="text-xl font-bold text-[#001856]">{metrics.totalProfs}</p>
-            <p className="text-xs text-gray-400">Sopros e Percussão</p>
-          </div>
-        </div> */}
-
-        <div onClick={() => onNavigate('financeiro-apoiadores')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-[#001856] flex items-center justify-center flex-shrink-0">
-            <Heart size={18} className="text-[#ffc300]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 truncate">Total de Apoiadores</p>
-            <p className="text-xl font-bold text-[#001856]">{metrics.totalSups}</p>
-            <p className="text-xs text-green-600">Empresas Incentivadas</p>
-          </div>
-        </div>
-
-        <div onClick={() => onNavigate('financeiro-doacoes')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-[#ffc300] flex items-center justify-center flex-shrink-0">
-            <DollarSign size={18} className="text-[#001856]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 truncate">Total de Doações</p>
-            <p className="text-xl font-bold text-[#001856]">{metrics.totalDonationsCount}</p>
-            <p className="text-xs text-gray-400">PIX, Boleto e Crédito</p>
-          </div>
-        </div>
-
-        <div onClick={() => onNavigate('conteudo-eventos')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all">
-          <div className="w-10 h-10 rounded-xl bg-[#001856] flex items-center justify-center flex-shrink-0">
-            <Calendar size={18} className="text-[#ffc300]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 truncate">Eventos na Agenda</p>
-            <p className="text-xl font-bold text-[#001856]">{metrics.scheduledEventsCount}</p>
-            <p className="text-xs text-gray-400">Concertos e Oficinas</p>
-          </div>
-        </div>
-
-        <div onClick={() => onNavigate('relacionamento-interesse')} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#001856]/20 transition-all sm:col-span-2 lg:col-span-2 xl:col-span-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#ffc300] flex items-center justify-center flex-shrink-0">
-                <Users size={18} className="text-[#001856]" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-400">Novos Interessados Cadastrados</p>
-                <p className="text-xl font-bold text-[#001856]">{metrics.totalInterestsCount} Interessados</p>
-                <p className="text-xs text-gray-400 italic">Via formulário "Tenho Interesse" do site público</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-[#001856] font-semibold border border-[#001856]/20 rounded-lg px-3 py-1.5 hover:bg-[#001856]/5 transition-colors flex-shrink-0">
-              Converter em Aluno <ArrowUpRight size={13} />
-            </div>
-          </div>
-        </div>
-
-      </div>
+        );
+      })()}
 
       {/* ── GRÁFICOS ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -285,6 +285,7 @@ const [students, setStudents] = useState<Student[]>([]);
           activeUser={activeAdminUser}
           setActiveUser={setActiveAdminUser}
           systemUsers={appUsersForHeader}
+          activeTab={activeTab}
           onQuickAction={handleQuickActionTrigger}
           students={students}
           professors={professors}

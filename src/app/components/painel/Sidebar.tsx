@@ -14,12 +14,15 @@ interface SidebarProps {
 
 const navGroups = [
   {
-    id: 'pessoas',
-    title: 'Pessoas (ERP)',
-    permissionKey: 'pessoas',
+    id: 'conteudo',
+    title: 'Conteúdo (CMS)',
+    permissionKey: 'conteudo',
     items: [
-      { id: 'pessoas-professores', label: 'Professores', icon: <UserCheck size={14} /> },
-      { id: 'pessoas-alunos', label: 'Alunos', icon: <UserPlus size={14} /> },
+      { id: 'site-banners', label: 'Hero Banners', icon: <Image size={14} /> },
+      { id: 'conteudo-eventos', label: 'Eventos', icon: <Calendar size={14} /> },
+      // { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
+      // { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> },
+      { id: 'conteudo-instrumentos', label: 'Instrumentos', icon: <ListMusic size={14} /> },
     ],
   },
   {
@@ -29,26 +32,24 @@ const navGroups = [
     items: [
       { id: 'relacionamento-interesse', label: 'Tenho Interesse', icon: <BookOpen size={14} /> },
       { id: 'relacionamento-apoiar', label: 'Quero Apoiar', icon: <HeartHandshake size={14} /> },
+      { id: 'pessoas-alunos', label: 'Alunos', icon: <UserPlus size={14} /> },
     ],
   },
+  // {
+  //   id: 'pessoas',
+  //   title: 'Pessoas (ERP)',
+  //   permissionKey: 'pessoas',
+  //   items: [
+  //     { id: 'pessoas-professores', label: 'Professores', icon: <UserCheck size={14} /> },
+  //     { id: 'pessoas-alunos', label: 'Alunos', icon: <UserPlus size={14} /> },
+  //   ],
+  // },
   {
     id: 'financeiro',
     title: 'Financeiro',
     permissionKey: 'financeiro',
     items: [
       { id: 'financeiro-doacoes', label: 'Doações Diretas', icon: <DollarSign size={14} /> },
-    ],
-  },
-  {
-    id: 'conteudo',
-    title: 'Conteúdo (CMS)',
-    permissionKey: 'conteudo',
-    items: [
-      { id: 'site-banners', label: 'Hero Banners', icon: <Image size={14} /> },
-      { id: 'conteudo-eventos', label: 'Eventos / Concertos', icon: <Calendar size={14} /> },
-      { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
-      { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> },
-      { id: 'conteudo-instrumentos', label: 'Instrumentos', icon: <ListMusic size={14} /> },
     ],
   },
   {
@@ -136,7 +137,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
                       key={item.id}
                       type="button"
                       onClick={() => navigate(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left cursor-pointer ${
                         activeTab === item.id
                           ? 'bg-[#ffc300] text-[#001856] font-semibold'
                           : 'text-white/60 hover:text-white hover:bg-white/10'

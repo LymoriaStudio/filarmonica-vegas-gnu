@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Supporter } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
+import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import {
   getDoacoes,
   createDoacao,
@@ -548,22 +549,23 @@ export default function FinanceiroERP({
       )}
 
       {/* ================================================================
-          MODAL: NOVA / EDITAR DOAÇÃO
+          DRAWER: NOVA / EDITAR DOAÇÃO
           ================================================================ */}
-      {donationModalOpen && activeDonation !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form onSubmit={handleSaveDonation} className="w-full max-w-md bg-white rounded-2xl overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-              <span className="font-bold text-[#001856] text-sm">
-                {activeDonation.id ? 'Editar doação' : 'Nova doação'}
-              </span>
-              <button type="button" onClick={() => setDonationModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Tipo */}
+      <Drawer
+        open={donationModalOpen && activeDonation !== null}
+        onClose={() => setDonationModalOpen(false)}
+        title={activeDonation?.id ? 'Editar doação' : 'Nova doação'}
+        description="Preencha os dados do doador e o valor da doação via Pix."
+        icon={DollarSign}
+        iconBg="bg-emerald-50"
+        iconColor="text-emerald-500"
+        onSubmit={handleSaveDonation}
+        submitLabel={savingDonation ? 'Salvando...' : 'Salvar'}
+        submitting={savingDonation}
+      >
+        {activeDonation && (
+          <>
+            <DrawerSection title="Tipo de doador">
               <div className="grid grid-cols-2 gap-2">
                 {(['fisica', 'juridica'] as const).map((t) => (
                   <button
@@ -580,122 +582,135 @@ export default function FinanceiroERP({
                   </button>
                 ))}
               </div>
+            </DrawerSection>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-medium">Nome completo</label>
-                <input
+            <DrawerSection title="Dados do doador">
+              <DrawerField label="Nome completo" required>
+                <DrawerInput
                   type="text"
                   value={activeDonation.donorName}
                   onChange={(e) => setActiveDonation({ ...activeDonation, donorName: e.target.value })}
                   placeholder="Nome do doador"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
                 />
-              </div>
+              </DrawerField>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-medium">
-                  {activeDonation.donorType === 'fisica' ? 'CPF' : 'CNPJ'}
-                </label>
-                <input
+              <DrawerField label={activeDonation.donorType === 'fisica' ? 'CPF' : 'CNPJ'} required>
+                <DrawerInput
                   type="text"
                   value={activeDonation.donorCpf}
                   onChange={(e) => setActiveDonation({ ...activeDonation, donorCpf: e.target.value })}
                   placeholder={activeDonation.donorType === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
                 />
-              </div>
+              </DrawerField>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-medium">E-mail (opcional)</label>
-                <input
+              <DrawerField label="E-mail">
+                <DrawerInput
                   type="email"
                   value={activeDonation.donorEmail}
                   onChange={(e) => setActiveDonation({ ...activeDonation, donorEmail: e.target.value })}
                   placeholder="email@exemplo.com"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
                 />
-              </div>
+              </DrawerField>
+            </DrawerSection>
 
-              <div>
-                <label className="block text-xs text-gray-500 mb-1 font-medium">Valor (R$)</label>
-                <input
+            <DrawerSection title="Valor">
+              <DrawerField label="Valor (R$)" required>
+                <DrawerInput
                   type="number"
                   required
                   min="0"
                   value={activeDonation.amount}
                   onChange={(e) => setActiveDonation({ ...activeDonation, amount: e.target.value === '' ? '' : Number(e.target.value) })}
                   placeholder="0"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-emerald-600 focus:outline-none focus:border-[#001856]"
                 />
-              </div>
-            </div>
-
-            <div className="p-5 border-t border-gray-100 flex justify-end gap-2">
-              <button type="button" onClick={() => setDonationModalOpen(false)} className="px-4 py-2 text-sm text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 cursor-pointer">Cancelar</button>
-              <button type="submit" disabled={savingDonation} className="px-6 py-2 text-sm font-bold bg-[#ffc300] text-[#001856] rounded-xl hover:bg-yellow-400 disabled:opacity-60 cursor-pointer">
-                {savingDonation ? 'Salvando...' : 'Salvar'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              </DrawerField>
+            </DrawerSection>
+          </>
+        )}
+      </Drawer>
 
       {/* ================================================================
-          MODAL: APOIADOR
+          DRAWER: APOIADOR
           ================================================================ */}
-      {supporterModalOpen && activeSupporter && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <form onSubmit={handleSaveSupporter} className="w-full max-w-lg bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl">
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-amber-500 uppercase tracking-widest">
-                {activeSupporter.id ? 'Alterar Apoiador' : 'Adicionar Patrocinador'}
-              </span>
-              <button type="button" onClick={() => setSupporterModalOpen(false)} className="text-gray-400">Fechar</button>
-            </div>
-            <div className="p-4 space-y-3.5 max-h-[420px] overflow-y-auto">
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nome Fantasia</label>
-                <input type="text" required value={activeSupporter.name || ''} onChange={(e) => setActiveSupporter({ ...activeSupporter, name: e.target.value })} className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">URL do Site</label>
-                <input type="text" value={activeSupporter.siteUrl || ''} onChange={(e) => setActiveSupporter({ ...activeSupporter, siteUrl: e.target.value })} className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none font-mono" placeholder="https://suaempresa.com.br" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Texto Institucional</label>
-                <textarea value={activeSupporter.description || ''} onChange={(e) => setActiveSupporter({ ...activeSupporter, description: e.target.value })} rows={2} className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded focus:outline-none" />
-              </div>
+      <Drawer
+        open={supporterModalOpen && !!activeSupporter}
+        onClose={() => setSupporterModalOpen(false)}
+        title={activeSupporter?.id ? 'Alterar Apoiador' : 'Adicionar Patrocinador'}
+        description="Configure o patrocínio corporativo e as informações exibidas no site público."
+        icon={Award}
+        iconBg="bg-amber-50"
+        iconColor="text-amber-500"
+        onSubmit={handleSaveSupporter}
+        submitLabel="Salvar Mecenas"
+      >
+        {activeSupporter && (
+          <>
+            <DrawerSection title="Identificação">
+              <DrawerField label="Nome Fantasia" required>
+                <DrawerInput
+                  type="text"
+                  required
+                  value={activeSupporter.name || ''}
+                  onChange={(e) => setActiveSupporter({ ...activeSupporter, name: e.target.value })}
+                />
+              </DrawerField>
+              <DrawerField label="URL do Site">
+                <DrawerInput
+                  type="text"
+                  value={activeSupporter.siteUrl || ''}
+                  onChange={(e) => setActiveSupporter({ ...activeSupporter, siteUrl: e.target.value })}
+                  placeholder="https://suaempresa.com.br"
+                />
+              </DrawerField>
+              <DrawerField label="Texto Institucional">
+                <DrawerTextarea
+                  value={activeSupporter.description || ''}
+                  onChange={(e) => setActiveSupporter({ ...activeSupporter, description: e.target.value })}
+                  rows={3}
+                />
+              </DrawerField>
+            </DrawerSection>
+
+            <DrawerSection title="Classificação">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Nível de Patrocínio</label>
-                  <select value={activeSupporter.sponsorshipLevel || 'silver'} onChange={(e) => setActiveSupporter({ ...activeSupporter, sponsorshipLevel: e.target.value as any })} className="w-full bg-gray-50 border border-gray-200 text-gray-400 p-2 text-xs rounded">
+                <DrawerField label="Nível de Patrocínio" required>
+                  <DrawerSelect
+                    value={activeSupporter.sponsorshipLevel || 'silver'}
+                    onChange={(e) => setActiveSupporter({ ...activeSupporter, sponsorshipLevel: e.target.value as any })}
+                  >
                     <option value="diamond">Diamante</option>
                     <option value="gold">Ouro</option>
                     <option value="silver">Prata</option>
                     <option value="bronze">Bronze</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Segmento</label>
-                  <input type="text" value={activeSupporter.category || ''} onChange={(e) => setActiveSupporter({ ...activeSupporter, category: e.target.value })} className="w-full bg-gray-50 border border-gray-200 text-[#001856] p-2 text-xs rounded" placeholder="Ex: Indústria" />
-                </div>
+                  </DrawerSelect>
+                </DrawerField>
+                <DrawerField label="Segmento">
+                  <DrawerInput
+                    type="text"
+                    value={activeSupporter.category || ''}
+                    onChange={(e) => setActiveSupporter({ ...activeSupporter, category: e.target.value })}
+                    placeholder="Ex: Indústria"
+                  />
+                </DrawerField>
               </div>
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="homeshow" checked={activeSupporter.highlightedOnHome || false} onChange={(e) => setActiveSupporter({ ...activeSupporter, highlightedOnHome: e.target.checked })} className="w-4 h-4 bg-gray-50 border border-gray-200" />
-                <label htmlFor="homeshow" className="text-[10px] font-mono uppercase text-gray-400">Mostrar na Homepage</label>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  id="homeshow"
+                  checked={activeSupporter.highlightedOnHome || false}
+                  onChange={(e) => setActiveSupporter({ ...activeSupporter, highlightedOnHome: e.target.checked })}
+                  className="w-4 h-4 border border-gray-200 rounded"
+                />
+                <label htmlFor="homeshow" className="text-xs font-semibold text-gray-700">Mostrar na Homepage</label>
               </div>
-              <div>
-                <label className="block text-[10px] font-mono uppercase text-gray-400 mb-2">Upload Logotipo</label>
-                <ImageUploader onUploadSuccess={(url) => setActiveSupporter({ ...activeSupporter, logo: url })} />
-              </div>
-            </div>
-            <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-end space-x-2">
-              <button type="button" onClick={() => setSupporterModalOpen(false)} className="text-xs text-gray-400 px-3 py-1 bg-white rounded">Cancelar</button>
-              <button type="submit" className="text-xs text-white px-5 py-1 bg-[#001856] rounded">Salvar Mecenas</button>
-            </div>
-          </form>
-        </div>
-      )}
+            </DrawerSection>
+
+            <DrawerSection title="Logotipo">
+              <ImageUploader onUploadSuccess={(url) => setActiveSupporter({ ...activeSupporter, logo: url })} />
+            </DrawerSection>
+          </>
+        )}
+      </Drawer>
 
 
     </div>
