@@ -7,3 +7,36 @@
   font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
   font-style: normal !important;
 }
+
+/* ── Scrollbars — área de conteúdo (fundo claro) ── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #e8ecf2;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* ── Scrollbar da sidebar (fundo navy #001856) ── */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #0a2a6e;
+  border-radius: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #3a6fd8;
+  border-radius: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5585e8;
+}

@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { InlineLoader } from '../../components/InlineLoader';
 import {
   Users, Heart, DollarSign, Calendar, Clock, MapPin,
   CheckCircle2, ChevronDown, X, RefreshCw
@@ -54,33 +55,27 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
 
   const { events, loading: eventsLoading } = useEvents({ onlyPublished: true });
 
-  useEffect(() => {
-    const cachedStudents = dataCache.get<StudentRow[]>('dashboard_students');
-    if (cachedStudents) { setStudents(cachedStudents); }
-    else {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchAll = () => {
+    setRefreshing(true);
+    const minDelay = new Promise<void>(res => setTimeout(res, 1000));
+
+    const fetches = Promise.all([
       supabase.from('students').select('id, created_at')
-        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_students', d); setStudents(d); });
-    }
-
-    const cachedProfs = dataCache.get<ProfessorRow[]>('professors');
-    if (cachedProfs) { setProfessors(cachedProfs); }
-    else { getProfessors().then(d => { dataCache.set('professors', d); setProfessors(d); }).catch(console.error); }
-
-    const cachedSupporters = dataCache.get<SupporterRow[]>('dashboard_supporters');
-    if (cachedSupporters) { setSupporters(cachedSupporters); }
-    else {
+        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_students', d); setStudents(d); }),
+      getProfessors().then(d => { dataCache.set('professors', d); setProfessors(d); }).catch(console.error),
       supabase.from('quero_apoiar').select('id, status, created_at').eq('status', 'aprovado')
-        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_supporters', d); setSupporters(d); });
-    }
-
-    const cachedDonations = dataCache.get<DoacaoRow[]>('dashboard_donations');
-    if (cachedDonations) { setDonations(cachedDonations); }
-    else {
+        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_supporters', d); setSupporters(d); }),
       getDoacoes()
         .then(all => { const confirmed = all.filter((d: DoacaoRow) => d.status === 'confirmado'); dataCache.set('dashboard_donations', confirmed); setDonations(confirmed); })
-        .catch(console.error);
-    }
-  }, []);
+        .catch(console.error),
+    ]);
+
+    Promise.all([fetches, minDelay]).finally(() => setRefreshing(false));
+  };
+
+  useEffect(() => { fetchAll(); }, []);
 
   // ── Date range filter state ───────────────────────────────────────────────
   const [range,       setRange]       = useState<DateRange>({ from: undefined, to: undefined });
@@ -338,7 +333,7 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
           </button>
         )}
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => fetchAll()}
           className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
         >
           <RefreshCw size={13} /> Atualizar
@@ -406,7 +401,7 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {cards.map(({ value, ...def }) => (
-              <StatCard key={def.id} {...def} value={value} onNavigate={onNavigate} />
+              <StatCard key={def.id} {...def} value={value} onNavigate={onNavigate} refreshing={refreshing} />
             ))}
           </div>
         );
@@ -461,7 +456,7 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
           </div>
           <div className="space-y-3">
             {eventsLoading ? (
-              <p className="text-sm text-gray-400 py-4 text-center">Carregando eventos...</p>
+              <InlineLoader message="Carregando eventos..." />
             ) : filteredEvents.length === 0 ? (
               <p className="text-sm text-gray-400 py-4 text-center">Nenhum evento{hasFilter ? ' no período selecionado' : ' cadastrado'}.</p>
             ) : filteredEvents.slice(0, 3).map((evt) => (

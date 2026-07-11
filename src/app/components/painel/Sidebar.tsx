@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Music, LayoutDashboard, Globe, Users, HeartHandshake, DollarSign,
   BookOpen, Settings, ChevronDown, ListMusic, UserCheck, UserPlus,
-  HelpCircle, Calendar, Image, ShieldAlert, FileClock, Menu, X, ArrowLeft,
+  HelpCircle, Calendar, Image, ShieldAlert, FileClock, Menu, X, ArrowLeft, MessageSquare,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
@@ -24,6 +24,7 @@ const navGroups = [
       // { id: 'conteudo-cursos', label: 'Cursos e Oficinas', icon: <BookOpen size={14} /> },
       // { id: 'conteudo-galeria', label: 'Galeria Mídia', icon: <Image size={14} /> },
       { id: 'conteudo-instrumentos', label: 'Instrumentos', icon: <ListMusic size={14} /> },
+      { id: 'conteudo-depoimentos', label: 'Depoimentos', icon: <MessageSquare size={14} /> },
     ],
   },
   {
@@ -94,7 +95,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto sidebar-scroll px-3 py-4">
         {/* Dashboard */}
         {hasPermission('dashboard') && (
           <button

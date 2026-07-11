@@ -27,7 +27,7 @@
   font-style: normal !important;
 }
 
-/* Custom modern scrollbars */
+/* Custom modern scrollbars — default (dark, for dark backgrounds) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -44,6 +44,25 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #3b3b3b;
+}
+
+/* Sidebar scrollbar — azul sobre fundo navy */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: #0a2a6e;
+  border-radius: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #3a6fd8;
+  border-radius: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5585e8;
 }
 
 /* Glassmorphism custom classes */

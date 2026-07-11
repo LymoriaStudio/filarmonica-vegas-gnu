@@ -21,9 +21,24 @@ interface StatCardProps extends StatCardDef {
   value: number | string;
   onNavigate: (tab: string) => void;
   onAction?: (key: string) => void;
+  refreshing?: boolean;
 }
 
-export function StatCard({ label, sublabel, icon: Icon, iconBg, iconColor, navigateTo, wide, ctaLabel, ctaAction, valueSuffix, value, onNavigate, onAction }: StatCardProps) {
+function Spinner() {
+  return (
+    <span className="inline-flex items-center justify-center animate-spin" style={{ width: 20, height: 20 }}>
+      {/* Music note SVG rotating */}
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" strokeOpacity="0.15" />
+        <path d="M9 18V5l12-2v13" strokeOpacity="0.9" />
+        <circle cx="6" cy="18" r="3" fill="currentColor" stroke="none" />
+        <circle cx="18" cy="16" r="3" fill="currentColor" stroke="none" />
+      </svg>
+    </span>
+  );
+}
+
+export function StatCard({ label, sublabel, icon: Icon, iconBg, iconColor, navigateTo, wide, ctaLabel, ctaAction, valueSuffix, value, onNavigate, onAction, refreshing }: StatCardProps) {
   const handleClick = () => {
     if (navigateTo) onNavigate(navigateTo);
     else if (ctaAction && onAction) onAction(ctaAction);
@@ -43,7 +58,10 @@ export function StatCard({ label, sublabel, icon: Icon, iconBg, iconColor, navig
             <div>
               <p className="text-xs text-gray-400">{label}</p>
               <p className="text-xl font-bold text-[#001856]">
-                {value}{valueSuffix ? ` ${valueSuffix}` : ''}
+                {refreshing
+                  ? <span className="inline-flex text-[#001856]"><Spinner /></span>
+                  : <>{value}{valueSuffix ? ` ${valueSuffix}` : ''}</>
+                }
               </p>
               <p className="text-xs text-gray-400">{sublabel}</p>
             </div>
@@ -68,7 +86,10 @@ export function StatCard({ label, sublabel, icon: Icon, iconBg, iconColor, navig
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs text-gray-400 truncate">{label}</p>
-        <p className="text-3xl font-bold text-[#001856]">{value}</p>
+        {refreshing
+          ? <div className="mt-1 text-[#001856]"><Spinner /></div>
+          : <p className="text-3xl font-bold text-[#001856]">{value}</p>
+        }
       </div>
     </div>
   );

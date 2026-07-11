@@ -37,6 +37,7 @@ const PAGE_LABELS: Record<string, string> = {
   'conteudo-cursos': 'Cursos e Oficinas',
   'conteudo-galeria': 'Galeria Mídia',
   'conteudo-instrumentos': 'Instrumentos',
+  'conteudo-depoimentos': 'Depoimentos',
   'sistema-usuarios': 'Controle de Usuários',
   'sistema-auditoria': 'Logs de Auditoria',
   'sistema-configuracoes': 'Configurações',
@@ -198,7 +199,7 @@ export default function Header({
   return (
     <header className="relative h-16 w-full border-b border-gray-200 flex items-center justify-between px-6 z-30 select-none bg-white">
       
-      <div>
+      <div className="pl-10 md:pl-0">
         <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Filarmônica de Metais</p>
         <h2 className="text-base font-bold text-[#001856]" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
           {activeTab && PAGE_LABELS[activeTab] ? PAGE_LABELS[activeTab] : `Olá, ${displayName}`}

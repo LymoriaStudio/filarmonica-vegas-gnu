@@ -2,6 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
+import { InlineLoader } from '../../components/InlineLoader';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -481,7 +482,7 @@ export default function RelationshipCMS({
           </div>
 
           {loadingInterests && (
-            <p className="text-gray-400 text-sm text-center py-8">Carregando interessados...</p>
+            <InlineLoader message="Carregando interessados..." />
           )}
           {errorInterests && (
             <p className="text-red-400 text-sm text-center py-8">{errorInterests}</p>
@@ -701,7 +702,7 @@ export default function RelationshipCMS({
             </div>
           </div>
 
-          {loadingSupports && <p className="text-gray-400 text-sm text-center py-8">Carregando apoiadores...</p>}
+          {loadingSupports && <InlineLoader message="Carregando apoiadores..." />}
           {errorSupports && <p className="text-red-400 text-sm text-center py-8">{errorSupports}</p>}
           {!loadingSupports && !errorSupports && filteredSupports.length === 0 && (
             <p className="text-gray-400 text-sm text-center py-8">Nenhuma proposta de apoio encontrada.</p>

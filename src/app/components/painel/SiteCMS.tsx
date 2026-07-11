@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { InlineLoader } from '../../components/InlineLoader';
 import {
   Plus, Edit2, Trash2, ArrowUp, ArrowDown, Copy, Calendar, Eye, Image,
   HelpCircle, AlignLeft, BarChart3, Star, Sparkles, Check, CheckSquare, Globe, Search
@@ -438,7 +439,7 @@ export default function SiteCMS({
           </div>
 
           {bannersLoading ? (
-            <div className="text-center py-12 text-xs text-gray-400 font-mono">Carregando banners...</div>
+            <InlineLoader message="Carregando banners..." />
           ) : filteredBanners.length === 0 ? (
             <div className="text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
               {bannerSearch || bannerStatusFilter !== 'all' ? 'Nenhum banner encontrado para os filtros aplicados.' : 'Nenhum banner cadastrado ainda.'}

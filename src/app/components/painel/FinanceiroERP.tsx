@@ -2,6 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
+import { InlineLoader } from '../../components/InlineLoader';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -338,7 +339,7 @@ export default function FinanceiroERP({
           </div>
 
           {/* Estado loading / erro / vazio */}
-          {loadingDoacoes && <p className="text-gray-400 text-sm text-center py-10">Carregando doações...</p>}
+          {loadingDoacoes && <InlineLoader message="Carregando doações..." />}
           {errorDoacoes && <p className="text-red-400 text-sm text-center py-10">{errorDoacoes}</p>}
           {!loadingDoacoes && !errorDoacoes && filteredDoacoes.length === 0 && (
             <p className="text-gray-400 text-sm text-center py-10 border border-dashed border-gray-200 rounded-2xl">
@@ -490,7 +491,7 @@ export default function FinanceiroERP({
           ================================================================ */}
       {subTab === 'relatorios' && (
         <div className="space-y-6">
-          {loadingDoacoes && <p className="text-gray-400 text-sm text-center py-8">Carregando dados...</p>}
+          {loadingDoacoes && <InlineLoader message="Carregando dados..." />}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
               { label: 'Entrada Diária', value: reportTotals.dailyTotal, color: 'text-[#001856]', sub: 'Somas do dia corrente' },

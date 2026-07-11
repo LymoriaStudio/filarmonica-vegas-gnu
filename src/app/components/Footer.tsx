@@ -1,4 +1,4 @@
-import { Instagram, Facebook, Youtube } from "lucide-react";
+import { Instagram, Facebook, Youtube, LayoutDashboard } from "lucide-react";
 import logoFilarmonica from "../../imports/LOGO_FILARM_NICA-1.png";
 
 const footerLinks = {
@@ -53,21 +53,6 @@ export function Footer() {
             >
               Um projeto social dedicado a democratizar o acesso à música erudita, transformando vidas por meio dos instrumentos de metal desde 2022.
             </p>
-            <div className="flex gap-4">
-              {[
-                { icon: <Instagram size={18} />, href: "https://www.instagram.com/filarmonicademetais?igsh=MWQ0MmszbWhic2g4eg==" },
-                { icon: <Facebook size={18} />, href: "#" },
-                { icon: <Youtube size={18} />, href: "https://youtube.com/@filarmonicademetais1215?si=dbFW-IkjdOfZzzAt" },
-              ].map((social, i) => (
-                <a
-                  key={i}
-                  href={social.href}
-                  className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-[#ffc300] hover:text-[#001856] transition-colors"
-                >
-                  {social.icon}
-                </a>
-              ))}
-            </div>
           </div>
 
           {/* Links */}
@@ -95,6 +80,23 @@ export function Footer() {
             </div>
           ))}
         </div>
+
+        {/* Ícones sociais */}
+        <div className="flex gap-4 mt-8">
+          {[
+            { icon: <Instagram size={18} />, href: "https://www.instagram.com/filarmonicademetais?igsh=MWQ0MmszbWhic2g4eg==" },
+            { icon: <Facebook size={18} />, href: "#" },
+            { icon: <Youtube size={18} />, href: "https://youtube.com/@filarmonicademetais1215?si=dbFW-IkjdOfZzzAt" },
+          ].map((social, i) => (
+            <a
+              key={i}
+              href={social.href}
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-[#ffc300] hover:text-[#001856] transition-colors"
+            >
+              {social.icon}
+            </a>
+          ))}
+        </div>
       </div>
 
       {/* Contact info bar */}
@@ -105,12 +107,22 @@ export function Footer() {
             <span style={{ fontFamily: "'Inter', sans-serif" }}>📞 (19) 99845-3478</span>
             <span style={{ fontFamily: "'Inter', sans-serif" }}>📍 R. Padre Avelino Canaza, 258 – Americana, SP</span>
           </div>
-          <p
-            className="text-white/30 text-sm"
-            style={{ fontFamily: "'Inter', sans-serif" }}
-          >
-            © 2025 Filarmônica de Metais. Todos os direitos reservados.
-          </p>
+          <div className="flex flex-col sm:flex-row items-start gap-3">
+            <p
+              className="text-white/30 text-sm"
+              style={{ fontFamily: "'Inter', sans-serif" }}
+            >
+              © 2025 Filarmônica de Metais. Todos os direitos reservados.
+            </p>
+            <a
+              href="/painel"
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/20 text-white/50 hover:border-[#ffc300] hover:text-[#ffc300] text-xs font-semibold transition-all duration-200 shrink-0"
+              style={{ fontFamily: "'Inter', sans-serif", letterSpacing: '0.05em', textTransform: 'uppercase' }}
+            >
+              <LayoutDashboard size={12} />
+              Painel
+            </a>
+          </div>
         </div>
       </div>
     </footer>

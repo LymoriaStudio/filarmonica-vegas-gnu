@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { InlineLoader } from '../../components/InlineLoader';
 import {
   FolderLock, Presentation, Calendar, Newspaper, Film, Plus, Trash2, Edit,
   Copy, Star, Eye, Globe, Sparkles, Image, Play, Check, Clock, CloudUpload, X,
@@ -768,7 +769,7 @@ export default function ConteudoCMS({
           </div>
 
           {eventsLoading ? (
-            <div className="text-center py-12 text-xs text-gray-400 font-mono">Carregando eventos...</div>
+            <InlineLoader message="Carregando eventos..." />
           ) : filteredEvents.length === 0 ? (
             <div className="text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
               {events.length === 0 ? 'Nenhum evento cadastrado ainda.' : 'Nenhum evento encontrado para este filtro.'}
@@ -855,14 +856,6 @@ export default function ConteudoCMS({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        title="Duplicar"
-                        onClick={() => handleDuplicateEvent(evt)}
-                        className="p-2 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-[#001856] hover:border-gray-300 transition-colors cursor-pointer"
-                      >
-                        <Copy size={13} />
-                      </button>
-                      <button
-                        type="button"
                         title="Editar"
                         onClick={() => handleOpenEventModal(evt)}
                         className="p-2 rounded-lg bg-white border border-gray-200 text-amber-500 hover:bg-amber-50 hover:border-amber-200 transition-colors cursor-pointer"
@@ -939,14 +932,6 @@ export default function ConteudoCMS({
                     </button>
                     <button
                       type="button"
-                      title="Duplicar"
-                      onClick={() => handleDuplicateEvent(evt)}
-                      className="p-2 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-[#001856] hover:border-gray-300 cursor-pointer transition-colors"
-                    >
-                      <Copy size={13} />
-                    </button>
-                    <button
-                      type="button"
                       title="Editar"
                       onClick={() => handleOpenEventModal(evt)}
                       className="p-2 rounded-lg bg-white border border-gray-200 text-amber-500 hover:bg-amber-50 hover:border-amber-200 cursor-pointer transition-colors"
@@ -992,7 +977,7 @@ export default function ConteudoCMS({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {coursesLoading ? (
-              <div className="col-span-2 text-center py-12 text-xs text-gray-400 font-mono">Carregando oficinas...</div>
+              <div className="col-span-2"><InlineLoader message="Carregando oficinas..." /></div>
             ) : courses.length === 0 ? (
               <div className="col-span-2 text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
                 Nenhuma oficina cadastrada ainda.
@@ -1062,7 +1047,7 @@ export default function ConteudoCMS({
 
           <div className="grid grid-cols-1 md:grid-cols-2 xxl:grid-cols-3 gap-6">
             {instrumentsLoading ? (
-              <div className="col-span-3 text-center py-12 text-xs text-gray-400 font-mono">Carregando instrumentos...</div>
+              <div className="col-span-3"><InlineLoader message="Carregando instrumentos..." /></div>
             ) : instruments.length === 0 ? (
               <div className="col-span-3 text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
                 Nenhum instrumento cadastrado ainda.
@@ -1086,7 +1071,7 @@ export default function ConteudoCMS({
                     {inst.slug}
                   </span>
                   {inst.gallery?.length > 0 && (
-                    <span className="absolute top-2 right-2 bg-black/75 backdrop-blur-sm text-gray-800 text-[9px] font-mono font-bold p-1 px-2.5 rounded-full border border-gray-200">
+                    <span className="absolute top-2 right-2 bg-black/75 backdrop-blur-sm text-[#ffc300] text-[9px] font-mono font-bold p-1 px-2.5 rounded-full border border-[#ffc300]/30">
                       {inst.gallery.length} foto(s)
                     </span>
                   )}
@@ -1261,7 +1246,7 @@ export default function ConteudoCMS({
           {galleryMode === 'midia' && (
             <div>
               {mediaLoading ? (
-                <div className="text-center py-12 text-xs text-gray-400 font-mono">Carregando arquivos do Storage...</div>
+                <InlineLoader message="Carregando arquivos..." />
               ) : mediaFiles.length === 0 ? (
                 <div className="text-center py-12 text-xs text-gray-400 font-mono border border-dashed border-gray-200 rounded-xl">
                   Nenhum arquivo encontrado no bucket.

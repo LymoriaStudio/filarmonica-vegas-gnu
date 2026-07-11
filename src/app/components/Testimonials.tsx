@@ -1,73 +1,22 @@
-import { Quote } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { supabase } from "../../lib/supabase";
 
-const testimonials = [
-  {
-    id: 1,
-    name: "Mãe da Lara Franca",
-    role: "Mãe de aluna — Pai / Mãe",
-    text: "Ver a dedicação da Lara para tirar o som perfeito e dominar cada nota me enche de orgulho. A Filarmônica ensina que a evolução vem do esforço contínuo, transformando a frustração inicial em pura resiliência.",
-    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 2,
-    name: "Mãe do Davi Franca",
-    role: "Mãe de aluno — Pai / Mãe",
-    text: "Antes das aulas na Filarmônica, o Davi era mais retraído e inseguro. A superação de cada partitura e o incentivo dos professores trouxeram uma segurança que ele levou para a vida escolar e social. As apresentações e a convivência com outros alunos criaram um senso de pertencimento crucial para essa fase da vida.",
-    avatar: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 3,
-    name: "Ilda",
-    role: "Mãe do Vinícius — Pai / Mãe",
-    text: "A Filarmônica contribuiu muito para a socialização e o comprometimento do meu filho Vinícius. O acompanhamento com profissionais capacitados e dedicados faz toda a diferença no aprendizado. Além disso, promove festas comemorativas uma vez ao mês, que as crianças amam. É um lugar acolhedor, uma verdadeira família.",
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 4,
-    name: "Mamãe do Arthur Dias",
-    role: "Mãe de aluno — Pai / Mãe",
-    text: "A Filarmônica tem sido muito importante na vida do meu filho. Além de proporcionar o aprendizado musical, ela contribui para o desenvolvimento da disciplina, da responsabilidade e do trabalho em equipe. Percebo que ele ficou mais dedicado, confiante e comprometido com seus objetivos.",
-    avatar: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 5,
-    name: "Felipe Alves Tiandim",
-    role: "Aluno — Filarmônica de Metais",
-    text: "A Filarmônica representa mais do que uma aula de música. É uma experiência única e divertida para aprender. Ela contribuiu para a minha vida social e pessoal, me ensinando a ser mais sociável, ter mais paciência e me comunicar melhor.",
-    avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 6,
-    name: "Mirela Inês Horta Gilcel",
-    role: "Aluna — Filarmônica de Metais",
-    text: "Para mim, a Filarmônica significa muito. Foi a minha primeira escola de música e abriu um livro de possibilidades. Além disso, ela me ensina a respeitar as pessoas como elas são e, principalmente, a me respeitar. Por isso, aprendo a gostar de trabalhar em equipe. Obrigada, Filarmônica.",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 7,
-    name: "Vinícius A. Cesolin",
-    role: "Aluno — Filarmônica de Metais",
-    text: "A Filarmônica me ensinou a ser feliz, porque me ajudou a socializar cada vez mais. Fico alegre com meus amigos e aprendi muitas coisas na Filarmônica, como as notas musicais. Os professores ensinam muito bem e eu acho esse projeto incrível.",
-    avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 8,
-    name: "Emanuelly Lisboa Giunco",
-    role: "Aluna — Filarmônica de Metais",
-    text: "Para mim, a Filarmônica é muito mais do que um espaço para aprender música. É uma segunda casa, um lugar onde encontro amizade, disciplina e muita inspiração.",
-    avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-  {
-    id: 9,
-    name: "Lara Arião Franca",
-    role: "Aluna — Filarmônica de Metais",
-    text: "A Filarmônica significa amor, carinho e cuidado. Não tenho palavras para falar tudo o que ela representa, porque significa mais do que palavras. Ela contribui não só para aprender a tocar bem, mas também com a amizade, o respeito, o amor, o carinho, a alegria, a felicidade, a empatia e muito mais.",
-    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=200",
-  },
-];
+interface Testimonial {
+  id: number;
+  name: string;
+  tag: string;
+  tag_detail: string;
+  text: string;
+  order: number;
+}
 
-// Detecta quantas colunas estão visíveis (1 mobile, 2 tablet, 3 desktop)
+function getInitials(name: string) {
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function useColumns() {
   const [cols, setCols] = useState(3);
   useEffect(() => {
@@ -84,17 +33,27 @@ function useColumns() {
 }
 
 export function Testimonials() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from('testimonials')
+      .select('id, name, tag, tag_detail, text, order')
+      .eq('active', true)
+      .order('order', { ascending: true })
+      .then(({ data }) => setTestimonials(data ?? []));
+  }, []);
+
   const cols = useColumns();
   const total = testimonials.length;
-  const totalPages = Math.ceil(total / cols);
+  const totalPages = Math.ceil(total / cols) || 1;
 
   const [page, setPage] = useState(0);
   const [paused, setPaused] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const next = useCallback(() => {
-    setPage((p) => (p + 1) % totalPages);
-  }, [totalPages]);
+  const next = useCallback(() => setPage((p) => (p + 1) % totalPages), [totalPages]);
+  const prev = () => setPage((p) => (p - 1 + totalPages) % totalPages);
 
   useEffect(() => {
     if (paused) return;
@@ -102,36 +61,54 @@ export function Testimonials() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [paused, next]);
 
-  // Reset page when cols change to avoid out-of-bounds
-  useEffect(() => {
-    setPage(0);
-  }, [cols]);
+  useEffect(() => { setPage(0); }, [cols]);
 
   const start = page * cols;
   const visible = testimonials.slice(start, start + cols);
 
   return (
-    <section className="bg-gray-50 py-20">
+    <section className="py-20" style={{ backgroundColor: "#001856" }}>
       <div className="max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <div className="text-center mb-14">
-          <span
-            className="text-[#ffc300] uppercase tracking-widest"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "13px" }}
-          >
-            Depoimentos
-          </span>
-          <h2
-            className="text-[#001856] mt-2"
-            style={{
-              fontFamily: "'Instrument Sans', sans-serif",
-              fontWeight: 700,
-              fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
-              lineHeight: 1.2,
-            }}
-          >
-            Acompanhe relatos de quem<br />vive a experiência da Filarmônica
-          </h2>
+
+        {/* Header com setas */}
+        <div className="flex items-end justify-between mb-8 gap-6">
+          <div>
+            <span
+              className="uppercase tracking-widest text-[#ffc300]"
+              style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: "13px" }}
+            >
+              Depoimentos
+            </span>
+            <h2
+              className="text-white mt-2"
+              style={{
+                fontFamily: "'Instrument Sans', sans-serif",
+                fontWeight: 700,
+                fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
+                lineHeight: 1.2,
+              }}
+            >
+              Quem vive a Filarmônica<br />conta a experiência
+            </h2>
+            <p className="text-white/50 mt-3 text-sm">
+              Depoimentos reais de alunos e famílias que fazem parte do projeto.
+            </p>
+          </div>
+
+          <div className="flex gap-3 shrink-0">
+            <button
+              onClick={prev}
+              className="w-11 h-11 rounded-full border-2 border-white/30 flex items-center justify-center text-white hover:border-white hover:bg-white/10 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={next}
+              className="w-11 h-11 rounded-full border-2 border-white/30 flex items-center justify-center text-white hover:border-white hover:bg-white/10 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Cards */}
@@ -143,53 +120,65 @@ export function Testimonials() {
           {visible.map((t) => (
             <div
               key={t.id}
-              className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col"
+              className="rounded-2xl p-7 flex flex-col"
+              style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)" }}
             >
-              <Quote size={32} className="text-[#ffc300] mb-4 flex-shrink-0" />
+              {/* Tag */}
+              <div className="flex items-center gap-2 mb-5">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: "#ffc300", color: "#001856" }}
+                >
+                  {t.tag}
+                </span>
+                <span className="text-white/40 text-xs">{t.tag_detail}</span>
+              </div>
+
+              {/* Aspas */}
+              <div className="text-[#ffc300] mb-4" style={{ fontSize: "2rem", lineHeight: 1, fontFamily: "Georgia, serif" }}>
+                ❝❝
+              </div>
+
+              {/* Texto */}
               <p
-                className="text-gray-600 leading-relaxed flex-1 mb-6"
-                style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.95rem" }}
+                className="text-white/80 leading-relaxed flex-1 mb-8"
+                style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.9rem" }}
               >
-                "{t.text}"
+                {t.text}
               </p>
-              <div className="flex items-center gap-4 mt-auto pt-4 border-t border-gray-100">
-                <img
-                  src={t.avatar}
-                  alt={t.name}
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                />
-                <div>
-                  <p
-                    className="text-[#001856]"
-                    style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700 }}
-                  >
-                    {t.name}
-                  </p>
-                  <p
-                    className="text-gray-400"
-                    style={{ fontFamily: "'Inter', sans-serif", fontSize: "0.8rem" }}
-                  >
-                    {t.role}
-                  </p>
+
+              {/* Autor */}
+              <div className="flex items-center gap-3 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm"
+                  style={{ backgroundColor: "#ffc300", color: "#001856" }}
+                >
+                  {getInitials(t.name)}
                 </div>
+                <p
+                  className="text-white font-semibold text-sm"
+                  style={{ fontFamily: "'Inter', sans-serif" }}
+                >
+                  {t.name}
+                </p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Bullet dots */}
-        <div className="flex justify-center gap-2 mt-8">
+        {/* Dots */}
+        <div className="flex justify-center gap-2 mt-10">
           {Array.from({ length: totalPages }).map((_, i) => (
             <button
               key={i}
               onClick={() => setPage(i)}
               aria-label={`Página ${i + 1}`}
-              className={`rounded-full transition-all duration-300 ${
-                i === page ? "bg-[#001856] w-8 h-3" : "bg-gray-300 w-3 h-3"
-              }`}
+              className={`rounded-full transition-all duration-300 ${i === page ? "w-8 h-3" : "w-3 h-3"}`}
+              style={{ backgroundColor: i === page ? "#ffc300" : "rgba(255,255,255,0.25)" }}
             />
           ))}
         </div>
+
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import { InlineLoader } from '../../components/InlineLoader';
+import {
   Users, UserCheck, ShieldAlert, Plus, Search, Filter, Mail, Phone, MapPin,
   Trash2, Edit, Check, Star, Download, Archive, ArrowUp, ArrowDown, UserPlus,
   Instagram, Facebook, Youtube, Linkedin, MessageCircle, FileSpreadsheet, X, Calendar, Music2
@@ -423,7 +424,7 @@ const handleArchiveStudent = async (id: string, name: string) => {
 
           {/* Real Grid table presentation */}
           {studentsLoading && (
-            <div className="text-center py-8 text-xs text-gray-400 font-mono">Carregando alunos...</div>
+            <InlineLoader message="Carregando alunos..." />
           )}
           {!studentsLoading && studentsError && (
             <div className="text-center py-8 text-xs text-red-500 font-mono bg-red-50 rounded-lg px-4">

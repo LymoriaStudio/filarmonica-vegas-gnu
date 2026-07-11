@@ -9,6 +9,7 @@ import RelationshipCMS from '../components/painel/RelationshipCMS';
 import FinanceiroERP from '../components/painel/FinanceiroERP';
 import ConteudoCMS from '../components/painel/ConteudoCMS';
 import SistemaConfig from '../components/painel/SistemaConfig';
+import TestimonialsCMS from '../components/painel/TestimonialsCMS';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 
 import {
@@ -377,6 +378,9 @@ const [students, setStudents] = useState<Student[]>([]);
               activeTab={activeTab}
             />
           )}
+
+          {/* DEPOIMENTOS */}
+          {activeTab === 'conteudo-depoimentos' && <TestimonialsCMS />}
 
           {/* CONTEÚDO SECTION */}
           {(activeTab === 'conteudo-eventos' || activeTab === 'conteudo-noticias' || activeTab === 'conteudo-cursos' || activeTab === 'conteudo-galeria' || activeTab === 'conteudo-instrumentos') && (
