@@ -736,18 +736,15 @@ export default function ConteudoCMS({
             </select>
 
             {/* Sort select */}
-            <div className="relative">
-              <SortAsc size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              <select
-                value={eventsSort}
-                onChange={e => setEventsSort(e.target.value as typeof eventsSort)}
-                className="pl-7 pr-7 py-1.5 text-[10px] font-mono border border-gray-200 rounded-lg bg-white focus:outline-none cursor-pointer appearance-none"
-              >
-                <option value="recent">Mais recentes</option>
-                <option value="oldest">Mais antigos</option>
-                <option value="az">Nome A→Z</option>
-              </select>
-            </div>
+            <select
+              value={eventsSort}
+              onChange={e => setEventsSort(e.target.value as typeof eventsSort)}
+              className="px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#ffc300] cursor-pointer"
+            >
+              <option value="recent">Mais recentes</option>
+              <option value="oldest">Mais antigos</option>
+              <option value="az">Nome A→Z</option>
+            </select>
 
             {/* Card / List toggle */}
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">

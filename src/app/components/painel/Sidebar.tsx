@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import {
   Music, LayoutDashboard, Globe, Users, HeartHandshake, DollarSign,
   BookOpen, Settings, ChevronDown, ListMusic, UserCheck, UserPlus,
-  HelpCircle, Calendar, Image, ShieldAlert, FileClock, Menu, X,
+  HelpCircle, Calendar, Image, ShieldAlert, FileClock, Menu, X, ArrowLeft,
 } from 'lucide-react';
+import { useNavigate } from 'react-router';
 
 interface SidebarProps {
   activeTab: string;
@@ -64,6 +65,7 @@ const navGroups = [
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, userRole, permissions }: SidebarProps) {
+  const navigate = useNavigate();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     pessoas: true,
     relacionamento: true,
@@ -76,7 +78,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
   const hasPermission = (key: string) =>
     userRole === 'super_admin' || userRole === 'admin' || permissions.includes(key);
 
-  const navigate = (id: string) => {
+  const goTo = (id: string) => {
     setActiveTab(id);
     setIsOpenMobile(false);
   };
@@ -97,7 +99,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
         {hasPermission('dashboard') && (
           <button
             type="button"
-            onClick={() => navigate('dashboard')}
+            onClick={() => goTo('dashboard')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left mb-3 ${
               activeTab === 'dashboard'
                 ? 'bg-[#ffc300] text-[#001856] font-semibold'
@@ -136,7 +138,7 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => navigate(item.id)}
+                      onClick={() => goTo(item.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left cursor-pointer ${
                         activeTab === item.id
                           ? 'bg-[#ffc300] text-[#001856] font-semibold'
@@ -154,19 +156,16 @@ export default function Sidebar({ activeTab, setActiveTab, userRole, permissions
         })}
       </nav>
 
-      {/* User bottom */}
-      <div className="px-4 py-4 border-t border-white/10 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-[#ffc300]/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-[#ffc300] text-xs font-bold">
-            {userRole === 'super_admin' ? 'SA' : userRole.substring(0, 2).toUpperCase()}
-          </span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-medium text-white/70 truncate">
-            {userRole === 'super_admin' ? 'Super Administrador' : userRole}
-          </div>
-          <div className="text-[10px] text-white/30">Painel Operacional</div>
-        </div>
+      {/* Voltar ao Site */}
+      <div className="px-3 py-4 border-t border-white/10">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          <ArrowLeft size={15} />
+          Voltar ao Site
+        </button>
       </div>
     </div>
   );

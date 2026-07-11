@@ -31,6 +31,7 @@ function toInterestView(i: Interessado) {
     instrumentOfInterest: i.instrument_of_interest,
     message: i.message ?? '',
     date: i.date ? new Date(i.date).toLocaleDateString('pt-BR') : '',
+    rawDate: i.date ?? '',
     status: i.status ?? 'novo',
   };
 }
@@ -38,7 +39,7 @@ function toInterestView(i: Interessado) {
 type InterestView = ReturnType<typeof toInterestView>;
 
 // ── Mapper: tabela quero_apoiar -> SupportFormResponse ────────────────────────
-function toSupportView(row: any): SupportFormResponse {
+function toSupportView(row: any): SupportFormResponse & { rawDate: string } {
   return {
     id: row.id ?? '',
     name: row.name,
@@ -48,6 +49,7 @@ function toSupportView(row: any): SupportFormResponse {
     supportType: row.support_type,
     message: row.message ?? '',
     date: row.date ? new Date(row.date).toLocaleDateString('pt-BR') : '',
+    rawDate: row.date ?? '',
     status: row.status ?? 'pendente',
   };
 }
@@ -162,8 +164,8 @@ export default function RelationshipCMS({
         s.supportType?.toLowerCase().includes(q)
       );
     }
-    if (supportSort === 'recent') list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    else if (supportSort === 'oldest') list.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (supportSort === 'recent') list.sort((a, b) => ((b as any).rawDate || '').localeCompare((a as any).rawDate || ''));
+    else if (supportSort === 'oldest') list.sort((a, b) => ((a as any).rawDate || '').localeCompare((b as any).rawDate || ''));
     else list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return list;
   }, [supports, supportSearch, supportSort]);
@@ -178,8 +180,8 @@ export default function RelationshipCMS({
         i.instrumentOfInterest?.toLowerCase().includes(q)
       );
     }
-    if (interestSort === 'recent') list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    else if (interestSort === 'oldest') list.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (interestSort === 'recent') list.sort((a, b) => (b.rawDate || '').localeCompare(a.rawDate || ''));
+    else if (interestSort === 'oldest') list.sort((a, b) => (a.rawDate || '').localeCompare(b.rawDate || ''));
     else list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return list;
   }, [interests, interestSearch, interestSort]);
