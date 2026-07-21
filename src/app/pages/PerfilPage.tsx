@@ -1,78 +1,54 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Camera, Save, KeyRound, Eye, EyeOff, Check, Mail, Shield, User, Calendar } from 'lucide-react';
+import { ArrowLeft, Camera, Save, KeyRound, Eye, EyeOff, Check, Mail, Shield, User, Calendar, Pencil, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { uploadFileToSupabase } from '../components/painel/MiniWidgets';
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
-const INPUT = "w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all disabled:bg-gray-50 disabled:text-gray-400";
+const INPUT = "w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed";
 const LABEL = "block text-[11px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest";
-
-function Field({ label, value, onChange, disabled = false, icon, type = 'text' }: {
-  label: string; value: string; onChange?: (v: string) => void;
-  disabled?: boolean; icon?: React.ReactNode; type?: string;
-}) {
-  return (
-    <div>
-      <label className={LABEL}>{label}</label>
-      <div className="relative">
-        {icon && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">{icon}</span>}
-        <input
-          type={type}
-          value={value}
-          onChange={e => onChange?.(e.target.value)}
-          disabled={disabled}
-          className={INPUT + (icon ? ' pl-9' : '')}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PerfilPage() {
   const navigate = useNavigate();
 
-  // profile data
-  const [userId, setUserId]     = useState('');
-  const [name, setName]         = useState('');
-  const [email, setEmail]       = useState('');
-  const [role, setRole]         = useState('');
+  const [userId, setUserId]       = useState('');
+  const [name, setName]           = useState('');
+  const [email, setEmail]         = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [role, setRole]           = useState('');
+  const [editRole, setEditRole]   = useState('');
   const [createdAt, setCreatedAt] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarPreview, setAvatarPreview] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading]     = useState(true);
 
-  // save states
+  const [editMode, setEditMode]   = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-  const [profileError, setProfileError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [profileError, setProfileError]     = useState('');
 
-  // password
-  const [currentPass, setCurrentPass] = useState('');
-  const [newPass, setNewPass]         = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew]         = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  // password modal
+  const [pwModalOpen, setPwModalOpen]   = useState(false);
+  const [currentPass, setCurrentPass]   = useState('');
+  const [newPass, setNewPass]           = useState('');
+  const [confirmPass, setConfirmPass]   = useState('');
+  const [showCurrent, setShowCurrent]   = useState(false);
+  const [showNew, setShowNew]           = useState(false);
+  const [showConfirm, setShowConfirm]   = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError]     = useState('');
 
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Load profile ──────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
       if (!user) { navigate('/login'); return; }
-
       setUserId(user.id);
       setEmail(user.email ?? '');
+      setEditEmail(user.email ?? '');
       setAvatarUrl(user.user_metadata?.avatar_url ?? '');
 
       const { data: profile } = await supabase
@@ -84,13 +60,13 @@ export default function PerfilPage() {
       if (profile) {
         setName(profile.name ?? '');
         setRole(profile.role ?? '');
+        setEditRole(profile.role ?? '');
         setCreatedAt(profile.created_at ? new Date(profile.created_at).toLocaleDateString('pt-BR') : '');
       }
       setLoading(false);
     })();
   }, [navigate]);
 
-  // ── Avatar select ─────────────────────────────────────────────────────────
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -98,15 +74,19 @@ export default function PerfilPage() {
     setAvatarPreview(URL.createObjectURL(file));
   };
 
-  // ── Save profile ──────────────────────────────────────────────────────────
+  const handleCancelEdit = () => {
+    setEditEmail(email);
+    setEditRole(role);
+    setEditMode(false);
+    setProfileError('');
+  };
+
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     setProfileError('');
     setProfileSuccess(false);
     try {
       let finalAvatarUrl = avatarUrl;
-
-      // upload avatar if pending
       if (pendingFile) {
         finalAvatarUrl = await uploadFileToSupabase(pendingFile, `avatars/${userId}`);
         await supabase.auth.updateUser({ data: { avatar_url: finalAvatarUrl } });
@@ -114,15 +94,21 @@ export default function PerfilPage() {
         setPendingFile(null);
       }
 
-      // update name in profiles table
+      if (editEmail !== email) {
+        const { error: emailErr } = await supabase.auth.updateUser({ email: editEmail });
+        if (emailErr) throw emailErr;
+        setEmail(editEmail);
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({ name })
+        .update({ name, role: editRole })
         .eq('id', userId);
-
       if (error) throw error;
 
+      setRole(editRole);
       setProfileSuccess(true);
+      setEditMode(false);
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch (err: any) {
       setProfileError(err.message ?? 'Erro ao salvar perfil.');
@@ -131,21 +117,33 @@ export default function PerfilPage() {
     }
   };
 
-  // ── Change password ───────────────────────────────────────────────────────
+  const handleOpenPwModal = () => {
+    setCurrentPass(''); setNewPass(''); setConfirmPass('');
+    setPasswordError(''); setPasswordSuccess(false);
+    setPwModalOpen(true);
+  };
+
   const handleSavePassword = async () => {
     setPasswordError('');
-    setPasswordSuccess(false);
-    if (!newPass || !confirmPass) { setPasswordError('Preencha todos os campos de senha.'); return; }
+    if (!currentPass) { setPasswordError('Informe a senha atual.'); return; }
+    if (!newPass || !confirmPass) { setPasswordError('Preencha a nova senha e a confirmação.'); return; }
     if (newPass.length < 6) { setPasswordError('A nova senha deve ter ao menos 6 caracteres.'); return; }
     if (newPass !== confirmPass) { setPasswordError('As senhas não coincidem.'); return; }
 
     setSavingPassword(true);
     try {
+      // Re-authenticate with current password to validate it
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPass,
+      });
+      if (signInErr) { setPasswordError('Senha atual incorreta.'); return; }
+
       const { error } = await supabase.auth.updateUser({ password: newPass });
       if (error) throw error;
-      setCurrentPass(''); setNewPass(''); setConfirmPass('');
+
       setPasswordSuccess(true);
-      setTimeout(() => setPasswordSuccess(false), 3000);
+      setTimeout(() => { setPasswordSuccess(false); setPwModalOpen(false); }, 2000);
     } catch (err: any) {
       setPasswordError(err.message ?? 'Erro ao alterar senha.');
     } finally {
@@ -173,13 +171,9 @@ export default function PerfilPage() {
 
       {/* Top bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => navigate('/painel')}
-          className="flex items-center gap-2 text-gray-500 hover:text-[#001856] transition-colors text-sm font-medium"
-        >
-          <ArrowLeft size={16} />
-          Voltar ao Painel
+        <button type="button" onClick={() => navigate('/painel')}
+          className="flex items-center gap-2 text-gray-500 hover:text-[#001856] transition-colors text-sm font-medium">
+          <ArrowLeft size={16} /> Voltar ao Painel
         </button>
         <span className="text-gray-200">|</span>
         <span className="text-[#001856] font-semibold text-sm">Meu Perfil</span>
@@ -187,11 +181,9 @@ export default function PerfilPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* ── LEFT CARD: Avatar + identidade ── */}
+        {/* ── LEFT: Avatar + identidade ── */}
         <div className="lg:col-span-1 space-y-4">
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col items-center text-center">
-
-            {/* Avatar */}
             <div className="relative mb-4">
               <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-md bg-[#001856] flex items-center justify-center">
                 {displayAvatar
@@ -199,11 +191,8 @@ export default function PerfilPage() {
                   : <span className="text-[#ffc300] text-3xl font-bold">{initials}</span>
                 }
               </div>
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-[#001856] rounded-full flex items-center justify-center shadow-md hover:bg-[#002070] transition-colors"
-              >
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-[#001856] rounded-full flex items-center justify-center shadow-md hover:bg-[#002070] transition-colors">
                 <Camera size={14} className="text-[#ffc300]" />
               </button>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
@@ -214,6 +203,12 @@ export default function PerfilPage() {
             <span className="mt-2 inline-block bg-[#001856] text-[#ffc300] text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full">
               {roleLabel[role] ?? role}
             </span>
+
+            {/* Botão alterar senha */}
+            <button type="button" onClick={handleOpenPwModal}
+              className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-[#001856] hover:text-[#001856] text-xs font-semibold transition-all">
+              <KeyRound size={13} /> Alterar senha
+            </button>
 
             {pendingFile && (
               <p className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
@@ -244,40 +239,54 @@ export default function PerfilPage() {
           </div>
         </div>
 
-        {/* ── RIGHT CARDS ── */}
+        {/* ── RIGHT: Detalhes ── */}
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Detalhes cadastrais */}
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
-            <h3 className="text-base font-bold text-[#001856] mb-1">Detalhes Cadastrais</h3>
-            <p className="text-xs text-gray-400 mb-5">Atualize seu nome de exibição e foto de perfil.</p>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-base font-bold text-[#001856]">Detalhes Cadastrais</h3>
+              {!editMode ? (
+                <button type="button" onClick={() => setEditMode(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-[#001856] hover:border-[#001856] text-xs font-semibold transition-all">
+                  <Pencil size={12} /> Editar
+                </button>
+              ) : (
+                <button type="button" onClick={handleCancelEdit}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 text-xs font-semibold transition-all">
+                  <X size={12} /> Cancelar
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mb-5">
+              {editMode ? 'Edite os campos e clique em salvar.' : 'Clique no lápis para editar seus dados.'}
+            </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Nome — sempre editável */}
               <div className="sm:col-span-2">
-                <Field
-                  label="Nome completo"
-                  value={name}
-                  onChange={setName}
-                  icon={<User size={14} />}
-                />
+                <label className={LABEL}><User size={11} className="inline mr-1" />Nome completo</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)}
+                  disabled={!editMode}
+                  className={INPUT} />
               </div>
-              <Field
-                label="Endereço de e-mail (inalterável)"
-                value={email}
-                disabled
-                icon={<Mail size={14} />}
-              />
-              <Field
-                label="Cargo / Função (inalterável)"
-                value={roleLabel[role] ?? role}
-                disabled
-                icon={<Shield size={14} />}
-              />
-            </div>
 
-            <p className="text-[11px] text-gray-400 mt-4">
-              * E-mail e cargo são gerenciados pelo administrador do sistema.
-            </p>
+              {/* E-mail */}
+              <div>
+                <label className={LABEL}><Mail size={11} className="inline mr-1" />Endereço de e-mail</label>
+                <input type="email" value={editMode ? editEmail : email}
+                  onChange={e => setEditEmail(e.target.value)}
+                  disabled={!editMode}
+                  className={INPUT} />
+              </div>
+
+              {/* Cargo */}
+              <div>
+                <label className={LABEL}><Shield size={11} className="inline mr-1" />Cargo / Função</label>
+                <input type="text" value={editMode ? editRole : (roleLabel[role] ?? role)}
+                  onChange={e => setEditRole(e.target.value)}
+                  disabled={!editMode}
+                  className={INPUT} />
+              </div>
+            </div>
 
             {profileError && (
               <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -285,43 +294,61 @@ export default function PerfilPage() {
               </div>
             )}
 
-            <div className="flex justify-end mt-5">
-              <button
-                type="button"
-                onClick={handleSaveProfile}
-                disabled={savingProfile}
-                className="flex items-center gap-2 bg-[#001856] hover:bg-[#002070] text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50"
-              >
-                {profileSuccess
-                  ? <><Check size={15} /> Salvo!</>
-                  : savingProfile
-                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
-                    : <><Save size={15} /> Salvar Alterações</>
-                }
-              </button>
-            </div>
+            {editMode && (
+              <div className="flex justify-end mt-5">
+                <button type="button" onClick={handleSaveProfile} disabled={savingProfile}
+                  className="flex items-center gap-2 bg-[#001856] hover:bg-[#002070] text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50">
+                  {profileSuccess
+                    ? <><Check size={15} /> Salvo!</>
+                    : savingProfile
+                      ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
+                      : <><Save size={15} /> Salvar Alterações</>
+                  }
+                </button>
+              </div>
+            )}
           </div>
+        </div>
+      </div>
 
-          {/* Alterar senha */}
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-1">
-              <KeyRound size={16} className="text-[#001856]" />
-              <h3 className="text-base font-bold text-[#001856]">Alterar Senha de Acesso</h3>
+      {/* ── Modal alterar senha ── */}
+      {pwModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <KeyRound size={16} className="text-[#001856]" />
+                <h3 className="text-base font-bold text-[#001856]">Alterar Senha</h3>
+              </div>
+              <button type="button" onClick={() => setPwModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={18} />
+              </button>
             </div>
             <p className="text-xs text-gray-400 mb-5">Use uma senha forte com ao menos 6 caracteres.</p>
 
             <div className="space-y-4">
-              {/* new password */}
+              {/* Senha atual */}
+              <div>
+                <label className={LABEL}>Senha atual</label>
+                <div className="relative">
+                  <input type={showCurrent ? 'text' : 'password'} value={currentPass}
+                    onChange={e => setCurrentPass(e.target.value)}
+                    placeholder="••••••••" className={INPUT + ' pr-10'} />
+                  <button type="button" onClick={() => setShowCurrent(!showCurrent)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Nova senha */}
               <div>
                 <label className={LABEL}>Nova senha</label>
                 <div className="relative">
-                  <input
-                    type={showNew ? 'text' : 'password'}
-                    value={newPass}
+                  <input type={showNew ? 'text' : 'password'} value={newPass}
                     onChange={e => setNewPass(e.target.value)}
-                    placeholder="••••••••"
-                    className={INPUT + ' pr-10'}
-                  />
+                    placeholder="••••••••" className={INPUT + ' pr-10'} />
                   <button type="button" onClick={() => setShowNew(!showNew)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -329,17 +356,13 @@ export default function PerfilPage() {
                 </div>
               </div>
 
-              {/* confirm password */}
+              {/* Confirmar senha */}
               <div>
                 <label className={LABEL}>Confirmar nova senha</label>
                 <div className="relative">
-                  <input
-                    type={showConfirm ? 'text' : 'password'}
-                    value={confirmPass}
+                  <input type={showConfirm ? 'text' : 'password'} value={confirmPass}
                     onChange={e => setConfirmPass(e.target.value)}
-                    placeholder="••••••••"
-                    className={INPUT + ' pr-10'}
-                  />
+                    placeholder="••••••••" className={INPUT + ' pr-10'} />
                   <button type="button" onClick={() => setShowConfirm(!showConfirm)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -354,25 +377,28 @@ export default function PerfilPage() {
               </div>
             )}
 
-            <div className="flex justify-end mt-5">
-              <button
-                type="button"
-                onClick={handleSavePassword}
-                disabled={savingPassword}
-                className="flex items-center gap-2 bg-[#001856] hover:bg-[#002070] text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50"
-              >
-                {passwordSuccess
-                  ? <><Check size={15} /> Alterada!</>
-                  : savingPassword
-                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
-                    : <><KeyRound size={15} /> Alterar Senha</>
+            {passwordSuccess && (
+              <div className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                <Check size={14} /> Senha alterada com sucesso!
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button type="button" onClick={() => setPwModalOpen(false)}
+                className="px-4 py-2.5 rounded-lg border border-gray-200 text-gray-500 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+              <button type="button" onClick={handleSavePassword} disabled={savingPassword}
+                className="flex items-center gap-2 bg-[#001856] hover:bg-[#002070] text-white text-sm font-bold px-5 py-2.5 rounded-lg transition-all disabled:opacity-50">
+                {savingPassword
+                  ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
+                  : <><KeyRound size={15} /> Alterar Senha</>
                 }
               </button>
             </div>
           </div>
-
         </div>
-      </div>
+      )}
     </div>
   );
 }

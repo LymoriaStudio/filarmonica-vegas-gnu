@@ -83,6 +83,18 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
   const [draftRange,  setDraftRange]  = useState<DateRange>({ from: undefined, to: undefined });
   const [activePreset, setActivePreset] = useState('Todos os períodos');
   const pickerRef = useRef<HTMLDivElement>(null);
+  const btnRef    = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 320 });
+
+  // Recalculate fixed position whenever picker opens
+  useEffect(() => {
+    if (!pickerOpen || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const maxW = Math.min(vw - 16, 620);
+    const left = Math.max(8, Math.min(rect.left, vw - maxW - 8));
+    setDropdownPos({ top: rect.bottom + 8, left, width: maxW });
+  }, [pickerOpen]);
 
   // close on outside click
   useEffect(() => {
@@ -205,16 +217,18 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
     <div className="space-y-6 p-8 min-h-screen">
 
       {/* ── FILTRO DE PERÍODO ─────────────────────────────────────────────── */}
-      <div className="bg-white border border-gray-100 rounded-xl shadow-sm px-5 py-3 flex items-center gap-4 flex-wrap">
-        {/* Label "Período" */}
-        <div className="flex items-center gap-2 text-[#001856]">
-          <Calendar size={15} className="text-[#ffc300]" />
-          <span className="text-sm font-semibold">Período</span>
-        </div>
+      <div className="bg-white border border-gray-100 rounded-xl shadow-sm px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-wrap">
+        {/* Label "Período" + Select — coluna no mobile, linha no desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-2 text-[#001856]">
+            <Calendar size={15} className="text-[#ffc300]" />
+            <span className="text-sm font-semibold">Período</span>
+          </div>
 
-        {/* Trigger button */}
-        <div className="relative" ref={pickerRef}>
+          {/* Trigger button */}
+          <div className="relative" ref={pickerRef}>
           <button
+            ref={btnRef}
             onClick={() => { setDraftRange(range); setPickerOpen(v => !v); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
               hasFilter
@@ -229,115 +243,131 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
 
           {/* Dropdown */}
           {pickerOpen && (
-            <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col md:flex-row overflow-hidden min-w-max">
-
-              {/* Presets sidebar */}
-              <div className="bg-gray-50 border-r border-gray-100 p-3 flex flex-col gap-0.5 min-w-[170px]">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-2 py-1">Períodos rápidos</p>
-                {PRESETS.map(p => (
+            <div
+              className="fixed z-[9999] bg-white border border-gray-200 rounded-2xl shadow-xl flex flex-col overflow-hidden"
+              style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+            >
+              <div className="flex flex-col lg:flex-row">
+                {/* Presets sidebar */}
+                <div className="bg-gray-50 border-b lg:border-b-0 lg:border-r border-gray-100 p-3 flex flex-row lg:flex-col gap-1 flex-wrap lg:flex-nowrap lg:min-w-[150px]">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-2 py-1 w-full hidden lg:block">Períodos rápidos</p>
+                  {PRESETS.map(p => (
+                    <button
+                      key={p.label}
+                      onClick={() => applyPreset(p.label, p.range())}
+                      className={`text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap ${
+                        activePreset === p.label
+                          ? 'bg-[#001856] text-white font-semibold'
+                          : 'text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                  <div className="hidden lg:block border-t border-gray-200 my-1 w-full" />
                   <button
-                    key={p.label}
-                    onClick={() => applyPreset(p.label, p.range())}
-                    className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      activePreset === p.label
+                    onClick={() => setActivePreset('Personalizado')}
+                    className={`text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap ${
+                      activePreset === 'Personalizado'
                         ? 'bg-[#001856] text-white font-semibold'
                         : 'text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {p.label}
+                    Personalizado
                   </button>
-                ))}
-                <div className="border-t border-gray-200 my-1" />
-                <button
-                  onClick={() => setActivePreset('Personalizado')}
-                  className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                    activePreset === 'Personalizado'
-                      ? 'bg-[#001856] text-white font-semibold'
-                      : 'text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Personalizado
-                </button>
-              </div>
+                </div>
 
-              {/* Calendar + custom inputs */}
-              <div className="p-4 flex flex-col gap-4">
-                <DayPicker
-                  mode="range"
-                  numberOfMonths={2}
-                  selected={draftRange}
-                  onSelect={(r) => setDraftRange(r ?? { from: undefined, to: undefined })}
-                  locale={undefined}
-                  styles={{
-                    months: { gap: '1rem' },
-                  }}
-                  classNames={{
-                    day_selected: '!bg-[#001856] !text-white rounded-full',
-                    day_range_middle: '!bg-[#001856]/10 !text-[#001856] rounded-none',
-                    day_range_start: '!bg-[#001856] !text-white rounded-full',
-                    day_range_end: '!bg-[#001856] !text-white rounded-full',
-                    day_today: 'font-bold border border-[#ffc300] rounded-full',
-                  }}
-                />
+                {/* Calendar + custom inputs */}
+                <div className="p-3 flex flex-col gap-3 overflow-x-auto">
+                  <DayPicker
+                    mode="range"
+                    numberOfMonths={1}
+                    selected={draftRange}
+                    onSelect={(r) => setDraftRange(r ?? { from: undefined, to: undefined })}
+                    locale={undefined}
+                    classNames={{
+                      day_selected: '!bg-[#001856] !text-white rounded-full',
+                      day_range_middle: '!bg-[#001856]/10 !text-[#001856] rounded-none',
+                      day_range_start: '!bg-[#001856] !text-white rounded-full',
+                      day_range_end: '!bg-[#001856] !text-white rounded-full',
+                      day_today: 'font-bold border border-[#ffc300] rounded-full',
+                      root: 'text-sm',
+                      month: 'w-full',
+                      caption: 'flex justify-center items-center py-1 relative',
+                      nav_button: 'absolute top-0 p-1 rounded hover:bg-gray-100',
+                      nav_button_previous: 'left-0',
+                      nav_button_next: 'right-0',
+                      table: 'w-full border-collapse',
+                      head_cell: 'text-gray-400 font-medium text-[11px] pb-1 text-center w-8',
+                      cell: 'text-center p-0',
+                      day: 'w-8 h-8 text-xs rounded-full mx-auto flex items-center justify-center hover:bg-gray-100 transition-colors',
+                    }}
+                  />
 
-                {/* Intervalo personalizado */}
-                <div className="border-t border-gray-100 pt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Intervalo personalizado</p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500">De</label>
-                      <input
-                        type="date"
-                        value={draftRange.from ? draftRange.from.toISOString().slice(0,10) : ''}
-                        onChange={e => setDraftRange(r => ({ ...r, from: e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined }))}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-500">Até</label>
-                      <input
-                        type="date"
-                        value={draftRange.to ? draftRange.to.toISOString().slice(0,10) : ''}
-                        onChange={e => setDraftRange(r => ({ ...r, to: e.target.value ? new Date(e.target.value + 'T23:59:59') : undefined }))}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#001856] focus:outline-none focus:border-[#001856]"
-                      />
-                    </div>
-                    <div className="flex items-end gap-2 mt-4">
-                      <button
-                        onClick={() => setPickerOpen(false)}
-                        className="px-4 py-2 text-sm text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={applyCustom}
-                        className="px-5 py-2 text-sm font-bold bg-[#001856] text-white rounded-lg hover:bg-[#001856]/90 transition-colors"
-                      >
-                        Aplicar
-                      </button>
+                  {/* Intervalo personalizado */}
+                  <div className="border-t border-gray-100 pt-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Intervalo personalizado</p>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-end gap-2">
+                      <div className="flex gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-gray-500">De</label>
+                          <input
+                            type="date"
+                            value={draftRange.from ? draftRange.from.toISOString().slice(0,10) : ''}
+                            onChange={e => setDraftRange(r => ({ ...r, from: e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined }))}
+                            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-[#001856] focus:outline-none focus:border-[#001856]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-gray-500">Até</label>
+                          <input
+                            type="date"
+                            value={draftRange.to ? draftRange.to.toISOString().slice(0,10) : ''}
+                            onChange={e => setDraftRange(r => ({ ...r, to: e.target.value ? new Date(e.target.value + 'T23:59:59') : undefined }))}
+                            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-[#001856] focus:outline-none focus:border-[#001856]"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPickerOpen(false)}
+                          className="px-3 py-1.5 text-xs text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={applyCustom}
+                          className="px-4 py-1.5 text-xs font-bold bg-[#001856] text-white rounded-lg hover:bg-[#001856]/90 transition-colors"
+                        >
+                          Aplicar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
-        </div>
+          </div>{/* fecha div do trigger */}
+        </div>{/* fecha div label+select */}
 
         {/* Atualizar / limpar */}
-        {hasFilter && (
+        <div className="flex items-center gap-2 sm:ml-auto">
+          {hasFilter && (
+            <button
+              onClick={clearFilter}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors"
+            >
+              <X size={13} /> Limpar
+            </button>
+          )}
           <button
-            onClick={clearFilter}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors"
+            onClick={() => fetchAll()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
           >
-            <X size={13} /> Limpar
+            <RefreshCw size={13} /> Atualizar
           </button>
-        )}
-        <button
-          onClick={() => fetchAll()}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw size={13} /> Atualizar
-        </button>
+        </div>
       </div>
 
       {/* ── KPI CARDS ───────────────────────────────────────────────────────── */}

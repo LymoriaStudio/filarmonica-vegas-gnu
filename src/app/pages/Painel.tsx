@@ -94,7 +94,7 @@ const [students, setStudents] = useState<Student[]>([]);
   const [supporters, setSupporters] = useState<Supporter[]>(initialSupporters);
 
   const [interests, setInterests] = useState<InterestFormResponse[]>(initialInterestForm);
-  const [supports, setSupports] = useState<SupportFormResponse[]>(initialSupportForm);
+  const [supports, setSupports] = useState<SupportFormResponse[]>([]);
   const [donations, setDonations] = useState<DirectDonation[]>(initialDonations);
   const [contacts, setContacts] = useState<ContactMessage[]>(initialContacts);
 

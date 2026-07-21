@@ -2,7 +2,7 @@ import { Buffer } from "buffer";
 window.Buffer = Buffer;
 import { useState } from "react";
 import * as yup from "yup";
-import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft } from "lucide-react";
+import { Send, Phone, Mail, MapPin, CheckCircle, Heart, Building2, QrCode, ArrowLeft, ChevronDown } from "lucide-react";
 // import { QrCodePix } from "qrcode-pix"; // geração automática de Pix comentada
 // import { QRCodeSVG } from "qrcode.react"; // geração automática de Pix comentada
 import { schemaInteresse } from "../validations/contactRules";
@@ -585,21 +585,24 @@ export function Contact() {
                     >
                       Instrumento de interesse
                     </label>
-                    <select
-                      name="instrumento"
-                      value={interesseForm.instrumento}
-                      onChange={handleChange}
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none"
-                      style={{ fontFamily: "'Inter', sans-serif" }}
-                    >
-                      <option value="" className="text-gray-800">Selecione um instrumento</option>
-                      <option value="trompete" className="text-gray-800">Trompete</option>
-                      <option value="trombone" className="text-gray-800">Trombone</option>
-                      <option value="trompa" className="text-gray-800">Trompa</option>
-                      <option value="bombardino" className="text-gray-800">Bombardino</option>
-                      <option value="tuba" className="text-gray-800">Tuba</option>
-                      <option value="outros" className="text-gray-800">Outros</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        name="instrumento"
+                        value={interesseForm.instrumento}
+                        onChange={handleChange}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-10 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none cursor-pointer"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <option value="" className="text-gray-800">Selecione um instrumento</option>
+                        <option value="trompete" className="text-gray-800">Trompete</option>
+                        <option value="trombone" className="text-gray-800">Trombone</option>
+                        <option value="trompa" className="text-gray-800">Trompa</option>
+                        <option value="bombardino" className="text-gray-800">Bombardino</option>
+                        <option value="tuba" className="text-gray-800">Tuba</option>
+                        <option value="outros" className="text-gray-800">Outros</option>
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
+                    </div>
                   </div>
 
                   <div>
@@ -729,18 +732,21 @@ export function Contact() {
                     >
                       Tipo de apoio
                     </label>
-                    <select
-                      name="tipo"
-                      value={apoioForm.tipo}
-                      onChange={handleChange}
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none"
-                      style={{ fontFamily: "'Inter', sans-serif" }}
-                    >
-                      <option value="" className="text-gray-800">Selecione</option>
-                      <option value="patrocinio" className="text-gray-800">Patrocínio</option>
-                      <option value="parceria-escola" className="text-gray-800">Parceria com escola</option>
-                      <option value="outros" className="text-gray-800">Outros</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        name="tipo"
+                        value={apoioForm.tipo}
+                        onChange={handleChange}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-10 text-white focus:outline-none focus:border-[#ffc300] transition-colors appearance-none cursor-pointer"
+                        style={{ fontFamily: "'Inter', sans-serif" }}
+                      >
+                        <option value="" className="text-gray-800">Selecione</option>
+                        <option value="patrocinio" className="text-gray-800">Patrocínio</option>
+                        <option value="parceria-escola" className="text-gray-800">Parceria com escola</option>
+                        <option value="outros" className="text-gray-800">Outros</option>
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
+                    </div>
                   </div>
 
                   <div>

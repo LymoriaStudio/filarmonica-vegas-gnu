@@ -6,7 +6,7 @@ import { InlineLoader } from '../../components/InlineLoader';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  HeartHandshake, BookOpen, HelpCircle, Check, Archive, Trash2, Mail, Phone,
+  HeartHandshake, BookOpen, HelpCircle, Check, Archive, ArchiveRestore, Trash2, Mail, Phone,
   UserPlus, UserCheck, MessageSquare, ExternalLink, Calendar, CheckCircle2,
   Play, Send, Share2, Eye, X, GraduationCap, Search, SortAsc
 } from 'lucide-react';
@@ -213,7 +213,10 @@ export default function RelationshipCMS({
   useEffect(() => {
     if (subTab !== 'apoiar') return;
     const cached = dataCache.get<SupportFormResponse[]>('quero_apoiar');
-    if (cached) { setSupports(cached); setLoadingSupports(false); return; }
+    // Ignora cache com IDs mockados (não-uuid)
+    if (cached && cached.length > 0 && /^[0-9a-f-]{36}$/i.test(cached[0].id)) {
+      setSupports(cached); setLoadingSupports(false); return;
+    }
     setLoadingSupports(true);
     setErrorSupports(null);
 
@@ -234,7 +237,9 @@ export default function RelationshipCMS({
   }, [subTab]);
 
   useEffect(() => {
-    if (!loadingSupports && supports.length > 0) dataCache.set('quero_apoiar', supports);
+    // Só grava no cache após fetch do Supabase (IDs reais começam com padrão uuid)
+    const hasRealIds = supports.length > 0 && /^[0-9a-f-]{36}$/i.test(supports[0].id);
+    if (!loadingSupports && hasRealIds) dataCache.set('quero_apoiar', supports);
   }, [supports, loadingSupports]);
 
   // ── ABRE FICHA DE MATRÍCULA ───────────────────────────────────────────────
@@ -373,6 +378,18 @@ export default function RelationshipCMS({
     }
   };
 
+  const handleUnarchiveInterest = async (id: string, name: string) => {
+    try {
+      await updateInteressado(id, { status: 'novo' });
+      setInterests((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, status: 'novo' } : i))
+      );
+      addAuditLog('Desarquivou Ficha de Interesse', 'Relacionamento', `Desarquivou inscrição de: ${name}`);
+    } catch (err: any) {
+      alert('Erro ao desarquivar: ' + err.message);
+    }
+  };
+
   // ── DELETE interessado ────────────────────────────────────────────────────
   const handleDeleteInterest = async (id: string, name: string) => {
     if (!confirm(`Excluir permanentemente a ficha de ${name}? Esta ação não pode ser desfeita.`)) return;
@@ -399,6 +416,22 @@ export default function RelationshipCMS({
       addAuditLog('Arquivou Proposta Apoio', 'Relacionamento', `Arquivou proposta de: ${name}`);
     } catch (err: any) {
       alert('Erro ao arquivar: ' + err.message);
+    }
+  };
+
+  const handleUnarchiveSupport = async (id: string, name: string) => {
+    try {
+      const { error } = await supabase
+        .from('quero_apoiar')
+        .update({ status: 'pendente', updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSupports((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'pendente' } : s)));
+      addAuditLog('Desarquivou Proposta Apoio', 'Relacionamento', `Desarquivou proposta de: ${name}`);
+    } catch (err: any) {
+      alert('Erro ao desarquivar: ' + err.message);
     }
   };
 
@@ -443,7 +476,7 @@ export default function RelationshipCMS({
             Relacionamento
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            Responda formulários do site público e converta interessados diretamente no ERP em 1 clique.
+            Respostas obtidas através dos formulários do site.
           </p>
         </div>
 
@@ -551,6 +584,26 @@ export default function RelationshipCMS({
                           >
                             <Eye size={12} />
                           </button>
+                          {inter.status !== 'arquivado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleArchiveInterest(inter.id, inter.name)}
+                              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-400 rounded-lg border border-gray-200 cursor-pointer transition-colors"
+                              title="Arquivar"
+                            >
+                              <Archive size={12} />
+                            </button>
+                          )}
+                          {inter.status === 'arquivado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUnarchiveInterest(inter.id, inter.name)}
+                              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-500 rounded-lg border border-amber-200 cursor-pointer transition-colors"
+                              title="Desarquivar"
+                            >
+                              <ArchiveRestore size={12} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDeleteInterest(inter.id, inter.name)}
@@ -710,18 +763,18 @@ export default function RelationshipCMS({
 
           {!loadingSupports && filteredSupports.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="text-sm" style={{ minWidth: '780px', width: '100%' }}>
+              <div className="md:overflow-x-visible overflow-x-auto">
+                <table className="text-sm w-full table-fixed md:table-auto" style={{ minWidth: '700px' }}>
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ width: '160px', maxWidth: '160px' }}>Nome</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '160px' }}>Empresa</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '190px' }}>E-mail</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '150px' }}>Telefone</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '110px' }}>Tipo de apoio</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '100px' }}>Data</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400" style={{ minWidth: '90px' }}>Status</th>
-                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right bg-white sticky right-0 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]" style={{ minWidth: '180px' }}>Ações</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[15%]">Nome</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[13%]">Empresa</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[20%]">E-mail</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[13%]">Telefone</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[12%]">Tipo de apoio</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[9%]">Data</th>
+                      <th className="text-left px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 w-[9%]">Status</th>
+                      <th className="px-3 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 text-right w-[9%]">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -731,40 +784,41 @@ export default function RelationshipCMS({
                         onClick={() => setViewSupport(sup)}
                         className={`hover:bg-gray-50 transition-colors cursor-pointer ${sup.status === 'arquivado' ? 'opacity-50' : ''}`}
                       >
-                        <td className="px-4 py-3" style={{ width: '160px', maxWidth: '160px' }}>
+                        <td className="px-3 py-3 max-w-0">
                           <p className="font-semibold text-[#001856] text-xs truncate" title={sup.name}>{sup.name}</p>
                           {sup.message && <p className="text-[10px] text-gray-400 truncate mt-0.5">{sup.message}</p>}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-gray-600 truncate">{sup.company || '—'}</span>
+                        <td className="px-3 py-3 max-w-0">
+                          <span className="text-xs text-gray-600 truncate block">{sup.company || '—'}</span>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-gray-500 flex items-center gap-1"><Mail size={10} className="text-amber-500 shrink-0" />{sup.email}</span>
+                        <td className="px-3 py-3 max-w-0">
+                          <span className="text-xs text-gray-500 flex items-center gap-1 min-w-0"><Mail size={10} className="text-amber-500 shrink-0" /><span className="truncate">{sup.email}</span></span>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-gray-600 flex items-center gap-1.5 whitespace-nowrap"><Phone size={11} className="text-[#001856] shrink-0" />{sup.phone}</span>
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-gray-600 flex items-center gap-1 whitespace-nowrap"><Phone size={11} className="text-[#001856] shrink-0" />{sup.phone}</span>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded whitespace-nowrap">{sup.supportType}</span>
+                        <td className="px-3 py-3">
+                          <span className="text-[10px] font-semibold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded whitespace-nowrap">{sup.supportType}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <span className="text-xs text-gray-400 font-mono whitespace-nowrap">{sup.date}</span>
                         </td>
-                        <td className="px-4 py-3">
-                          {sup.status === 'aprovado' && <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full whitespace-nowrap">Aprovado</span>}
-                          {sup.status === 'pendente' && <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full whitespace-nowrap">Pendente</span>}
-                          {sup.status === 'arquivado' && <span className="text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 px-2 py-0.5 rounded-full whitespace-nowrap">Arquivado</span>}
-                          {sup.status === 'contacted' && <span className="text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-full whitespace-nowrap">Contactado</span>}
+                        <td className="px-3 py-3">
+                          {sup.status === 'aprovado' && <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">Aprovado</span>}
+                          {sup.status === 'pendente' && <span className="text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">Pendente</span>}
+                          {sup.status === 'arquivado' && <span className="text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">Arquivado</span>}
+                          {sup.status === 'contacted' && <span className="text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">Contactado</span>}
                         </td>
-                        <td className="px-4 py-3 bg-white sticky right-0 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]" onClick={e => e.stopPropagation()}>
+                        <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
                             {sup.status !== 'aprovado' && sup.status !== 'arquivado' && (
                               <button
                                 type="button"
                                 onClick={() => handlePromoToSupporter(sup)}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-[10px] font-bold cursor-pointer transition-colors whitespace-nowrap"
+                                className="flex items-center gap-1 p-1.5 xl:px-2.5 xl:py-1.5 bg-[#ffc300] hover:bg-yellow-400 text-[#001856] rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                                title="Tornar Oficial"
                               >
-                                <UserCheck size={11} /> Tornar Oficial
+                                <UserCheck size={11} /><span className="hidden xl:inline whitespace-nowrap">Oficial</span>
                               </button>
                             )}
                             <button
@@ -783,6 +837,16 @@ export default function RelationshipCMS({
                                 title="Arquivar"
                               >
                                 <Archive size={12} />
+                              </button>
+                            )}
+                            {sup.status === 'arquivado' && (
+                              <button
+                                type="button"
+                                onClick={() => handleUnarchiveSupport(sup.id, sup.name)}
+                                className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-500 rounded-lg border border-amber-200 cursor-pointer transition-colors"
+                                title="Desarquivar"
+                              >
+                                <ArchiveRestore size={12} />
                               </button>
                             )}
                           </div>

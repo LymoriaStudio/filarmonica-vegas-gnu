@@ -73,6 +73,7 @@ export default function FinanceiroERP({
     donorCpf: string;
     donorEmail: string;
     amount: number | '';
+    status: 'confirmado' | 'pendente';
   } | null>(null);
   const [savingDonation, setSavingDonation] = useState(false);
 
@@ -121,12 +122,13 @@ export default function FinanceiroERP({
         donor_cpf: activeDonation.donorCpf || null,
         donor_email: activeDonation.donorEmail || null,
         amount: Number(activeDonation.amount) || 0,
+        status: activeDonation.status,
       };
       if (activeDonation.id) {
         await updateDoacao(activeDonation.id, payload);
         setDoacoes((prev) => prev.map((d) =>
           d.id === activeDonation.id
-            ? { ...d, ...payload, donorName: payload.donor_name ?? 'Anônimo', donorType: payload.donor_type, donorCpf: payload.donor_cpf ?? '', donorEmail: payload.donor_email ?? '', amount: payload.amount }
+            ? { ...d, ...payload, donorName: payload.donor_name ?? 'Anônimo', donorType: payload.donor_type, donorCpf: payload.donor_cpf ?? '', donorEmail: payload.donor_email ?? '', amount: payload.amount, status: payload.status }
             : d
         ));
         addAuditLog('Editou Doação', 'Financeiro', `Editou doação de ${activeDonation.donorName}`);
@@ -156,12 +158,12 @@ export default function FinanceiroERP({
   };
 
   const openNewDonation = () => {
-    setActiveDonation({ donorName: '', donorType: 'fisica', donorCpf: '', donorEmail: '', amount: '' });
+    setActiveDonation({ donorName: '', donorType: 'fisica', donorCpf: '', donorEmail: '', amount: '', status: 'pendente' });
     setDonationModalOpen(true);
   };
 
   const openEditDonation = (d: DoacaoView) => {
-    setActiveDonation({ id: d.id, donorName: d.donorName, donorType: d.donorType, donorCpf: d.donorCpf, donorEmail: d.donorEmail, amount: d.amount });
+    setActiveDonation({ id: d.id, donorName: d.donorName, donorType: d.donorType, donorCpf: d.donorCpf, donorEmail: d.donorEmail, amount: d.amount, status: (d.status as 'confirmado' | 'pendente') ?? 'pendente' });
     setDonationModalOpen(true);
   };
 
@@ -624,6 +626,18 @@ export default function FinanceiroERP({
                   onChange={(e) => setActiveDonation({ ...activeDonation, amount: e.target.value === '' ? '' : Number(e.target.value) })}
                   placeholder="0"
                 />
+              </DrawerField>
+            </DrawerSection>
+
+            <DrawerSection title="Status">
+              <DrawerField label="Status da doação">
+                <DrawerSelect
+                  value={activeDonation.status}
+                  onChange={(e) => setActiveDonation({ ...activeDonation, status: e.target.value as 'confirmado' | 'pendente' })}
+                >
+                  <option value="confirmado">Confirmada</option>
+                  <option value="pendente">Pendente</option>
+                </DrawerSelect>
               </DrawerField>
             </DrawerSection>
           </>

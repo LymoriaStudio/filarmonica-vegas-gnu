@@ -112,7 +112,7 @@ export function Footer() {
               className="text-white/30 text-sm"
               style={{ fontFamily: "'Inter', sans-serif" }}
             >
-              © 2025 Filarmônica de Metais. Todos os direitos reservados.
+              Lymoria Filarmônica • Versão 1.0.0<br />Sistema desenvolvido por Lymoria Studio.
             </p>
             <a
               href="/painel"

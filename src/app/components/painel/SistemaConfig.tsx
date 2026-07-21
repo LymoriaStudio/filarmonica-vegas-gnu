@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Building2, ShieldAlert, Library, Settings, History, Save, Plus, Trash2,
   Edit, Check, AlertTriangle, CloudDownload, Calendar, Lock, Globe, Share2,
@@ -55,6 +55,21 @@ export default function SistemaConfig({
   const [painelUsers, setPainelUsers] = useState<PainelUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
+
+  // Filtros de usuários
+  const [userSearch, setUserSearch]       = useState('');
+  const [userRoleFilter, setUserRoleFilter]     = useState('all');
+  const [userStatusFilter, setUserStatusFilter] = useState('all');
+
+  const filteredUsers = useMemo(() => {
+    return painelUsers.filter(u => {
+      const matchName = !userSearch || u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase());
+      const matchRole = userRoleFilter === 'all' || u.role === userRoleFilter;
+      const rawStatus = (u as any).status ?? (u.blocked ? 'bloqueado' : 'ativo');
+      const matchStatus = userStatusFilter === 'all' || rawStatus === userStatusFilter;
+      return matchName && matchRole && matchStatus;
+    });
+  }, [painelUsers, userSearch, userRoleFilter, userStatusFilter]);
 
   // User modal
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -221,18 +236,18 @@ export default function SistemaConfig({
     <div className="space-y-6 p-6 animate-fade-in select-none">
 
       {/* Top Banner section */}
-      <div className="pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* <div className="pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold font-sans text-[#001856] tracking-tight flex items-center">
             <Building2 className="mr-2 text-[#001856]" size={20} />
-            Configuração Fina & Infraestrutura (Sistema)
+            Logs do Sistema
           </h2>
           <p className="text-xs text-gray-400 mt-1">
             Audite eventos de segurança contra exclusão, regule o controle de usuários do staff e altere parâmetros SEO da homepage.
           </p>
         </div>
 
-      </div>
+      </div> */}
 
       {/* ==========================================================
           SUBTAB 1: IAM STAFF MEMBERS (USERS & ROLES)
@@ -251,6 +266,34 @@ export default function SistemaConfig({
             </button>
           </div>
 
+          {/* Busca e filtros */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Buscar por nome ou e-mail..."
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#001856]/20"
+              />
+            </div>
+            <select value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)}
+              className="px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#001856]/20 cursor-pointer">
+              <option value="all">Todos os cargos</option>
+              <option value="admin">Admin</option>
+              <option value="editor">Editor</option>
+            </select>
+            <select value={userStatusFilter} onChange={e => setUserStatusFilter(e.target.value)}
+              className="px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#001856]/20 cursor-pointer">
+              <option value="all">Todos os status</option>
+              <option value="ativo">Ativo</option>
+              <option value="bloqueado">Bloqueado</option>
+              <option value="inativo">Inativo</option>
+              <option value="pendente">Pendente</option>
+            </select>
+          </div>
+
           {/* Error / loading */}
           {usersError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
@@ -267,12 +310,12 @@ export default function SistemaConfig({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {painelUsers.length === 0 && (
+              {filteredUsers.length === 0 && (
                 <div className="col-span-3 text-center py-12 text-gray-400 text-sm">
-                  Nenhum usuário cadastrado ainda.
+                  Nenhum usuário encontrado.
                 </div>
               )}
-              {painelUsers.map(u => (
+              {filteredUsers.map(u => (
                 <div key={u.id} className="p-4 bg-white border border-gray-100 rounded-xl flex flex-col gap-3">
                   {/* top */}
                   <div className="flex items-center gap-3">
@@ -552,7 +595,7 @@ export default function SistemaConfig({
           <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-xs flex justify-between items-center text-neutral-450 font-mono">
             <span className="flex items-center text-amber-500">
               <AlertTriangle size={14} className="mr-2" />
-              Selo Geral Auditoria Imutável (CFR-11)
+              Apenas Administradores podem visualizar os Logs
             </span>
             <span>Total de registros: {auditLogs.length} eventos</span>
           </div>

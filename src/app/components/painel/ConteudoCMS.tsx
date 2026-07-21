@@ -1382,12 +1382,12 @@ export default function ConteudoCMS({
           </DrawerSection>
           <DrawerSection title="Imagem de Capa">
             {activeEvent.cover && (
-              <div className="relative rounded-xl overflow-hidden border border-gray-200">
-                <img src={activeEvent.cover} alt="Capa" referrerPolicy="no-referrer" className="w-full h-36 object-cover" />
-                <button type="button" onClick={() => setActiveEvent(prev => prev ? { ...prev, cover: undefined } : prev)} className="absolute top-2 right-2 p-1 bg-black/60 hover:bg-black/80 rounded-full text-white cursor-pointer"><X size={12} /></button>
+              <div className="relative">
+                <img src={activeEvent.cover} alt="Capa" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded-xl border border-gray-200" />
+                <button type="button" onClick={() => setActiveEvent(prev => prev ? { ...prev, cover: undefined } : prev)} className="absolute -top-2.5 -right-2.5 z-10 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
               </div>
             )}
-            <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingEventCoverFile(file); setActiveEvent(prev => prev ? { ...prev, cover: previewUrl } : prev); }} />
+            {!activeEvent.cover && <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingEventCoverFile(file); setActiveEvent(prev => prev ? { ...prev, cover: previewUrl } : prev); }} />}
             <p className="text-[10px] text-gray-400">Formatos: JPG, PNG, WEBP &bull; Máx. 10MB &bull; Recomendado: 16:9</p>
           </DrawerSection>
         </>)}
@@ -1525,17 +1525,22 @@ export default function ConteudoCMS({
               </DrawerField>
             </div>
             <DrawerField label="Imagem principal">
-              {activeInstrument.image && <img src={activeInstrument.image} alt="Preview" referrerPolicy="no-referrer" className="w-full h-28 object-cover rounded-lg border border-gray-200 mb-2" />}
-              <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingInstrumentImageFile(file); setActiveInstrument(prev => prev ? { ...prev, image: previewUrl } : prev); }} />
+              {activeInstrument.image && (
+                <div className="relative mb-2">
+                  <img src={activeInstrument.image} alt="Preview" referrerPolicy="no-referrer" className="w-full h-28 object-cover rounded-lg border border-gray-200" />
+                  <button type="button" onClick={() => { setPendingInstrumentImageFile(null); setActiveInstrument(prev => prev ? { ...prev, image: '' } : prev); }} className="absolute -top-2.5 -right-2.5 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
+                </div>
+              )}
+              {!activeInstrument.image && <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingInstrumentImageFile(file); setActiveInstrument(prev => prev ? { ...prev, image: previewUrl } : prev); }} />}
             </DrawerField>
           </DrawerSection>
           <DrawerSection title="Galeria de Fotos">
             {activeInstrument.gallery && activeInstrument.gallery.length > 0 && (
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {activeInstrument.gallery.map(url => (
-                  <div key={url} className="relative group">
+                  <div key={url} className="relative">
                     <img src={url} alt="Galeria" referrerPolicy="no-referrer" className="w-full h-16 object-cover rounded border border-gray-200" />
-                    <button type="button" onClick={() => handleRemoveGalleryImage(url)} className="absolute top-0.5 right-0.5 bg-rose-950 text-rose-400 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-all"><X size={10} /></button>
+                    <button type="button" onClick={() => handleRemoveGalleryImage(url)} className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-md border-2 border-white"><X size={12} strokeWidth={2.5} /></button>
                   </div>
                 ))}
               </div>

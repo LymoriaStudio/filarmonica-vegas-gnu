@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { InlineLoader } from '../../components/InlineLoader';
 import {
   Users, UserCheck, ShieldAlert, Plus, Search, Filter, Mail, Phone, MapPin,
-  Trash2, Edit, Check, Star, Download, Archive, ArrowUp, ArrowDown, UserPlus,
+  Trash2, Edit, Check, Star, Download, Archive, ArchiveRestore, ArrowUp, ArrowDown, UserPlus,
   Instagram, Facebook, Youtube, Linkedin, MessageCircle, FileSpreadsheet, X, Calendar, Music2
 } from 'lucide-react';
 import { Professor, Student, Organizer, AuditLog } from '../../validations/types';
@@ -57,7 +58,6 @@ export default function PessoasERP({
   const [viewStudent, setViewStudent] = useState<Student | null>(null);
 
   // Simulated export to CSV modal
-  const [exportModalContent, setExportModalContent] = useState<string | null>(null);
 
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentsError, setStudentsError] = useState('');
@@ -268,15 +268,35 @@ const handleArchiveStudent = async (id: string, name: string) => {
   }
 };
 
+const handleUnarchiveStudent = async (id: string, name: string) => {
+  try {
+    await updateStudentStatus(id, 'ativo');
+    setStudents(prev => prev.map(s => s.id === id ? { ...s, status: 'ativo' } : s));
+    addAuditLog('Desarquivou Aluno', 'Alunos', `Alterou status de: ${name} para Ativo`);
+  } catch (err: any) {
+    alert('Erro ao desarquivar aluno: ' + err.message);
+  }
+};
+
 
   // Mock list exporter
   const handleExportStudents = () => {
-    let csv = 'ID,Nome Completo,Status,Turma,Instrumento,Responsavel,Telefone,Email,Data Nascimento\n';
-    students.forEach(s => {
-      csv += `"${s.id}","${s.name}","${s.status}","${s.classroom}","${s.instrument}","${s.guardian || ''}","${s.phone}","${s.email}","${s.birthDate}"\n`;
-    });
-    setExportModalContent(csv);
-    addAuditLog('Exportou Alunos', 'Alunos', `Exportou lista de ${students.length} alunos inscritos formate CSV`);
+    const rows = students.map(s => ({
+      'ID': s.id,
+      'Nome Completo': s.name,
+      'Status': s.status,
+      'Turma': s.classroom,
+      'Instrumento': s.instrument,
+      'Responsável': s.guardian || '',
+      'Telefone': s.phone,
+      'E-mail': s.email,
+      'Data de Nascimento': s.birthDate,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Alunos');
+    XLSX.writeFile(wb, `alunos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    addAuditLog('Exportou Alunos', 'Alunos', `Exportou lista de ${students.length} alunos em Excel`);
   };
 
 
@@ -517,6 +537,16 @@ const handleArchiveStudent = async (id: string, name: string) => {
                               className="p-1 px-1.5 bg-gray-100 hover:bg-amber-950 rounded text-amber-500 hover:text-amber-200 transition-all cursor-pointer"
                             >
                               <Archive size={11} />
+                            </button>
+                          )}
+                          {alu.status === 'archived' && (
+                            <button
+                              type="button"
+                              title="Desarquivar"
+                              onClick={() => handleUnarchiveStudent(alu.id, alu.name)}
+                              className="p-1 px-1.5 bg-amber-50 hover:bg-amber-100 rounded text-amber-500 border border-amber-200 transition-all cursor-pointer"
+                            >
+                              <ArchiveRestore size={11} />
                             </button>
                           )}
                           <button
@@ -1243,37 +1273,6 @@ const handleArchiveStudent = async (id: string, name: string) => {
       </Drawer>
 
 
-      {/* Modal D: Simulated Exporter visual outcome */}
-      {exportModalContent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 animate-fade-in">
-          <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xl">
-            <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center text-xs">
-              <span className="font-mono font-bold text-emerald-400 flex items-center">
-                <FileSpreadsheet size={14} className="mr-2" />
-                DADOS EXPORTADOS COM SUCESSO (CSV SPRESS)
-              </span>
-              <button onClick={() => setExportModalContent(null)} className="text-gray-400 hover:text-[#001856]">Fechar</button>
-            </div>
-            
-            <div className="p-4 bg-gray-50 font-mono text-[10px] text-gray-500 overflow-auto max-h-72">
-              <pre>{exportModalContent}</pre>
-            </div>
-
-            <div className="p-3 bg-white border-t border-gray-200 text-right">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(exportModalContent);
-                  alert('String CSV copiada para a área de transferência!');
-                  setExportModalContent(null);
-                }}
-                className="p-1 px-4 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-mono font-semibold text-xs transition-all cursor-pointer"
-              >
-                Copiar Linhas CSV
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

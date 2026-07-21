@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InlineLoader } from '../../components/InlineLoader';
 import {
-  Plus, Edit2, Trash2, ArrowUp, ArrowDown, Copy, Calendar, Eye, Image,
+  Plus, Edit2, Trash2, ArrowUp, ArrowDown, Copy, Calendar, Eye, Image, X,
   HelpCircle, AlignLeft, BarChart3, Star, Sparkles, Check, CheckSquare, Globe, Search
 } from 'lucide-react';
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
@@ -156,13 +156,14 @@ export default function SiteCMS({
     e.preventDefault();
     if (!activeBanner) return;
 
-    // Precisa ter ou uma imagem já existente (edição), ou um arquivo pendente selecionado
-    const hasDesktopImage = !!activeBanner.imageDesktop || !!pendingDesktopFile;
-    const hasMobileImage = !!activeBanner.imageMobile || !!pendingMobileFile;
-
-    if (!hasDesktopImage || !hasMobileImage) {
-      alert('Envie as imagens desktop e mobile antes de salvar.');
-      return;
+    // Só exige imagem se for um novo banner (sem id)
+    if (!activeBanner.id) {
+      const hasDesktopImage = !!activeBanner.imageDesktop || !!pendingDesktopFile;
+      const hasMobileImage = !!activeBanner.imageMobile || !!pendingMobileFile;
+      if (!hasDesktopImage || !hasMobileImage) {
+        alert('Envie as imagens desktop e mobile antes de salvar.');
+        return;
+      }
     }
 
     setBannerSaving(true);
@@ -185,6 +186,33 @@ export default function SiteCMS({
         imageDesktop: finalImageDesktop,
         imageMobile: finalImageMobile,
       });
+
+      // Reorder: when the new order collides with an existing banner, push all subsequent ones down by 1
+      const newOrder = activeBanner.order;
+      const othersAtOrAbove = banners
+        .filter(b => b.id !== activeBanner.id && b.order >= newOrder)
+        .sort((a, b) => a.order - b.order);
+
+      // Walk through sorted list; shift each one that would collide with the previous
+      const shiftMap: Record<string, number> = {};
+      let expectedNext = newOrder + 1;
+      for (const b of othersAtOrAbove) {
+        if (b.order < expectedNext) {
+          shiftMap[b.id] = expectedNext;
+          expectedNext++;
+        } else {
+          expectedNext = b.order + 1; // no collision, reset chain
+        }
+      }
+
+      if (Object.keys(shiftMap).length > 0) {
+        await Promise.all(
+          Object.entries(shiftMap).map(([id, order]) =>
+            supabase.from('banners').update({ order }).eq('id', id)
+          )
+        );
+        setBanners(prev => prev.map(b => shiftMap[b.id] !== undefined ? { ...b, order: shiftMap[b.id] } : b));
+      }
 
       if (activeBanner.id) {
         // Edit
@@ -471,7 +499,24 @@ export default function SiteCMS({
 
                   {/* Info and Actions */}
                   <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center gap-2">
+                      {b.status === 'ativo' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Público
+                        </span>
+                      )}
+                      {b.status === 'rascunho' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" /> Rascunho
+                        </span>
+                      )}
+                      {b.status === 'agendado' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-600 border border-sky-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 inline-block" /> Agendado
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         disabled={idx === 0}
@@ -488,9 +533,8 @@ export default function SiteCMS({
                       >
                         <ArrowDown size={12} />
                       </button>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
+                      <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                      <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => handleDuplicateBanner(b)}
@@ -512,6 +556,7 @@ export default function SiteCMS({
                       >
                         <Trash2 size={12} />
                       </button>
+                    </div>
                     </div>
                   </div>
                 </div>
@@ -553,14 +598,24 @@ export default function SiteCMS({
           </DrawerSection>
 
           <DrawerSection title="Imagens">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-4">
               <DrawerField label="Imagem Desktop">
-                {activeBanner.imageDesktop && <img src={activeBanner.imageDesktop} alt="Desktop" referrerPolicy="no-referrer" className="w-full h-20 object-cover rounded border border-gray-200 mb-2" />}
-                <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingDesktopFile(file); setActiveBanner(prev => prev ? { ...prev, imageDesktop: previewUrl } : prev); }} />
+                {activeBanner.imageDesktop && (
+                  <div className="relative mb-2">
+                    <img src={activeBanner.imageDesktop} alt="Desktop" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded border border-gray-200" />
+                    <button type="button" onClick={() => { setPendingDesktopFile(null); setActiveBanner(prev => prev ? { ...prev, imageDesktop: '' } : prev); }} className="absolute -top-2.5 -right-2.5 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
+                  </div>
+                )}
+                {!activeBanner.imageDesktop && <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingDesktopFile(file); setActiveBanner(prev => prev ? { ...prev, imageDesktop: previewUrl } : prev); }} />}
               </DrawerField>
               <DrawerField label="Imagem Mobile">
-                {activeBanner.imageMobile && <img src={activeBanner.imageMobile} alt="Mobile" referrerPolicy="no-referrer" className="w-full h-20 object-cover rounded border border-gray-200 mb-2" />}
-                <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingMobileFile(file); setActiveBanner(prev => prev ? { ...prev, imageMobile: previewUrl } : prev); }} />
+                {activeBanner.imageMobile && (
+                  <div className="relative mb-2">
+                    <img src={activeBanner.imageMobile} alt="Mobile" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded border border-gray-200" />
+                    <button type="button" onClick={() => { setPendingMobileFile(null); setActiveBanner(prev => prev ? { ...prev, imageMobile: '' } : prev); }} className="absolute -top-2.5 -right-2.5 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
+                  </div>
+                )}
+                {!activeBanner.imageMobile && <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingMobileFile(file); setActiveBanner(prev => prev ? { ...prev, imageMobile: previewUrl } : prev); }} />}
               </DrawerField>
             </div>
           </DrawerSection>
