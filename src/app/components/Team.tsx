@@ -28,8 +28,8 @@ const team: Member[] = [
     objectPosition: "center 15%",
   },
   {
-    name: "Hannel Baumgartner",
-    role: "Sócio Fundador do Grupo Vegas e Cofundador",
+    name: "Hannel Baungartner",
+    role: "Sócio-fundador do Grupo Vegas e Cofundador",
     short:
       "Empresário e idealizador de projetos voltados ao desenvolvimento social e cultural, incentiva a cultura, educação e transformação social por meio da música.",
     full: "Empresário e idealizador de projetos voltados ao desenvolvimento social e cultural, Hannel Baumgartner é sócio fundador do Grupo Vegas e cofundador da Filarmônica. Sua atuação é marcada pelo incentivo à cultura, educação e transformação social por meio da música, apoiando iniciativas que ampliam oportunidades e fortalecem o impacto positivo na comunidade.",
@@ -47,7 +47,7 @@ const team: Member[] = [
   },
   {
     name: "Djinane Panegassi Pavan",
-    role: "Secretária e Gestão de Relacionamento",
+    role: "Secretária e Gestora de Relacionamento",
     short:
       "Graduada em Administração, com especializações em Marketing, Psicanálise e Desenho Projetivo. Cuida da organização e do acolhimento das famílias.",
     full: "Graduada em Administração, com especializações em Administração, Marketing, Psicanálise e Desenho Projetivo, Djinane atua na organização administrativa e acolhimento das famílias na Filarmônica de Metais GNU/VEGAS. Seu trabalho envolve gestão de matrículas, apoio aos eventos e acompanhamento próximo das crianças e responsáveis, contribuindo para um ambiente humano, organizado e acolhedor.",

@@ -1,3 +1,12 @@
+import mome1 from '@/imports/momentos/mome1.jpeg'
+import mome2 from '@/imports/momentos/mome2.jpeg'
+import mome3 from '@/imports/momentos/mome3.jpeg'
+import mome4 from '@/imports/momentos/mome4.jpeg'
+import mome5 from '@/imports/momentos/mome5.jpeg'
+
+
+
+
 const galleryImages = [
   {
     src: "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
@@ -29,6 +38,32 @@ const galleryImages = [
     alt: "Maestro e orquestra",
     caption: "Temporada 2025 — Sala de Concertos",
   },
+    {
+    src: mome1,
+    alt: "Apresentação de música",
+    caption: "Apresentação de música",
+  },
+      {
+    src: mome2,
+    alt: "Apresentação de música",
+    caption: "Apresentação de música",
+  },
+      {
+    src: mome3,
+    alt: "Apresentação de música",
+    caption: "Apresentação de música",
+  },
+      {
+    src: mome4,
+    alt: "Apresentação de música",
+    caption: "Aula",
+  },
+      {
+    src: mome5,
+    alt: "Apresentação de música",
+    caption: "Alunos",
+  }
+
 ];
 
 export function Gallery() {
