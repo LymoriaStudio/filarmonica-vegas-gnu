@@ -71,7 +71,7 @@ const EMPTY_NEWS: NewsArticle[] = [];
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin:  ['dashboard', 'site', 'pessoas', 'relacionamento', 'financeiro', 'conteudo', 'sistema'],
-  editor: ['dashboard', 'site', 'pessoas', 'relacionamento', 'financeiro', 'conteudo'],
+  editor: ['dashboard', 'site', 'pessoas', 'relacionamento', 'conteudo'],
 };
 
 export default function Painel() {
@@ -368,15 +368,23 @@ const [students, setStudents] = useState<Student[]>([]);
             />
           )}
 
-          {/* FINANCEIRO SECTION */}
+          {/* FINANCEIRO SECTION — apenas admin */}
           {(activeTab === 'financeiro-doacoes' || activeTab === 'financeiro-apoiadores' || activeTab === 'financeiro-relatorios') && (
-            <FinanceiroERP
-              key={activeTab}
-              supporters={supporters}
-              setSupporters={setSupporters}
-              addAuditLog={addAuditLog}
-              activeTab={activeTab}
-            />
+            (ROLE_PERMISSIONS[currentProfile?.role ?? 'editor'] ?? []).includes('financeiro') ? (
+              <FinanceiroERP
+                key={activeTab}
+                supporters={supporters}
+                setSupporters={setSupporters}
+                addAuditLog={addAuditLog}
+                activeTab={activeTab}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-32 text-center gap-3">
+                <span className="text-5xl">🔒</span>
+                <p className="text-lg font-bold text-[#001856]">Acesso restrito</p>
+                <p className="text-sm text-gray-400">Você não tem permissão para acessar esta seção.</p>
+              </div>
+            )
           )}
 
           {/* DEPOIMENTOS */}

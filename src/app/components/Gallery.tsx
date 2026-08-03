@@ -8,36 +8,6 @@ import mome5 from '@/imports/momentos/mome5.jpeg'
 
 
 const galleryImages = [
-  {
-    src: "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
-    alt: "Filarmônica em concerto",
-    caption: "Grande Concerto Anual 2025",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1653324650979-015a4402a57f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
-    alt: "Ensaio coletivo",
-    caption: "Ensaio semanal em preparação",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1777226407432-801354c2ea42?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
-    alt: "Apresentação especial",
-    caption: "Noite de Gala — Teatro Municipal",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
-    alt: "Jovens músicos da filarmônica",
-    caption: "Formatura dos novos músicos",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1777730864372-c8d57f01d0f2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
-    alt: "Apresentação dos metais",
-    caption: "Concerto especial em uniforme",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1719753458800-c09cfb167ac5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1200",
-    alt: "Maestro e orquestra",
-    caption: "Temporada 2025 — Sala de Concertos",
-  },
     {
     src: mome1,
     alt: "Apresentação de música",
