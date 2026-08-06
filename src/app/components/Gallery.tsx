@@ -3,6 +3,7 @@ import mome2 from '@/imports/momentos/mome2.jpeg'
 import mome3 from '@/imports/momentos/mome3.jpeg'
 import mome4 from '@/imports/momentos/mome4.jpeg'
 import mome5 from '@/imports/momentos/mome5.jpeg'
+import mome6 from '@/imports/momentos/mome6.png'
 
 
 
@@ -11,27 +12,32 @@ const galleryImages = [
     {
     src: mome1,
     alt: "Apresentação de música",
-    caption: "Apresentação de música",
+    caption: "Concerto de Encerramento de 2025",
   },
       {
     src: mome2,
     alt: "Apresentação de música",
-    caption: "Apresentação de música",
+    caption: "Concerto de Encerramento de 2025",
   },
       {
     src: mome3,
     alt: "Apresentação de música",
-    caption: "Apresentação de música",
+    caption: "Concerto de Encerramento de 2025",
   },
-      {
+  {
     src: mome4,
     alt: "Apresentação de música",
-    caption: "Aula",
+    caption: "Concerto de Encerramento de 2024",
   },
-      {
+  {
     src: mome5,
     alt: "Apresentação de música",
-    caption: "Alunos",
+    caption: "Concerto de Encerramento de 2024",
+  },
+  {
+    src: mome6,
+    alt: "Apresentação de música",
+    caption: "Concerto de Meio de Ano de 2026",
   }
 
 ];
