@@ -13,12 +13,16 @@ import qrcode100 from "../../images/qrcode-100.png";
 import qrcode300 from "../../images/qrcode-300.png";
 import qrcode1000 from "../../images/qrcode-1000.png";
 import qrcodeDefinir from "../../images/qrcode-definir.png";
+import interesseImage from "../../images/c-tenhointeresse.jpeg"
+import apoioImage from "../../images/c-apoio.jpeg"
+import doacaoImage from "../../images/c-doacao.jpeg"
+
 
 type Tab = "interesse" | "apoio" | "doacao";
 type DonorType = "fisica" | "juridica";
 
-const interesseImage = "https://images.unsplash.com/photo-1709145234621-30c08c457fb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
-const apoioImage = "https://images.unsplash.com/photo-1763627516727-2ca3e324fa59?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1400";
+
+
 
 const QR_IMAGES: Record<number, string> = {
   100: qrcode100,
@@ -199,6 +203,12 @@ export function Contact() {
     setDonorForm({ nome: "", cpf: "", email: "" });
   };
 
+  const imagesContact = {
+    "interesse": interesseImage,
+    "apoio": apoioImage,
+    "doacao": doacaoImage,
+  }
+
   return (
     <section id="contato" className="bg-white py-20">
       <div className="max-w-7xl mx-auto px-6">
@@ -234,7 +244,7 @@ export function Contact() {
             <div className="rounded-2xl overflow-hidden h-64 lg:h-auto flex-1 relative">
               <img
                 key={tab}
-                src={tab === "interesse" ? interesseImage : apoioImage}
+                src={imagesContact[tab]}
                 alt={tab === "interesse" ? "Crianças tocando instrumentos de metal" : "Concerto da filarmônica"}
                 className="w-full h-full object-cover animate-[fadeIn_0.5s_ease-out]"
               />
