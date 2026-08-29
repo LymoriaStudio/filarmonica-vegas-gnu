@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router';
-import { supabase } from '../../lib/supabase';
+import { getSession, onAuthStateChange } from '../services/authService';
 import { PageLoader } from '../components/PageLoader';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -8,16 +8,14 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Verifica sessão atual imediatamente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthenticated(!!session);
-    });
+    getSession().then((session) => setAuthenticated(!!session));
 
     // Reage a qualquer mudança de estado (login, logout, expiração, revogação)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const unsubscribe = onAuthStateChange((session) => {
       setAuthenticated(!!session);
     });
 
-    return () => subscription.unsubscribe();
+    return unsubscribe;
   }, []);
 
   if (authenticated === null) return <PageLoader message="Verificando acesso..." />;

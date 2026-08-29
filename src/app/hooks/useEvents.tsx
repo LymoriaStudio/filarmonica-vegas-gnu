@@ -1,23 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-
-export interface EventFromDb {
-  id: string;
-  cover_image: string | null;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  venue: string;
-  address: string;
-  google_maps_url: string | null;
-  category: string;
-  status: string;
-  highlighted: boolean;
-  link: string | null;
-  is_paid: boolean;
-  ticket: number | null;
-}
+import { getEvents, EventFromDb } from '../services/eventsService';
 
 export interface EventView {
   id: string;
@@ -114,31 +96,16 @@ export function useEvents(options: UseEventsOptions = {}) {
       setLoading(true);
       setError(null);
 
-      let query = supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
-
-      if (onlyPublished) {
-        query = query.eq('status', 'published');
+      try {
+        const data = await getEvents({ onlyPublished, highlightedFirst });
+        if (cancelled) return;
+        setEvents(data.map((row, i) => mapEventFromDb(row, i)));
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Erro ao carregar eventos');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-
-      if (highlightedFirst) {
-        query = query.order('highlighted', { ascending: false });
-      }
-
-      const { data, error: dbError } = await query;
-
-      if (cancelled) return;
-
-      if (dbError) {
-        setError(dbError.message);
-        setLoading(false);
-        return;
-      }
-
-      setEvents((data || []).map((row, i) => mapEventFromDb(row as EventFromDb, i)));
-      setLoading(false);
     };
 
     fetch();

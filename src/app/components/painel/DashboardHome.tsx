@@ -13,10 +13,11 @@ import { StatCard, StatCardDef } from './StatCard';
 import { DayPicker } from 'react-day-picker';
 import type { DateRange } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
-import { supabase } from '../../../lib/supabase';
 import { dataCache } from '../../../lib/dataCache';
 import { getProfessors } from '../../services/professorsService';
 import { getDoacoes } from '../../services/doacoesService';
+import { getStudentsMinimal } from '../../services/studentsService';
+import { getApoiadoresAprovadosMinimal } from '../../services/useApoiadores';
 import { useEvents } from '../../hooks/useEvents';
 import { OrchestraEvent, AuditLog, InterestFormResponse } from '../../validations/types';
 import { CustomAreaChart, CustomBarChart } from './MiniWidgets';
@@ -62,11 +63,11 @@ export default function DashboardHome({ interests, auditLogs, onNavigate, userRo
     const minDelay = new Promise<void>(res => setTimeout(res, 1000));
 
     const fetches = Promise.all([
-      supabase.from('students').select('id, created_at')
-        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_students', d); setStudents(d); }),
+      getStudentsMinimal()
+        .then(d => { dataCache.set('dashboard_students', d); setStudents(d); }).catch(console.error),
       getProfessors().then(d => { dataCache.set('professors', d); setProfessors(d); }).catch(console.error),
-      supabase.from('quero_apoiar').select('id, status, created_at').eq('status', 'aprovado')
-        .then(({ data }) => { const d = data ?? []; dataCache.set('dashboard_supporters', d); setSupporters(d); }),
+      getApoiadoresAprovadosMinimal()
+        .then(d => { dataCache.set('dashboard_supporters', d); setSupporters(d); }).catch(console.error),
       getDoacoes()
         .then(all => { const confirmed = all.filter((d: DoacaoRow) => d.status === 'confirmado'); dataCache.set('dashboard_donations', confirmed); setDonations(confirmed); })
         .catch(console.error),

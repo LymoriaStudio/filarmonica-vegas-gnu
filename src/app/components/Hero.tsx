@@ -1,22 +1,6 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "../../lib/supabase";
-
-interface Banner {
-  id: string;
-  image_desktop: string;
-  image_mobile: string;
-  tag: string | null;
-  title: string;
-  subtitle: string | null;
-  text: string | null;
-  primary_btn_text: string | null;
-  primary_btn_link: string | null;
-  secondary_btn_text: string | null;
-  secondary_btn_link: string | null;
-  order: number;
-  status: string;
-}
+import { getBannersAtivos, PublicBanner as Banner } from "../services/bannersService";
 
 function handleBtnClick(link: string | null) {
   if (!link) return;
@@ -38,17 +22,12 @@ export function Hero() {
 
   // ── GET banners ativos, ordenados ──────────────────────────────────────────
   useEffect(() => {
-    supabase
-      .from("banners")
-      .select("*")
-      .eq("status", "ativo")
-      .order("order", { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
-          setSlides(data as Banner[]);
-        }
-        setLoading(false);
-      });
+    getBannersAtivos()
+      .then((data) => {
+        if (data.length > 0) setSlides(data);
+      })
+      .catch((err) => console.error('Erro ao carregar banners:', err))
+      .finally(() => setLoading(false));
   }, []);
 
   // ── Auto-avanço ────────────────────────────────────────────────────────────

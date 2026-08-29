@@ -23,3 +23,14 @@ export async function createApoiador(
 
   if (error) throw error
 }
+
+// GET — só id/status/created_at dos aprovados, usado para agregações (dashboard)
+export async function getApoiadoresAprovadosMinimal(): Promise<Pick<Apoiador, 'id' | 'status' | 'created_at'>[]> {
+  const { data, error } = await supabase
+    .from('quero_apoiar')
+    .select('id, status, created_at')
+    .eq('status', 'aprovado')
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}

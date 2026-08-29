@@ -86,6 +86,15 @@ export async function getStudents() {
   return (data || []).map(mapStudentFromDb);
 }
 
+// GET — só id/created_at, usado para agregações (ex: gráfico de matrículas por mês no dashboard)
+export async function getStudentsMinimal(): Promise<{ id: string; created_at: string }[]> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('id, created_at');
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
 // POST — cria novo aluno
 export async function createStudent(student: any) {
   const { data, error } = await supabase

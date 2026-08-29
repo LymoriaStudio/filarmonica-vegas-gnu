@@ -4,15 +4,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
+import { getCurrentProfile, onAuthStateChange, CurrentProfile } from '../services/authService';
 
-export interface CurrentProfile {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  avatar_url?: string;
-}
+export type { CurrentProfile };
 
 export function useCurrentProfile() {
   const [profile, setProfile] = useState<CurrentProfile | null>(null);
@@ -23,32 +17,8 @@ export function useCurrentProfile() {
     setLoading(true);
     setError(null);
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData?.user) {
-        setError(authError?.message ?? 'Usuário não autenticado');
-        setProfile(null);
-        return;
-      }
-
-      const { data: profileRow, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, name, role')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (profileError) {
-        setError(profileError.message);
-        setProfile(null);
-        return;
-      }
-
-      setProfile({
-        id: profileRow.id,
-        name: profileRow.name,
-        email: authData.user.email ?? '',
-        role: profileRow.role,
-        avatar_url: authData.user.user_metadata?.avatar_url ?? '',
-      });
+      const data = await getCurrentProfile();
+      setProfile(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar perfil');
       setProfile(null);
@@ -61,13 +31,11 @@ export function useCurrentProfile() {
     refresh();
 
     // Mantém o profile sincronizado se o usuário fizer login/logout em outra aba
-    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+    const unsubscribe = onAuthStateChange(() => {
       refresh();
     });
 
-    return () => {
-      subscription?.subscription.unsubscribe();
-    };
+    return unsubscribe;
   }, [refresh]);
 
   return { profile, loading, error, refresh };

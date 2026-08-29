@@ -1,15 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { supabase } from "../../lib/supabase";
-
-interface Testimonial {
-  id: number;
-  name: string;
-  tag: string;
-  tag_detail: string;
-  text: string;
-  order: number;
-}
+import { getTestimonialsAtivos, PublicTestimonial as Testimonial } from "../services/testimonialsService";
 
 function getInitials(name: string) {
   const parts = name.trim().split(" ");
@@ -36,12 +27,9 @@ export function Testimonials() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
 
   useEffect(() => {
-    supabase
-      .from('testimonials')
-      .select('id, name, tag, tag_detail, text, order')
-      .eq('active', true)
-      .order('order', { ascending: true })
-      .then(({ data }) => setTestimonials(data ?? []));
+    getTestimonialsAtivos()
+      .then(setTestimonials)
+      .catch((err) => console.error('Erro ao carregar depoimentos:', err));
   }, []);
 
   const cols = useColumns();
