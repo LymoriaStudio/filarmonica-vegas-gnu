@@ -8,12 +8,12 @@ import {
 import { InstrumentEvent, NewsArticle, MusicCourse, GalleryPhoto, GalleryVideo, Professor, Instrument } from '../../validations/types';
 import { RichTextEditor, ImageUploader, Toast, uploadFileToSupabase } from './MiniWidgets';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
-import { supabase } from '../../../lib/supabase';
 import { dataCache } from '../../../lib/dataCache';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../../services/coursesServices';
 import { getProfessors } from '../../services/professorsService';
 import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile } from '../../services/storageService';
 import { getInstruments, createInstrument, updateInstrument, deleteInstrument } from '../../services/instrumentsServices';
+import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, mapEventToDb } from '../../services/eventsService';
 
 
 interface ConteudoCMSProps {
@@ -31,44 +31,6 @@ interface ConteudoCMSProps {
   addAuditLog: (action: string, module: string, details: string) => void;
   activeTab?: string;
 }
-
-// ==========================================
-// MAPPERS: eventos (snake_case <-> camelCase)
-// ==========================================
-const mapEventFromDb = (row: any): InstrumentEvent => ({
-  id: row.id,
-  cover: row.cover_image,
-  title: row.title,
-  description: row.description,
-  date: row.date,
-  time: row.time,
-  location: row.venue,
-  address: row.address,
-  mapsUrl: row.google_maps_url,
-  category: row.category,
-  status: row.status,
-  featured: row.highlighted ?? false,
-  link: row.link,
-  isPaid: row.is_paid ?? false,
-  ticket: row.ticket,
-});
-
-const mapEventToDb = (e: Partial<InstrumentEvent>) => ({
-  cover_image: e.cover || null,
-  title: e.title,
-  description: e.description,
-  date: e.date,
-  time: e.time,
-  venue: e.location,
-  address: e.address,
-  google_maps_url: e.mapsUrl || null,
-  category: e.category,
-  status: e.status || 'rascunho',
-  highlighted: e.featured ?? false,
-  link: e.link || null,
-  is_paid: e.isPaid ?? false,
-  ticket: e.isPaid ? (e.ticket ?? null) : null,
-});
 
 export default function ConteudoCMS({
   events,
@@ -149,21 +111,15 @@ export default function ConteudoCMS({
       }
 
       setEventsLoading(true);
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
-
-      if (error) {
-        console.error(error);
+      try {
+        const mapped = await getAllEventsAdmin();
+        dataCache.set('events', mapped);
+        setEvents(mapped);
+      } catch (err) {
+        console.error(err);
+      } finally {
         setEventsLoading(false);
-        return;
       }
-
-      const mapped = (data || []).map(mapEventFromDb);
-      dataCache.set('events', mapped);
-      setEvents(mapped);
-      setEventsLoading(false);
     };
 
     fetchEvents();
@@ -307,37 +263,12 @@ export default function ConteudoCMS({
 
       if (activeEvent.id) {
         // PUT (update)
-        const { data, error } = await supabase
-          .from('events')
-          .update(payload)
-          .eq('id', activeEvent.id)
-          .select()
-          .single();
-
-        if (error) {
-          console.error(error);
-          alert('Erro ao atualizar evento: ' + error.message);
-          return;
-        }
-
-        const updated = mapEventFromDb(data);
+        const updated = await updateEvent(activeEvent.id, payload);
         setEvents(prev => prev.map(ev => ev.id === updated.id ? updated : ev));
         addAuditLog('Alterou Evento', 'Conteúdo', `Atualizou cronograma: ${updated.title}`);
       } else {
         // POST (insert)
-        const { data, error } = await supabase
-          .from('events')
-          .insert(payload)
-          .select()
-          .single();
-
-        if (error) {
-          console.error(error);
-          alert('Erro ao criar evento: ' + error.message);
-          return;
-        }
-
-        const newEv = mapEventFromDb(data);
+        const newEv = await createEvent(payload);
         setEvents(prev => [newEv, ...prev]);
         addAuditLog('Criou Evento', 'Conteúdo', `Criou novo evento na agenda: ${newEv.title}`);
       }
@@ -361,53 +292,39 @@ export default function ConteudoCMS({
       status: 'rascunho',
     });
 
-    const { data, error } = await supabase
-      .from('events')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) {
-      console.error(error);
-      alert('Erro ao duplicar evento: ' + error.message);
-      return;
+    try {
+      const duplicated = await createEvent(payload);
+      setEvents(prev => [duplicated, ...prev]);
+      addAuditLog('Duplicou Evento', 'Conteúdo', `Duplicou programação: ${evt.title}`);
+      alert('Programação duplicada com sucesso! Ajuste a nova data no rascunho.');
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao duplicar evento: ' + err.message);
     }
-
-    const duplicated = mapEventFromDb(data);
-    setEvents(prev => [duplicated, ...prev]);
-    addAuditLog('Duplicou Evento', 'Conteúdo', `Duplicou programação: ${evt.title}`);
-    alert('Programação duplicada com sucesso! Ajuste a nova data no rascunho.');
   };
 
   const handleDeleteEvent = async (id: string, title: string) => {
     if (!confirm(`Remover o evento "${title}"? Esta ação não pode ser desfeita.`)) return;
 
-    const { error } = await supabase.from('events').delete().eq('id', id);
-
-    if (error) {
-      console.error(error);
-      alert('Erro ao remover evento: ' + error.message);
-      return;
+    try {
+      await deleteEvent(id);
+      setEvents(prev => prev.filter(e => e.id !== id));
+      addAuditLog('Deletou Evento', 'Conteúdo', `Removeu evento da agenda ID: ${id} (${title})`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao remover evento: ' + err.message);
     }
-
-    setEvents(prev => prev.filter(e => e.id !== id));
-    addAuditLog('Deletou Evento', 'Conteúdo', `Removeu evento da agenda ID: ${id} (${title})`);
   };
 
   const handleToggleFeatureEvent = async (id: string, title: string, active: boolean) => {
-    const { error } = await supabase
-      .from('events')
-      .update({ highlighted: active })
-      .eq('id', id);
-
-    if (error) {
-      console.error(error);
-      alert('Erro ao atualizar destaque: ' + error.message);
-      return;
+    try {
+      await updateEventHighlighted(id, active);
+      setEvents(prev => prev.map(e => e.id === id ? { ...e, featured: active } : e));
+      addAuditLog('Destacou Evento', 'Conteúdo', `${active ? 'Destacou' : 'Removeu destaque'} do evento: ${title}`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao atualizar destaque: ' + err.message);
     }
-
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, featured: active } : e));
-    addAuditLog('Destacou Evento', 'Conteúdo', `${active ? 'Destacou' : 'Removeu destaque'} do evento: ${title}`);
   };
 
 
