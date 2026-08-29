@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, Camera, Save, KeyRound, Eye, EyeOff, Check, Mail, Shield, User, Calendar, Pencil, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { uploadFileToSupabase } from '../components/painel/MiniWidgets';
+import { getMyProfile, updateMyAvatar, updateMyEmail, updateMyProfile, changeMyPassword } from '../services/profileService';
 
 const INPUT = "w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed";
 const LABEL = "block text-[11px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest";
@@ -43,26 +43,17 @@ export default function PerfilPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-      if (!user) { navigate('/login'); return; }
-      setUserId(user.id);
-      setEmail(user.email ?? '');
-      setEditEmail(user.email ?? '');
-      setAvatarUrl(user.user_metadata?.avatar_url ?? '');
+      const profile = await getMyProfile();
+      if (!profile) { navigate('/login'); return; }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('name, role, created_at')
-        .eq('id', user.id)
-        .single();
-
-      if (profile) {
-        setName(profile.name ?? '');
-        setRole(profile.role ?? '');
-        setEditRole(profile.role ?? '');
-        setCreatedAt(profile.created_at ? new Date(profile.created_at).toLocaleDateString('pt-BR') : '');
-      }
+      setUserId(profile.userId);
+      setEmail(profile.email);
+      setEditEmail(profile.email);
+      setAvatarUrl(profile.avatarUrl);
+      setName(profile.name);
+      setRole(profile.role);
+      setEditRole(profile.role);
+      setCreatedAt(profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('pt-BR') : '');
       setLoading(false);
     })();
   }, [navigate]);
@@ -89,22 +80,17 @@ export default function PerfilPage() {
       let finalAvatarUrl = avatarUrl;
       if (pendingFile) {
         finalAvatarUrl = await uploadFileToSupabase(pendingFile, `avatars/${userId}`);
-        await supabase.auth.updateUser({ data: { avatar_url: finalAvatarUrl } });
+        await updateMyAvatar(finalAvatarUrl);
         setAvatarUrl(finalAvatarUrl);
         setPendingFile(null);
       }
 
       if (editEmail !== email) {
-        const { error: emailErr } = await supabase.auth.updateUser({ email: editEmail });
-        if (emailErr) throw emailErr;
+        await updateMyEmail(editEmail);
         setEmail(editEmail);
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ name, role: editRole })
-        .eq('id', userId);
-      if (error) throw error;
+      await updateMyProfile(userId, name, editRole);
 
       setRole(editRole);
       setProfileSuccess(true);
@@ -132,16 +118,7 @@ export default function PerfilPage() {
 
     setSavingPassword(true);
     try {
-      // Re-authenticate with current password to validate it
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email,
-        password: currentPass,
-      });
-      if (signInErr) { setPasswordError('Senha atual incorreta.'); return; }
-
-      const { error } = await supabase.auth.updateUser({ password: newPass });
-      if (error) throw error;
-
+      await changeMyPassword(email, currentPass, newPass);
       setPasswordSuccess(true);
       setTimeout(() => { setPasswordSuccess(false); setPwModalOpen(false); }, 2000);
     } catch (err: any) {
