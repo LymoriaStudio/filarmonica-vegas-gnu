@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Bold, Italic, Heading1, Heading2, List, Eye, Code, CheckCircle, AlertCircle, FileText } from 'lucide-react';
-import { supabase } from '../../../lib/supabase';
 
 // Chart 1: Area Chart (Crescimento de Alunos / Doações)
 interface AreaChartProps {
@@ -419,46 +418,6 @@ export function RichTextEditor({ value, onChange, placeholder = 'Escreva o miolo
       </div>
     </div>
   );
-}
-
-
-// ==========================================
-// 3. SUPABASE STORAGE BUCKET CONFIG + HELPER
-// ==========================================
-export const BUCKET_NAME = 'filarmonica-media';
-
-/**
- * Faz o upload efetivo de um arquivo para o Supabase Storage.
- * Deve ser chamado apenas no momento de "Confirmar e Salvar" (submit do form),
- * e não no momento da seleção do arquivo no ImageUploader.
- *
- * Retorna a URL pública do arquivo enviado.
- */
-export async function uploadFileToSupabase(file: File, folder: string = 'uploads'): Promise<string> {
-  const safeName = file.name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // strip accents
-    .replace(/[^a-zA-Z0-9.\-_]/g, '_');
-
-  const path = `${folder}/${Date.now()}-${safeName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET_NAME)
-    .upload(path, file, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type || undefined,
-    });
-
-  if (uploadError) {
-    throw new Error(uploadError.message);
-  }
-
-  const { data: publicData } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(path);
-
-  return publicData.publicUrl;
 }
 
 export const getFileTypeFromExt = (ext: string): 'image' | 'pdf' | 'video' | 'doc' => {

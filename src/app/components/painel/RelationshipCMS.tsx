@@ -19,7 +19,8 @@ import {
 import { getApoiadores, updateApoiadorStatus } from '../../services/useApoiadores';
 import { createStudent } from '../../services/studentsService';
 import { SupportFormResponse, ContactMessage, Student, Supporter } from '../../validations/types';
-import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
+import { ImageUploader } from './MiniWidgets';
+import { uploadFileToSupabase } from '../../services/storageService';
 import { dataCache } from '../../../lib/dataCache';
 
 // ── Tipo local derivado da tabela Supabase ────────────────────────────────────

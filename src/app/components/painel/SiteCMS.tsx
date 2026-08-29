@@ -5,7 +5,8 @@ import {
   HelpCircle, AlignLeft, BarChart3, Star, Sparkles, Check, CheckSquare, Globe, Search
 } from 'lucide-react';
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
-import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
+import { ImageUploader } from './MiniWidgets';
+import { uploadFileToSupabase } from '../../services/storageService';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { dataCache } from '../../../lib/dataCache';
 import {

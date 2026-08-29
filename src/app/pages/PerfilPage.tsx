@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, Camera, Save, KeyRound, Eye, EyeOff, Check, Mail, Shield, User, Calendar, Pencil, X } from 'lucide-react';
-import { uploadFileToSupabase } from '../components/painel/MiniWidgets';
+import { uploadFileToSupabase } from '../services/storageService';
 import { getMyProfile, updateMyAvatar, updateMyEmail, updateMyProfile, changeMyPassword } from '../services/profileService';
 
 const INPUT = "w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed";

@@ -6,12 +6,12 @@ import {
   Search, LayoutGrid, List, SortAsc, Pencil, Music
 } from 'lucide-react';
 import { InstrumentEvent, NewsArticle, MusicCourse, GalleryPhoto, GalleryVideo, Professor, Instrument } from '../../validations/types';
-import { RichTextEditor, ImageUploader, Toast, uploadFileToSupabase } from './MiniWidgets';
+import { RichTextEditor, ImageUploader, Toast } from './MiniWidgets';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { dataCache } from '../../../lib/dataCache';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../../services/coursesServices';
 import { getProfessors } from '../../services/professorsService';
-import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile } from '../../services/storageService';
+import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile, uploadFileToSupabase } from '../../services/storageService';
 import { getInstruments, createInstrument, updateInstrument, deleteInstrument } from '../../services/instrumentsServices';
 import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, mapEventToDb } from '../../services/eventsService';
 

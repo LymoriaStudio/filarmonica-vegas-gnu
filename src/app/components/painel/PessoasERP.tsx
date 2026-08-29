@@ -7,7 +7,8 @@ import {
   Instagram, Facebook, Youtube, Linkedin, MessageCircle, FileSpreadsheet, X, Calendar, Music2
 } from 'lucide-react';
 import { Professor, Student, Organizer, AuditLog } from '../../validations/types';
-import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
+import { ImageUploader } from './MiniWidgets';
+import { uploadFileToSupabase } from '../../services/storageService';
 import { getStudents, createStudent, updateStudent, updateStudentStatus, deleteStudent } from '../../services/studentsService';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { getProfessors, createProfessor, updateProfessor, updateProfessorHighlight, updateProfessorOrder, deleteProfessor } from '../../services/professorsService';

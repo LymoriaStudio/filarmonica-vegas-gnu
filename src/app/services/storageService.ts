@@ -14,6 +14,36 @@ export interface StorageMediaFile {
 }
 
 // ==========================================
+// UPLOAD — usado por todos os formulários do painel que sobem imagem/arquivo
+// ==========================================
+export async function uploadFileToSupabase(file: File, folder: string = 'uploads'): Promise<string> {
+  const safeName = file.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[^a-zA-Z0-9.\-_]/g, '_');
+
+  const path = `${folder}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message);
+  }
+
+  const { data: publicData } = supabase.storage
+    .from(BUCKET)
+    .getPublicUrl(path);
+
+  return publicData.publicUrl;
+}
+
+// ==========================================
 // LISTAR TODOS OS ARQUIVOS DE TODAS AS PASTAS
 // ==========================================
 export async function listAllMedia(): Promise<StorageMediaFile[]> {
