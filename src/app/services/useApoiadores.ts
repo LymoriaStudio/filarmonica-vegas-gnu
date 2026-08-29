@@ -34,3 +34,24 @@ export async function getApoiadoresAprovadosMinimal(): Promise<Pick<Apoiador, 'i
   if (error) throw new Error(error.message)
   return data ?? []
 }
+
+// GET — lista todos os pedidos de apoio, mais recentes primeiro (painel admin)
+export async function getApoiadores(): Promise<Apoiador[]> {
+  const { data, error } = await supabase
+    .from('quero_apoiar')
+    .select('*')
+    .order('date', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+// PATCH — troca de status (usado por promover/arquivar/desarquivar no painel admin)
+export async function updateApoiadorStatus(id: string, status: string): Promise<void> {
+  const { error } = await supabase
+    .from('quero_apoiar')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+}

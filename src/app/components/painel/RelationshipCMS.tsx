@@ -16,9 +16,10 @@ import {
   deleteInteressado,
   Interessado,
 } from '../../services/interessadosService';
+import { getApoiadores, updateApoiadorStatus } from '../../services/useApoiadores';
+import { createStudent } from '../../services/studentsService';
 import { SupportFormResponse, ContactMessage, Student, Supporter } from '../../validations/types';
 import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
-import { supabase } from '../../../lib/supabase';
 import { dataCache } from '../../../lib/dataCache';
 
 // ── Tipo local derivado da tabela Supabase ────────────────────────────────────
@@ -54,34 +55,6 @@ function toSupportView(row: any): SupportFormResponse & { rawDate: string } {
     status: row.status ?? 'pendente',
   };
 }
-
-// ── Mapper: ficha de matrícula (camelCase) -> tabela `alunos` (snake_case) ────
-const mapStudentFormToDb = (f: Partial<StudentEnrollmentForm>) => ({
-  photo: f.photo || null,
-  name: f.name,
-  birth_date: f.birthDate || null,
-  instrument: f.instrument,
-  classroom: f.classroom || null,
-  phone: f.phone,
-  email: f.email,
-  guardian: f.guardian || null,
-  address: f.address || null,
-  status: f.status || 'ativo',
-});
-
-const mapStudentFromDb = (row: any): Student => ({
-  id: row.id,
-  name: row.name,
-  birthDate: row.birth_date,
-  instrument: row.instrument,
-  classroom: row.classroom,
-  phone: row.phone,
-  email: row.email,
-  guardian: row.guardian,
-  address: row.address,
-  photo: row.photo,
-  status: row.status,
-});
 
 interface StudentEnrollmentForm {
   photo?: string;
@@ -220,19 +193,13 @@ export default function RelationshipCMS({
     setLoadingSupports(true);
     setErrorSupports(null);
 
-    supabase
-      .from('quero_apoiar')
-      .select('*')
-      .order('date', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setErrorSupports('Erro ao carregar apoiadores: ' + error.message);
-        } else {
-          const mapped = (data ?? []).map(toSupportView);
-          dataCache.set('quero_apoiar', mapped);
-          setSupports(mapped);
-        }
+    getApoiadores()
+      .then((data) => {
+        const mapped = data.map(toSupportView);
+        dataCache.set('quero_apoiar', mapped);
+        setSupports(mapped);
       })
+      .catch((err) => setErrorSupports('Erro ao carregar apoiadores: ' + err.message))
       .finally(() => setLoadingSupports(false));
   }, [subTab]);
 
@@ -281,21 +248,7 @@ export default function RelationshipCMS({
         finalPhoto = await uploadFileToSupabase(pendingPhotoFile, 'students');
       }
 
-      const payload = mapStudentFormToDb({ ...enrollForm, photo: finalPhoto });
-
-      const { data, error } = await supabase
-        .from('students')
-        .insert(payload)
-        .select()
-        .single();
-
-      if (error) {
-        console.error(error);
-        alert('Erro ao matricular aluno: ' + error.message);
-        return;
-      }
-
-      const newStudent = mapStudentFromDb(data);
+      const newStudent = await createStudent({ ...enrollForm, photo: finalPhoto });
       setStudents((prev) => [...prev, newStudent]);
 
       await updateInteressado(enrollSource.id, { status: 'convertido' });
@@ -332,12 +285,7 @@ export default function RelationshipCMS({
     }
 
     try {
-      const { error } = await supabase
-        .from('quero_apoiar')
-        .update({ status: 'aprovado', updated_at: new Date().toISOString() })
-        .eq('id', item.id);
-
-      if (error) throw error;
+      await updateApoiadorStatus(item.id, 'aprovado');
 
       const newSupporter: Supporter = {
         id: `sup-${Date.now()}`,
@@ -405,12 +353,7 @@ export default function RelationshipCMS({
   // ── ARQUIVAR apoiador (persiste no Supabase) ──────────────────────────────
   const handleArchiveSupport = async (id: string, name: string) => {
     try {
-      const { error } = await supabase
-        .from('quero_apoiar')
-        .update({ status: 'arquivado', updated_at: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) throw error;
+      await updateApoiadorStatus(id, 'arquivado');
 
       setSupports((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'arquivado' } : s)));
       addAuditLog('Arquivou Proposta Apoio', 'Relacionamento', `Arquivou proposta de: ${name}`);
@@ -421,12 +364,7 @@ export default function RelationshipCMS({
 
   const handleUnarchiveSupport = async (id: string, name: string) => {
     try {
-      const { error } = await supabase
-        .from('quero_apoiar')
-        .update({ status: 'pendente', updated_at: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) throw error;
+      await updateApoiadorStatus(id, 'pendente');
 
       setSupports((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'pendente' } : s)));
       addAuditLog('Desarquivou Proposta Apoio', 'Relacionamento', `Desarquivou proposta de: ${name}`);
