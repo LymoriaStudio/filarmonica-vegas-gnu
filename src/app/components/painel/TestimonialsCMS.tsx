@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InlineLoader } from '../../components/InlineLoader';
 import { Plus, Edit2, Trash2, Search, MessageSquare } from 'lucide-react';
-import { supabase } from '../../../lib/supabase';
 import { dataCache } from '../../../lib/dataCache';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
-
-interface Testimonial {
-  id: number;
-  name: string;
-  tag: string;
-  tag_detail: string;
-  text: string;
-  order: number;
-  active: boolean;
-}
+import { Testimonial, getAllTestimonials, createTestimonial, updateTestimonial, deleteTestimonial } from '../../services/testimonialsService';
 
 function getInitials(name: string) {
   const parts = name.trim().split(' ');
@@ -47,14 +37,9 @@ export default function TestimonialsCMS() {
     if (cached) { setItems(cached); setLoading(false); return; }
 
     setLoading(true);
-    supabase
-      .from('testimonials')
-      .select('*')
-      .order('order', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) { console.error(error); }
-        else { const d = data ?? []; dataCache.set('testimonials', d); setItems(d); }
-      })
+    getAllTestimonials()
+      .then(d => { dataCache.set('testimonials', d); setItems(d); })
+      .catch(err => console.error(err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -104,18 +89,16 @@ export default function TestimonialsCMS() {
       };
 
       if (active.id) {
-        const { data, error } = await supabase
-          .from('testimonials').update(payload).eq('id', active.id).select().single();
-        if (error) { alert('Erro ao atualizar: ' + error.message); return; }
+        const data = await updateTestimonial(active.id, payload);
         setItems(prev => prev.map(t => t.id === data.id ? data : t));
       } else {
-        const { data, error } = await supabase
-          .from('testimonials').insert(payload).select().single();
-        if (error) { alert('Erro ao criar: ' + error.message); return; }
+        const data = await createTestimonial(payload);
         setItems(prev => [...prev, data]);
       }
       setDrawerOpen(false);
       setActive(null);
+    } catch (err: any) {
+      alert((active.id ? 'Erro ao atualizar: ' : 'Erro ao criar: ') + err.message);
     } finally {
       setSaving(false);
     }
@@ -123,9 +106,12 @@ export default function TestimonialsCMS() {
 
   const handleDelete = async (t: Testimonial) => {
     if (!confirm(`Remover depoimento de "${t.name}"?`)) return;
-    const { error } = await supabase.from('testimonials').delete().eq('id', t.id);
-    if (error) { alert('Erro ao remover: ' + error.message); return; }
-    setItems(prev => prev.filter(x => x.id !== t.id));
+    try {
+      await deleteTestimonial(t.id);
+      setItems(prev => prev.filter(x => x.id !== t.id));
+    } catch (err: any) {
+      alert('Erro ao remover: ' + err.message);
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
