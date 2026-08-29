@@ -7,8 +7,10 @@ import {
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
 import { ImageUploader, uploadFileToSupabase } from './MiniWidgets';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
-import { supabase } from '../../../lib/supabase';
 import { dataCache } from '../../../lib/dataCache';
+import {
+  getAllBannersAdmin, createBanner, updateBanner, deleteBanner, updateBannerOrder, mapBannerToDb,
+} from '../../services/bannersService';
 
 interface SiteCMSProps {
   banners: Banner[];
@@ -23,39 +25,6 @@ interface SiteCMSProps {
   setSelectedEntityForEdit: (entity: any) => void;
   activeTab?: string;
 }
-
-// Map a row from the `banners` table (snake_case) to the app's Banner type (camelCase)
-const mapBannerFromDb = (row: any): Banner => ({
-  id: row.id,
-  imageDesktop: row.image_desktop,
-  imageMobile: row.image_mobile,
-  tag: row.tag,
-  title: row.title,
-  subtitle: row.subtitle,
-  text: row.text,
-  primaryBtnText: row.primary_btn_text,
-  primaryBtnLink: row.primary_btn_link,
-  secondaryBtnText: row.secondary_btn_text,
-  secondaryBtnLink: row.secondary_btn_link,
-  order: row.order,
-  status: row.status,
-});
-
-// Map a Banner (camelCase) into the snake_case payload the `banners` table expects
-const mapBannerToDb = (b: Partial<Banner>) => ({
-  image_desktop: b.imageDesktop,
-  image_mobile: b.imageMobile,
-  tag: b.tag || null,
-  title: b.title,
-  subtitle: b.subtitle || null,
-  text: b.text || null,
-  primary_btn_text: b.primaryBtnText || null,
-  primary_btn_link: b.primaryBtnLink || null,
-  secondary_btn_text: b.secondaryBtnText || null,
-  secondary_btn_link: b.secondaryBtnLink || null,
-  order: b.order ?? 0,
-  status: b.status || 'rascunho',
-});
 
 export default function SiteCMS({
   banners,
@@ -106,21 +75,15 @@ export default function SiteCMS({
       }
 
       setBannersLoading(true);
-      const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .order('order', { ascending: true });
-
-      if (error) {
-        console.error(error);
+      try {
+        const mapped = await getAllBannersAdmin();
+        dataCache.set('banners', mapped);
+        setBanners(mapped);
+      } catch (err) {
+        console.error(err);
+      } finally {
         setBannersLoading(false);
-        return;
       }
-
-      const mapped = (data || []).map(mapBannerFromDb);
-      dataCache.set('banners', mapped);
-      setBanners(mapped);
-      setBannersLoading(false);
     };
 
     fetchBanners();
@@ -207,46 +170,19 @@ export default function SiteCMS({
 
       if (Object.keys(shiftMap).length > 0) {
         await Promise.all(
-          Object.entries(shiftMap).map(([id, order]) =>
-            supabase.from('banners').update({ order }).eq('id', id)
-          )
+          Object.entries(shiftMap).map(([id, order]) => updateBannerOrder(id, order))
         );
         setBanners(prev => prev.map(b => shiftMap[b.id] !== undefined ? { ...b, order: shiftMap[b.id] } : b));
       }
 
       if (activeBanner.id) {
         // Edit
-        const { data, error } = await supabase
-          .from('banners')
-          .update(payload)
-          .eq('id', activeBanner.id)
-          .select()
-          .single();
-
-        if (error) {
-          console.error(error);
-          alert('Erro ao atualizar banner: ' + error.message);
-          return;
-        }
-
-        const updated = mapBannerFromDb(data);
+        const updated = await updateBanner(activeBanner.id, payload);
         setBanners(prev => prev.map(b => b.id === updated.id ? updated : b));
         addAuditLog('Editou Banner', 'Site Banners', `Alterou banner: ${updated.title}`);
       } else {
         // Add
-        const { data, error } = await supabase
-          .from('banners')
-          .insert(payload)
-          .select()
-          .single();
-
-        if (error) {
-          console.error(error);
-          alert('Erro ao criar banner: ' + error.message);
-          return;
-        }
-
-        const newBanner = mapBannerFromDb(data);
+        const newBanner = await createBanner(payload);
         setBanners(prev => [...prev, newBanner]);
         addAuditLog('Criou Banner', 'Site Banners', `Inseriu banner: ${newBanner.title}`);
       }
@@ -266,16 +202,14 @@ export default function SiteCMS({
   const handleDeleteBanner = async (id: string, name: string) => {
     if (!confirm(`Remover o banner "${name}"? Esta ação não pode ser desfeita.`)) return;
 
-    const { error } = await supabase.from('banners').delete().eq('id', id);
-
-    if (error) {
-      console.error(error);
-      alert('Erro ao remover banner: ' + error.message);
-      return;
+    try {
+      await deleteBanner(id);
+      setBanners(prev => prev.filter(b => b.id !== id));
+      addAuditLog('Deletou Banner', 'Site Banners', `Removeu banner de ID: ${id} (${name})`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao remover banner: ' + err.message);
     }
-
-    setBanners(prev => prev.filter(b => b.id !== id));
-    addAuditLog('Deletou Banner', 'Site Banners', `Removeu banner de ID: ${id} (${name})`);
   };
 
   const handleDuplicateBanner = async (b: Banner) => {
@@ -286,21 +220,14 @@ export default function SiteCMS({
       status: 'rascunho',
     });
 
-    const { data, error } = await supabase
-      .from('banners')
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) {
-      console.error(error);
-      alert('Erro ao duplicar banner: ' + error.message);
-      return;
+    try {
+      const dup = await createBanner(payload);
+      setBanners(prev => [...prev, dup]);
+      addAuditLog('Duplicou Banner', 'Site Banners', `Duplicou banner: ${b.title}`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Erro ao duplicar banner: ' + err.message);
     }
-
-    const dup = mapBannerFromDb(data);
-    setBanners(prev => [...prev, dup]);
-    addAuditLog('Duplicou Banner', 'Site Banners', `Duplicou banner: ${b.title}`);
   };
 
   const handleMoveBanner = async (index: number, direction: 'up' | 'down') => {
@@ -313,24 +240,23 @@ export default function SiteCMS({
     const aOrder = a.order;
     const bOrder = b.order;
 
-    const [{ error: err1 }, { error: err2 }] = await Promise.all([
-      supabase.from('banners').update({ order: bOrder }).eq('id', a.id),
-      supabase.from('banners').update({ order: aOrder }).eq('id', b.id),
-    ]);
+    try {
+      await Promise.all([
+        updateBannerOrder(a.id, bOrder),
+        updateBannerOrder(b.id, aOrder),
+      ]);
 
-    if (err1 || err2) {
-      console.error(err1, err2);
+      setBanners(prev => prev.map(banner => {
+        if (banner.id === a.id) return { ...banner, order: bOrder };
+        if (banner.id === b.id) return { ...banner, order: aOrder };
+        return banner;
+      }));
+
+      addAuditLog('Reordenou Banners', 'Site Banners', 'Alterou a disposição dos banners no carrossel institucional');
+    } catch (err) {
+      console.error(err);
       alert('Erro ao reordenar banners.');
-      return;
     }
-
-    setBanners(prev => prev.map(banner => {
-      if (banner.id === a.id) return { ...banner, order: bOrder };
-      if (banner.id === b.id) return { ...banner, order: aOrder };
-      return banner;
-    }));
-
-    addAuditLog('Reordenou Banners', 'Site Banners', 'Alterou a disposição dos banners no carrossel institucional');
   };
 
   // Sync cache whenever banners state changes after load
