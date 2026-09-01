@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { createClient } from '@supabase/supabase-js';
 import logoFilarmonica from '../../imports/LOGO_FILARM_NICA-1.png';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { login } from '../services/authService';
 
 export default function LoginPage() {
   const [email, setEmail]             = useState('');
@@ -20,11 +15,14 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    console.log({ data, authError });
-    setLoading(false);
-    if (authError || !data.session) { setError('E-mail ou senha incorretos. Tente novamente.'); return; }
-    navigate('/painel');
+    try {
+      await login(email, password);
+      navigate('/painel');
+    } catch {
+      setError('E-mail ou senha incorretos. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const INPUT = "w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all";

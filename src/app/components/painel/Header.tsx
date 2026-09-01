@@ -10,13 +10,8 @@ import {
 } from 'lucide-react';
 import { AdminNotification, Student, Professor, OrchestraEvent, NewsArticle } from '../../validations/types';
 import { useCurrentProfile } from '../../hooks/useCurrentProfile';
-import { createClient } from '@supabase/supabase-js';
+import { logout } from '../../services/authService';
 import { useNavigate } from 'react-router';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 const PAGE_LABELS: Record<string, string> = {
   'dashboard': 'Dashboard',
@@ -76,7 +71,7 @@ export default function Header({
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await logout();
     navigate('/login');
   };
 
