@@ -1,4 +1,4 @@
-import { supabase } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 
 export interface Instrument {
   id: string;
@@ -12,25 +12,35 @@ export interface Instrument {
   color: string;
 }
 
-function mapFromDb(row: any): Instrument {
+interface ApiInstrumentoDto {
+  id: string;
+  slug: string;
+  nome: string;
+  descricao: string;
+  descricaoLonga: string;
+  imagemUrl: string;
+  videoUrl: string | null;
+  cor: string;
+  galeriaUrls: string[];
+}
+
+function mapFromApi(dto: ApiInstrumentoDto): Instrument {
   return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    description: row.description,
-    longDescription: row.long_description,
-    image: row.image,
-    gallery: Array.isArray(row.gallery) ? row.gallery : [],
-    videoUrl: row.video_url ?? null,
-    color: row.color ?? '#001856',
+    id: dto.id,
+    slug: dto.slug,
+    name: dto.nome,
+    description: dto.descricao,
+    longDescription: dto.descricaoLonga,
+    image: dto.imagemUrl,
+    gallery: dto.galeriaUrls ?? [],
+    videoUrl: dto.videoUrl,
+    color: dto.cor || '#001856',
   };
 }
 
+// GET — lista de instrumentos (site institucional).
+// Fala com o backend próprio (filarmonica-api) — GET /api/instrumentos.
 export async function getInstruments(): Promise<Instrument[]> {
-  const { data, error } = await supabase
-    .from('instruments')
-    .select('*')
-    .order('created_at', { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapFromDb);
+  const data = await apiClient.get<ApiInstrumentoDto[]>('/api/instrumentos');
+  return data.map(mapFromApi);
 }

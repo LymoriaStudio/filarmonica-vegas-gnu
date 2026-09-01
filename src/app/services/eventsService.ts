@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 import { InstrumentEvent } from '../validations/types';
 
 export interface EventFromDb {
@@ -26,27 +27,66 @@ export interface GetEventsOptions {
   highlightedFirst?: boolean;
 }
 
-// GET — eventos, com filtro opcional por status e ordenação por destaque
+interface ApiEventoDto {
+  id: string;
+  imagemCapaUrl: string | null;
+  titulo: string;
+  descricao: string;
+  data: string;
+  horario: string | null;
+  local: string;
+  endereco: string | null;
+  googleMapsUrl: string | null;
+  categoria: string;
+  status: string;
+  destaque: boolean;
+  link: string | null;
+  pago: boolean;
+  valorIngresso: number | null;
+}
+
+interface ApiPagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+// GET — eventos, com filtro opcional por status e ordenação por destaque.
+// Fala com o backend próprio (filarmonica-api) — GET /api/eventos.
 export async function getEvents(options: GetEventsOptions = {}): Promise<EventFromDb[]> {
   const { onlyPublished = true, highlightedFirst = false } = options;
 
-  let query = supabase
-    .from('events')
-    .select('*')
-    .order('date', { ascending: true });
+  const params = new URLSearchParams({ pageSize: '200' });
+  if (onlyPublished) params.set('status', 'Publicado');
 
-  if (onlyPublished) {
-    query = query.eq('status', 'published');
-  }
+  const result = await apiClient.get<ApiPagedResult<ApiEventoDto>>(`/api/eventos?${params.toString()}`);
 
+  let items: EventFromDb[] = result.items.map(e => ({
+    id: e.id,
+    cover_image: e.imagemCapaUrl,
+    title: e.titulo,
+    description: e.descricao,
+    date: e.data,
+    time: e.horario ?? '',
+    venue: e.local,
+    address: e.endereco ?? '',
+    google_maps_url: e.googleMapsUrl,
+    category: e.categoria,
+    status: e.status.toLowerCase(),
+    highlighted: e.destaque,
+    link: e.link,
+    is_paid: e.pago,
+    ticket: e.valorIngresso,
+  }));
+
+  items.sort((a, b) => a.date.localeCompare(b.date));
   if (highlightedFirst) {
-    query = query.order('highlighted', { ascending: false });
+    items = [...items].sort((a, b) => Number(b.highlighted) - Number(a.highlighted));
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return (data as EventFromDb[]) ?? [];
+  return items;
 }
 
 // ── Mappers (snake_case DB <-> InstrumentEvent do painel admin) ────────────────
@@ -87,10 +127,17 @@ export const mapEventToDb = (e: Partial<InstrumentEvent>) => ({
 
 type EventDbPayload = ReturnType<typeof mapEventToDb>;
 
-// GET — todos os eventos (painel admin, sem filtro de status)
+// GET — todos os eventos (painel admin, sem filtro de status).
+// Continua no Supabase — o CRUD administrativo de eventos (ConteudoCMS.tsx)
+// ainda não foi migrado pro backend próprio.
 export async function getAllEventsAdmin(): Promise<InstrumentEvent[]> {
-  const data = await getEvents({ onlyPublished: false });
-  return data.map(mapEventFromDb);
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .order('date', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return ((data as EventFromDb[]) ?? []).map(mapEventFromDb);
 }
 
 // POST — cria evento

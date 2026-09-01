@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 import { Banner } from '../validations/types';
 
 export interface PublicBanner {
@@ -17,19 +18,46 @@ export interface PublicBanner {
   status: string;
 }
 
-// GET — banners ativos, ordenados (usado no Hero do site institucional)
-export async function getBannersAtivos(): Promise<PublicBanner[]> {
-  const { data, error } = await supabase
-    .from('banners')
-    .select('*')
-    .eq('status', 'ativo')
-    .order('order', { ascending: true });
+interface ApiBannerDto {
+  id: string;
+  imageDesktopUrl: string;
+  imageMobileUrl: string;
+  tag: string | null;
+  title: string;
+  subtitle: string | null;
+  text: string | null;
+  primaryBtnText: string | null;
+  primaryBtnLink: string | null;
+  secondaryBtnText: string | null;
+  secondaryBtnLink: string | null;
+  displayOrder: number;
+}
 
-  if (error) throw new Error(error.message);
-  return (data as PublicBanner[]) ?? [];
+// GET — banners ativos, ordenados (usado no Hero do site institucional).
+// Fala com o backend próprio (filarmonica-api) — já vem só com os ativos,
+// com a URL das imagens resolvida.
+export async function getBannersAtivos(): Promise<PublicBanner[]> {
+  const data = await apiClient.get<ApiBannerDto[]>('/api/banners/ativos');
+  return data.map(b => ({
+    id: b.id,
+    image_desktop: b.imageDesktopUrl,
+    image_mobile: b.imageMobileUrl,
+    tag: b.tag,
+    title: b.title,
+    subtitle: b.subtitle,
+    text: b.text,
+    primary_btn_text: b.primaryBtnText,
+    primary_btn_link: b.primaryBtnLink,
+    secondary_btn_text: b.secondaryBtnText,
+    secondary_btn_link: b.secondaryBtnLink,
+    order: b.displayOrder,
+    status: 'ativo',
+  }));
 }
 
 // ── Mappers (snake_case DB <-> Banner do painel admin) ─────────────────────────
+// Ainda usados só pelo CRUD administrativo (SiteCMS.tsx), que continua no
+// Supabase até a Fase 7 (admin) da migração.
 export const mapBannerFromDb = (row: any): Banner => ({
   id: row.id,
   imageDesktop: row.image_desktop,

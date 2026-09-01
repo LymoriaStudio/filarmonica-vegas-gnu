@@ -1,7 +1,8 @@
 import { supabase } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 
 export interface PublicTestimonial {
-  id: number;
+  id: string;
   name: string;
   tag: string;
   tag_detail: string;
@@ -9,20 +10,31 @@ export interface PublicTestimonial {
   order: number;
 }
 
-export interface Testimonial extends PublicTestimonial {
+export interface Testimonial extends Omit<PublicTestimonial, 'id'> {
+  id: number;
   active: boolean;
 }
 
-// GET — depoimentos ativos, ordenados (usado na seção pública de depoimentos)
-export async function getTestimonialsAtivos(): Promise<PublicTestimonial[]> {
-  const { data, error } = await supabase
-    .from('testimonials')
-    .select('id, name, tag, tag_detail, text, order')
-    .eq('active', true)
-    .order('order', { ascending: true });
+interface ApiDepoimentoDto {
+  id: string;
+  nome: string;
+  tag: string;
+  tagDetalhe: string;
+  texto: string;
+}
 
-  if (error) throw new Error(error.message);
-  return data ?? [];
+// GET — depoimentos ativos, ordenados (usado na seção pública de depoimentos).
+// Fala com o backend próprio (filarmonica-api) — já vem só os ativos, ordenados.
+export async function getTestimonialsAtivos(): Promise<PublicTestimonial[]> {
+  const data = await apiClient.get<ApiDepoimentoDto[]>('/api/depoimentos');
+  return data.map((d, i) => ({
+    id: d.id,
+    name: d.nome,
+    tag: d.tag,
+    tag_detail: d.tagDetalhe,
+    text: d.texto,
+    order: i,
+  }));
 }
 
 // GET — todos os depoimentos (painel admin), incluindo inativos
