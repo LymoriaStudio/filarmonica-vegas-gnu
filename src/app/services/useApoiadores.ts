@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { apiClient } from '../../lib/apiClient'
 
 export interface Apoiador {
   id?: string
@@ -14,14 +15,24 @@ export interface Apoiador {
   updated_at?: string
 }
 
+// Fala com o backend próprio (filarmonica-api) — POST /api/pedidos-apoio.
+// Continua sendo o formulário público "quero apoiar" (Contact.tsx).
+//
+// ⚠️ Grava no banco NOVO, separado do Supabase que getApoiadores()/
+// RelationshipCMS.tsx ainda leem — até a Fase 9 (migração de dados) rodar,
+// pedidos feitos aqui NÃO aparecem no painel administrativo. Não fazer
+// deploy deste branch em produção antes da Fase 9.
 export async function createApoiador(
   payload: Omit<Apoiador, 'id' | 'date' | 'status' | 'created_at' | 'updated_at'>
 ): Promise<void> {
-  const { error } = await supabase
-    .from('quero_apoiar')
-    .insert([payload])
-
-  if (error) throw error
+  await apiClient.post('/api/pedidos-apoio', {
+    nome: payload.name,
+    empresa: payload.company ?? null,
+    email: payload.email,
+    telefone: payload.phone,
+    tipoApoio: payload.support_type,
+    mensagem: payload.message ?? null,
+  })
 }
 
 // GET — só id/status/created_at dos aprovados, usado para agregações (dashboard)
