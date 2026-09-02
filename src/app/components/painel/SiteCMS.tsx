@@ -7,10 +7,12 @@ import {
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
 import { uploadFileToSupabase } from '../../services/storageService';
+import { uploadMedia } from '../../services/mediaService';
+import { resolveMediaUrl } from '../../../lib/apiClient';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { dataCache } from '../../../lib/dataCache';
 import {
-  getAllBannersAdmin, createBanner, updateBanner, deleteBanner, updateBannerOrder, mapBannerToDb,
+  getAllBannersAdmin, createBanner, updateBanner, deleteBanner, BannerFormPayload,
 } from '../../services/bannersService';
 
 interface SiteCMSProps {
@@ -133,60 +135,48 @@ export default function SiteCMS({
     setBannerSaving(true);
 
     try {
-      let finalImageDesktop = activeBanner.imageDesktop;
-      let finalImageMobile = activeBanner.imageMobile;
+      let finalImageDesktop = activeBanner.imageDesktop!;
+      let finalImageMobile = activeBanner.imageMobile!;
 
-      // Faz o upload real para o Supabase Storage somente agora,
-      // no momento de confirmar e salvar.
+      // Faz o upload real somente agora, no momento de confirmar e salvar.
+      // uploadMedia devolve o caminho relativo — é isso que a API espera de volta,
+      // nunca a URL absoluta.
       if (pendingDesktopFile) {
-        finalImageDesktop = await uploadFileToSupabase(pendingDesktopFile, 'banners');
+        finalImageDesktop = (await uploadMedia(pendingDesktopFile, 'banners')).caminhoRelativo;
       }
       if (pendingMobileFile) {
-        finalImageMobile = await uploadFileToSupabase(pendingMobileFile, 'banners');
+        finalImageMobile = (await uploadMedia(pendingMobileFile, 'banners')).caminhoRelativo;
       }
 
-      const payload = mapBannerToDb({
-        ...activeBanner,
+      const payload: BannerFormPayload = {
         imageDesktop: finalImageDesktop,
         imageMobile: finalImageMobile,
-      });
+        tag: activeBanner.tag,
+        title: activeBanner.title!,
+        subtitle: activeBanner.subtitle,
+        text: activeBanner.text,
+        primaryBtnText: activeBanner.primaryBtnText,
+        primaryBtnLink: activeBanner.primaryBtnLink,
+        secondaryBtnText: activeBanner.secondaryBtnText,
+        secondaryBtnLink: activeBanner.secondaryBtnLink,
+        order: activeBanner.order!,
+        status: activeBanner.status!,
+      };
 
-      // Reorder: when the new order collides with an existing banner, push all subsequent ones down by 1
-      const newOrder = activeBanner.order;
-      const othersAtOrAbove = banners
-        .filter(b => b.id !== activeBanner.id && b.order >= newOrder)
-        .sort((a, b) => a.order - b.order);
-
-      // Walk through sorted list; shift each one that would collide with the previous
-      const shiftMap: Record<string, number> = {};
-      let expectedNext = newOrder + 1;
-      for (const b of othersAtOrAbove) {
-        if (b.order < expectedNext) {
-          shiftMap[b.id] = expectedNext;
-          expectedNext++;
-        } else {
-          expectedNext = b.order + 1; // no collision, reset chain
-        }
-      }
-
-      if (Object.keys(shiftMap).length > 0) {
-        await Promise.all(
-          Object.entries(shiftMap).map(([id, order]) => updateBannerOrder(id, order))
-        );
-        setBanners(prev => prev.map(b => shiftMap[b.id] !== undefined ? { ...b, order: shiftMap[b.id] } : b));
-      }
-
+      // A reordenação por colisão de `order` é resolvida no próprio backend
+      // (BannerAdminService) — não precisa mais calcular a cadeia aqui.
       if (activeBanner.id) {
-        // Edit
         const updated = await updateBanner(activeBanner.id, payload);
-        setBanners(prev => prev.map(b => b.id === updated.id ? updated : b));
         addAuditLog('Editou Banner', 'Site Banners', `Alterou banner: ${updated.title}`);
       } else {
-        // Add
         const newBanner = await createBanner(payload);
-        setBanners(prev => [...prev, newBanner]);
         addAuditLog('Criou Banner', 'Site Banners', `Inseriu banner: ${newBanner.title}`);
       }
+
+      // Recarrega a lista inteira — o backend pode ter deslocado a ordem de
+      // outros banners, então o estado local não pode ser calculado à mão.
+      const refreshed = await getAllBannersAdmin();
+      setBanners(refreshed);
 
       setBannerModalOpen(false);
       setActiveBanner(null);
@@ -194,7 +184,7 @@ export default function SiteCMS({
       setPendingMobileFile(null);
     } catch (err: any) {
       console.error(err);
-      alert('Erro ao enviar imagens: ' + err.message);
+      alert('Erro ao salvar banner: ' + err.message);
     } finally {
       setBannerSaving(false);
     }
@@ -214,16 +204,24 @@ export default function SiteCMS({
   };
 
   const handleDuplicateBanner = async (b: Banner) => {
-    const payload = mapBannerToDb({
-      ...b,
+    const payload: BannerFormPayload = {
+      imageDesktop: b.imageDesktop,
+      imageMobile: b.imageMobile,
       title: `${b.title} (Cópia)`,
+      subtitle: b.subtitle,
+      text: b.text,
+      primaryBtnText: b.primaryBtnText,
+      primaryBtnLink: b.primaryBtnLink,
+      secondaryBtnText: b.secondaryBtnText,
+      secondaryBtnLink: b.secondaryBtnLink,
       order: BannersSorted().length + 1,
       status: 'rascunho',
-    });
+    };
 
     try {
-      const dup = await createBanner(payload);
-      setBanners(prev => [...prev, dup]);
+      await createBanner(payload);
+      const refreshed = await getAllBannersAdmin();
+      setBanners(refreshed);
       addAuditLog('Duplicou Banner', 'Site Banners', `Duplicou banner: ${b.title}`);
     } catch (err: any) {
       console.error(err);
@@ -238,25 +236,35 @@ export default function SiteCMS({
 
     const a = sorted[index];
     const b = sorted[newIdx];
-    const aOrder = a.order;
-    const bOrder = b.order;
+
+    const toPayload = (banner: Banner, order: number): BannerFormPayload => ({
+      imageDesktop: banner.imageDesktop,
+      imageMobile: banner.imageMobile,
+      title: banner.title,
+      subtitle: banner.subtitle,
+      text: banner.text,
+      primaryBtnText: banner.primaryBtnText,
+      primaryBtnLink: banner.primaryBtnLink,
+      secondaryBtnText: banner.secondaryBtnText,
+      secondaryBtnLink: banner.secondaryBtnLink,
+      order,
+      status: banner.status,
+    });
 
     try {
-      await Promise.all([
-        updateBannerOrder(a.id, bOrder),
-        updateBannerOrder(b.id, aOrder),
-      ]);
+      // Move o de baixo pra ordem do de cima primeiro — o backend desloca o
+      // restante automaticamente ao detectar a colisão, então uma única troca
+      // de posição já basta; a lista é recarregada por inteiro no final para
+      // refletir a ordem definitiva calculada pelo backend.
+      await updateBanner(a.id, toPayload(a, b.order));
 
-      setBanners(prev => prev.map(banner => {
-        if (banner.id === a.id) return { ...banner, order: bOrder };
-        if (banner.id === b.id) return { ...banner, order: aOrder };
-        return banner;
-      }));
+      const refreshed = await getAllBannersAdmin();
+      setBanners(refreshed);
 
       addAuditLog('Reordenou Banners', 'Site Banners', 'Alterou a disposição dos banners no carrossel institucional');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Erro ao reordenar banners.');
+      alert('Erro ao reordenar banners: ' + err.message);
     }
   };
 
@@ -408,8 +416,8 @@ export default function SiteCMS({
                 >
                   {/* Visual Banner Preview Container */}
                   <div className="h-40 relative bg-gray-100 flex items-center justify-center">
-                    <img 
-                      src={b.imageDesktop} 
+                    <img
+                      src={resolveMediaUrl(b.imageDesktop)}
                       alt={b.title} 
                       referrerPolicy="no-referrer"
                       className="absolute inset-0 w-full h-full object-cover"
@@ -529,7 +537,7 @@ export default function SiteCMS({
               <DrawerField label="Imagem Desktop">
                 {activeBanner.imageDesktop && (
                   <div className="relative mb-2">
-                    <img src={activeBanner.imageDesktop} alt="Desktop" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded border border-gray-200" />
+                    <img src={resolveMediaUrl(activeBanner.imageDesktop)} alt="Desktop" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded border border-gray-200" />
                     <button type="button" onClick={() => { setPendingDesktopFile(null); setActiveBanner(prev => prev ? { ...prev, imageDesktop: '' } : prev); }} className="absolute -top-2.5 -right-2.5 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
                   </div>
                 )}
@@ -538,7 +546,7 @@ export default function SiteCMS({
               <DrawerField label="Imagem Mobile">
                 {activeBanner.imageMobile && (
                   <div className="relative mb-2">
-                    <img src={activeBanner.imageMobile} alt="Mobile" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded border border-gray-200" />
+                    <img src={resolveMediaUrl(activeBanner.imageMobile)} alt="Mobile" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded border border-gray-200" />
                     <button type="button" onClick={() => { setPendingMobileFile(null); setActiveBanner(prev => prev ? { ...prev, imageMobile: '' } : prev); }} className="absolute -top-2.5 -right-2.5 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
                   </div>
                 )}

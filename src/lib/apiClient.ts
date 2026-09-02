@@ -10,6 +10,11 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5080';
 
+// Onde os arquivos enviados (fotos/PDFs) ficam publicamente acessíveis — precisa
+// bater com FileStorage:PublicBaseUrl configurado na API. Por padrão, assume
+// que a própria API serve os arquivos em /media (ver Program.cs, UseStaticFiles).
+const MEDIA_BASE_URL = import.meta.env.VITE_MEDIA_BASE_URL ?? `${API_BASE_URL}/media`;
+
 const ACCESS_TOKEN_KEY = 'fm_access_token';
 const REFRESH_TOKEN_KEY = 'fm_refresh_token';
 
@@ -151,4 +156,16 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
 
 export function resolveApiUrl(relativePath: string): string {
   return `${API_BASE_URL}${relativePath.startsWith('/') ? '' : '/'}${relativePath}`;
+}
+
+// Resolve o caminho relativo salvo pelas entidades (Banner.ImageDesktop, etc.)
+// para uma URL exibível em <img src>. Se já vier uma URL absoluta (ex: os DTOs
+// de leitura pública, que o backend já resolve), devolve como está.
+export function resolveMediaUrl(pathOrUrl: string | null | undefined): string {
+  if (!pathOrUrl) return '';
+  // Já é uma URL utilizável como está: http(s) (o backend já resolveu),
+  // blob: (preview local de um arquivo recém-selecionado, ainda não enviado)
+  // ou data: (ex: imagem embutida inline).
+  if (/^(https?:|blob:|data:)/i.test(pathOrUrl)) return pathOrUrl;
+  return `${MEDIA_BASE_URL}/${pathOrUrl.replace(/^\/+/, '')}`;
 }

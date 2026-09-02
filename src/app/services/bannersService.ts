@@ -1,4 +1,3 @@
-import { supabase } from '../../lib/supabase';
 import { apiClient } from '../../lib/apiClient';
 import { Banner } from '../validations/types';
 
@@ -55,76 +54,97 @@ export async function getBannersAtivos(): Promise<PublicBanner[]> {
   }));
 }
 
-// ── Mappers (snake_case DB <-> Banner do painel admin) ─────────────────────────
-// Ainda usados só pelo CRUD administrativo (SiteCMS.tsx), que continua no
-// Supabase até a Fase 7 (admin) da migração.
-export const mapBannerFromDb = (row: any): Banner => ({
-  id: row.id,
-  imageDesktop: row.image_desktop,
-  imageMobile: row.image_mobile,
-  tag: row.tag,
-  title: row.title,
-  subtitle: row.subtitle,
-  text: row.text,
-  primaryBtnText: row.primary_btn_text,
-  primaryBtnLink: row.primary_btn_link,
-  secondaryBtnText: row.secondary_btn_text,
-  secondaryBtnLink: row.secondary_btn_link,
-  order: row.order,
-  status: row.status,
-});
-
-export const mapBannerToDb = (b: Partial<Banner>) => ({
-  image_desktop: b.imageDesktop,
-  image_mobile: b.imageMobile,
-  tag: b.tag || null,
-  title: b.title,
-  subtitle: b.subtitle || null,
-  text: b.text || null,
-  primary_btn_text: b.primaryBtnText || null,
-  primary_btn_link: b.primaryBtnLink || null,
-  secondary_btn_text: b.secondaryBtnText || null,
-  secondary_btn_link: b.secondaryBtnLink || null,
-  order: b.order ?? 0,
-  status: b.status || 'rascunho',
-});
-
-type BannerDbPayload = ReturnType<typeof mapBannerToDb>;
-
-// GET — todos os banners (painel admin, qualquer status), ordenados
-export async function getAllBannersAdmin(): Promise<Banner[]> {
-  const { data, error } = await supabase
-    .from('banners')
-    .select('*')
-    .order('order', { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return (data || []).map(mapBannerFromDb);
+// ── Admin (SiteCMS.tsx) ─────────────────────────────────────────────────────
+// AdminBannerDto expõe o caminho RELATIVO cru de imageDesktop/imageMobile
+// (não a URL resolvida) — é o que create/update esperam de volta.
+interface AdminBannerDto {
+  id: string;
+  imageDesktop: string;
+  imageMobile: string;
+  tag: string | null;
+  title: string;
+  subtitle: string | null;
+  text: string | null;
+  primaryBtnText: string | null;
+  primaryBtnLink: string | null;
+  secondaryBtnText: string | null;
+  secondaryBtnLink: string | null;
+  displayOrder: number;
+  status: string;
 }
 
-// POST — cria banner
-export async function createBanner(payload: BannerDbPayload): Promise<Banner> {
-  const { data, error } = await supabase.from('banners').insert(payload).select().single();
-  if (error) throw new Error(error.message);
-  return mapBannerFromDb(data);
+function mapAdminDtoToBanner(dto: AdminBannerDto): Banner {
+  return {
+    id: dto.id,
+    imageDesktop: dto.imageDesktop,
+    imageMobile: dto.imageMobile,
+    title: dto.title,
+    subtitle: dto.subtitle ?? '',
+    text: dto.text ?? '',
+    primaryBtnText: dto.primaryBtnText ?? '',
+    primaryBtnLink: dto.primaryBtnLink ?? '',
+    secondaryBtnText: dto.secondaryBtnText ?? '',
+    secondaryBtnLink: dto.secondaryBtnLink ?? '',
+    order: dto.displayOrder,
+    status: dto.status.toLowerCase() as Banner['status'],
+    ...(dto.tag ? { tag: dto.tag } : {}),
+  } as Banner;
+}
+
+export interface BannerFormPayload {
+  imageDesktop: string; // caminho relativo (de mediaService.uploadMedia)
+  imageMobile: string;
+  tag?: string | null;
+  title: string;
+  subtitle?: string | null;
+  text?: string | null;
+  primaryBtnText?: string | null;
+  primaryBtnLink?: string | null;
+  secondaryBtnText?: string | null;
+  secondaryBtnLink?: string | null;
+  order: number;
+  status: 'ativo' | 'rascunho' | 'agendado';
+}
+
+function toApiPayload(b: BannerFormPayload) {
+  const capitalized = b.status.charAt(0).toUpperCase() + b.status.slice(1);
+  return {
+    imageDesktop: b.imageDesktop,
+    imageMobile: b.imageMobile,
+    tag: b.tag || null,
+    title: b.title,
+    subtitle: b.subtitle || null,
+    text: b.text || null,
+    primaryBtnText: b.primaryBtnText || null,
+    primaryBtnLink: b.primaryBtnLink || null,
+    secondaryBtnText: b.secondaryBtnText || null,
+    secondaryBtnLink: b.secondaryBtnLink || null,
+    displayOrder: b.order,
+    status: capitalized,
+  };
+}
+
+// GET — todos os banners (painel admin, qualquer status)
+export async function getAllBannersAdmin(): Promise<Banner[]> {
+  const data = await apiClient.get<AdminBannerDto[]>('/api/admin/banners');
+  return data.map(mapAdminDtoToBanner).sort((a, b) => a.order - b.order);
+}
+
+// POST — cria banner. A reordenação por colisão de `order` é feita no
+// próprio backend (BannerAdminService) — o front não precisa mais calcular
+// a cadeia de deslocamento manualmente.
+export async function createBanner(payload: BannerFormPayload): Promise<Banner> {
+  const dto = await apiClient.post<AdminBannerDto>('/api/admin/banners', toApiPayload(payload));
+  return mapAdminDtoToBanner(dto);
 }
 
 // PUT — atualiza banner
-export async function updateBanner(id: string, payload: BannerDbPayload): Promise<Banner> {
-  const { data, error } = await supabase.from('banners').update(payload).eq('id', id).select().single();
-  if (error) throw new Error(error.message);
-  return mapBannerFromDb(data);
+export async function updateBanner(id: string, payload: BannerFormPayload): Promise<Banner> {
+  const dto = await apiClient.put<AdminBannerDto>(`/api/admin/banners/${id}`, toApiPayload(payload));
+  return mapAdminDtoToBanner(dto);
 }
 
 // DELETE — remove banner
 export async function deleteBanner(id: string): Promise<void> {
-  const { error } = await supabase.from('banners').delete().eq('id', id);
-  if (error) throw new Error(error.message);
-}
-
-// PATCH — só a ordem (usado tanto pelo swap de mover ↑/↓ quanto pela cadeia de
-// deslocamento quando uma nova ordem colide com um banner já existente)
-export async function updateBannerOrder(id: string, order: number): Promise<void> {
-  const { error } = await supabase.from('banners').update({ order }).eq('id', id);
-  if (error) throw new Error(error.message);
+  await apiClient.delete(`/api/admin/banners/${id}`);
 }
