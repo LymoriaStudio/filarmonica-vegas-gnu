@@ -12,6 +12,8 @@ import { uploadFileToSupabase } from '../../services/storageService';
 import { getStudents, createStudent, updateStudent, updateStudentStatus, deleteStudent } from '../../services/studentsService';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { getProfessors, createProfessor, updateProfessor, updateProfessorHighlight, updateProfessorOrder, deleteProfessor } from '../../services/professorsService';
+import { uploadMedia } from '../../services/mediaService';
+import { resolveMediaUrl } from '../../../lib/apiClient';
 
 interface PessoasERPProps {
   professors: Professor[];
@@ -136,7 +138,8 @@ const handleSaveProf = async (e: React.FormEvent) => {
   try {
     let finalPhoto = activeProf.photo;
     if (pendingProfPhoto) {
-      finalPhoto = await uploadFileToSupabase(pendingProfPhoto, 'professors');
+      const uploaded = await uploadMedia(pendingProfPhoto, 'professors');
+      finalPhoto = uploaded.caminhoRelativo;
     }  else if (!finalPhoto) {
       finalPhoto = getProfessorAvatarFallback(activeProf.name); }
 
@@ -169,8 +172,10 @@ const handleSaveProf = async (e: React.FormEvent) => {
 };
 
 const handleToggleHighlightProf = async (id: string, name: string, active: boolean) => {
+  const current = professors.find(p => p.id === id);
+  if (!current) return;
   try {
-    await updateProfessorHighlight(id, active);
+    await updateProfessorHighlight(current, active);
     setProfessors(prev => prev.map(p => p.id === id ? { ...p, highlighted: active } : p));
     addAuditLog('Destacou Professor', 'Professores', `${active ? 'Destacou' : 'Ocultou'} ${name}`);
   } catch (err: any) {
@@ -189,8 +194,8 @@ const handleOrderProf = async (index: number, direction: 'up' | 'down') => {
 
   try {
     await Promise.all([
-      updateProfessorOrder(a.id, b.order),
-      updateProfessorOrder(b.id, tempOrder),
+      updateProfessorOrder(a, b.order),
+      updateProfessorOrder(b, tempOrder),
     ]);
     setProfessors(prev => prev.map(p => {
       if (p.id === a.id) return { ...p, order: b.order };
@@ -601,7 +606,7 @@ const handleUnarchiveStudent = async (id: string, name: string) => {
                  }}
                     alt={prof.name} 
                     referrerPolicy="no-referrer"
-                    src={prof.photo || getProfessorAvatarFallback(prof.name)} 
+                    src={(prof.photo && resolveMediaUrl(prof.photo)) || getProfessorAvatarFallback(prof.name)}
                     className="w-14 h-14 object-cover rounded-lg border border-gray-200 shrink-0"
                   />
                   <div className="min-w-0">
@@ -1201,7 +1206,7 @@ const handleUnarchiveStudent = async (id: string, name: string) => {
 
           <DrawerSection title="Foto" optional>
             <ImageUploader
-              bg={activeProf.photo && activeProf.photo}
+              bg={activeProf.photo ? resolveMediaUrl(activeProf.photo) : undefined}
               allowedTypes="Imagens (.jpg, .png, .webp)"
               onFileSelected={(file, previewUrl) => {
                 setPendingProfPhoto(file);
