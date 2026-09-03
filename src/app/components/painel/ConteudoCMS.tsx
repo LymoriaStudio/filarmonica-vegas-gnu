@@ -13,7 +13,8 @@ import { getCourses, createCourse, updateCourse, deleteCourse } from '../../serv
 import { getProfessors } from '../../services/professorsService';
 import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile, uploadFileToSupabase } from '../../services/storageService';
 import { getInstruments, createInstrument, updateInstrument, deleteInstrument } from '../../services/instrumentsServices';
-import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, mapEventToDb } from '../../services/eventsService';
+import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, uploadEventCover, mapEventToDb } from '../../services/eventsService';
+import { resolveMediaUrl } from '../../../lib/apiClient';
 
 
 interface ConteudoCMSProps {
@@ -251,9 +252,10 @@ export default function ConteudoCMS({
     try {
       let finalCover = activeEvent.cover;
 
-      // Faz o upload da capa somente agora, ao confirmar/salvar
+      // Faz o upload da capa somente agora, ao confirmar/salvar.
+      // Devolve o caminho relativo — é isso que a API espera gravar.
       if (pendingEventCoverFile) {
-        finalCover = await uploadFileToSupabase(pendingEventCoverFile, 'eventos');
+        finalCover = await uploadEventCover(pendingEventCoverFile);
       }
 
       const payload = mapEventToDb({
@@ -317,9 +319,11 @@ export default function ConteudoCMS({
   };
 
   const handleToggleFeatureEvent = async (id: string, title: string, active: boolean) => {
+    const current = events.find(e => e.id === id);
+    if (!current) return;
     try {
-      await updateEventHighlighted(id, active);
-      setEvents(prev => prev.map(e => e.id === id ? { ...e, featured: active } : e));
+      const updated = await updateEventHighlighted(current, active);
+      setEvents(prev => prev.map(e => e.id === id ? updated : e));
       addAuditLog('Destacou Evento', 'Conteúdo', `${active ? 'Destacou' : 'Removeu destaque'} do evento: ${title}`);
     } catch (err: any) {
       console.error(err);
@@ -702,7 +706,7 @@ export default function ConteudoCMS({
                   {/* Cover image */}
                   <div className="relative">
                     <img
-                      src={evt.cover}
+                      src={resolveMediaUrl(evt.cover)}
                       alt={evt.title}
                       referrerPolicy="no-referrer"
                       className="w-full h-40 object-cover bg-gray-50"
@@ -802,7 +806,7 @@ export default function ConteudoCMS({
                 >
                   {/* Thumb */}
                   <img
-                    src={evt.cover}
+                    src={resolveMediaUrl(evt.cover)}
                     alt={evt.title}
                     referrerPolicy="no-referrer"
                     className="w-14 h-14 object-cover rounded-lg shrink-0 bg-gray-50"
@@ -1300,7 +1304,7 @@ export default function ConteudoCMS({
           <DrawerSection title="Imagem de Capa">
             {activeEvent.cover && (
               <div className="relative">
-                <img src={activeEvent.cover} alt="Capa" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded-xl border border-gray-200" />
+                <img src={resolveMediaUrl(activeEvent.cover)} alt="Capa" referrerPolicy="no-referrer" className="w-full h-36 object-cover rounded-xl border border-gray-200" />
                 <button type="button" onClick={() => setActiveEvent(prev => prev ? { ...prev, cover: undefined } : prev)} className="absolute -top-2.5 -right-2.5 z-10 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
               </div>
             )}
