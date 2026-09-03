@@ -1,103 +1,118 @@
-import { supabase } from '../../lib/supabase';
-import { Instrument } from '../validations/types';
+import { apiClient } from '../../lib/apiClient';
+import { uploadMedia } from './mediaService';
 
-const TABLE = 'instruments';
-
-// ==========================================
-// MAPPERS: instrumentos (snake_case <-> camelCase)
-// ==========================================
-const mapInstrumentFromDb = (row: any): Instrument => ({
-  id: row.id,
-  slug: row.slug,
-  name: row.name,
-  description: row.description,
-  longDescription: row.long_description,
-  image: row.image,
-  gallery: Array.isArray(row.gallery) ? row.gallery : [],
-  videoUrl: row.video_url,
-  color: row.color,
-});
-
-const mapInstrumentToDb = (instrument: Partial<Instrument>) => ({
-  slug: instrument.slug,
-  name: instrument.name,
-  description: instrument.description,
-  long_description: instrument.longDescription,
-  image: instrument.image,
-  gallery: instrument.gallery ?? [],
-  video_url: instrument.videoUrl || null,
-  color: instrument.color || null,
-});
-
-// ==========================================
-// GET (listar todos os instrumentos)
-// ==========================================
-export async function getInstruments(): Promise<Instrument[]> {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Erro ao buscar instrumentos:', error);
-    throw error;
-  }
-
-  return (data || []).map(mapInstrumentFromDb);
+export interface AdminInstrumentFoto {
+  id: string;
+  url: string; // caminho relativo cru
 }
 
-// ==========================================
-// POST (criar novo instrumento)
-// ==========================================
-export async function createInstrument(instrument: Partial<Instrument>): Promise<Instrument> {
-  const payload = mapInstrumentToDb(instrument);
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert(payload)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro ao criar instrumento:', error);
-    throw error;
-  }
-
-  return mapInstrumentFromDb(data);
+export interface AdminInstrument {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  longDescription: string;
+  image: string; // caminho relativo cru
+  videoUrl: string | null;
+  color: string;
+  gallery: AdminInstrumentFoto[];
 }
 
-// ==========================================
-// PUT (atualizar instrumento existente)
-// ==========================================
-export async function updateInstrument(id: string, instrument: Partial<Instrument>): Promise<Instrument> {
-  const payload = mapInstrumentToDb(instrument);
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro ao atualizar instrumento:', error);
-    throw error;
-  }
-
-  return mapInstrumentFromDb(data);
+interface AdminInstrumentoFotoDto {
+  id: string;
+  url: string;
+  ordem: number;
 }
 
-// ==========================================
+interface AdminInstrumentoDto {
+  id: string;
+  slug: string;
+  nome: string;
+  descricao: string;
+  descricaoLonga: string;
+  imagem: string;
+  videoUrl: string | null;
+  cor: string;
+  galeria: AdminInstrumentoFotoDto[];
+}
+
+function mapDto(dto: AdminInstrumentoDto): AdminInstrument {
+  return {
+    id: dto.id,
+    slug: dto.slug,
+    name: dto.nome,
+    description: dto.descricao,
+    longDescription: dto.descricaoLonga,
+    image: dto.imagem,
+    videoUrl: dto.videoUrl,
+    color: dto.cor,
+    gallery: [...dto.galeria].sort((a, b) => a.ordem - b.ordem).map(f => ({ id: f.id, url: f.url })),
+  };
+}
+
+export interface InstrumentFormPayload {
+  slug: string;
+  name: string;
+  description: string;
+  longDescription: string;
+  image: string; // caminho relativo (de mediaService.uploadMedia)
+  videoUrl?: string | null;
+  color?: string;
+}
+
+function toApiPayload(p: InstrumentFormPayload) {
+  return {
+    slug: p.slug,
+    nome: p.name,
+    descricao: p.description,
+    descricaoLonga: p.longDescription,
+    imagem: p.image,
+    videoUrl: p.videoUrl || null,
+    cor: p.color || '#001856',
+  };
+}
+
+// GET (listar todos os instrumentos, painel admin)
+export async function getInstruments(): Promise<AdminInstrument[]> {
+  const data = await apiClient.get<AdminInstrumentoDto[]>('/api/admin/instrumentos');
+  return data.map(mapDto);
+}
+
+// POST (criar novo instrumento) — sem galeria; fotos são adicionadas depois,
+// via addInstrumentPhoto, uma vez que o instrumento já tem id.
+export async function createInstrument(payload: InstrumentFormPayload): Promise<AdminInstrument> {
+  const dto = await apiClient.post<AdminInstrumentoDto>('/api/admin/instrumentos', toApiPayload(payload));
+  return mapDto(dto);
+}
+
+// PUT (atualizar instrumento existente) — idem, sem galeria no corpo
+export async function updateInstrument(id: string, payload: InstrumentFormPayload): Promise<AdminInstrument> {
+  const dto = await apiClient.put<AdminInstrumentoDto>(`/api/admin/instrumentos/${id}`, toApiPayload(payload));
+  return mapDto(dto);
+}
+
 // DELETE (remover instrumento)
-// ==========================================
 export async function deleteInstrument(id: string): Promise<void> {
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .eq('id', id);
+  await apiClient.delete(`/api/admin/instrumentos/${id}`);
+}
 
-  if (error) {
-    console.error('Erro ao remover instrumento:', error);
-    throw error;
-  }
+// Upload da imagem principal ou de uma foto de galeria — devolve o caminho
+// relativo, que é o que a API espera gravar (nunca a URL absoluta).
+export async function uploadInstrumentImage(file: File): Promise<string> {
+  const { caminhoRelativo } = await uploadMedia(file, 'instruments');
+  return caminhoRelativo;
+}
+
+// Adiciona uma foto à galeria (tabela InstrumentoFoto no backend — não é mais
+// um array na própria linha do instrumento). Devolve o instrumento atualizado.
+export async function addInstrumentPhoto(instrumentId: string, file: File): Promise<AdminInstrument> {
+  const caminhoRelativo = await uploadInstrumentImage(file);
+  const dto = await apiClient.post<AdminInstrumentoDto>(`/api/admin/instrumentos/${instrumentId}/fotos`, { url: caminhoRelativo });
+  return mapDto(dto);
+}
+
+// Remove uma foto da galeria pelo id da foto (não mais pela URL).
+export async function removeInstrumentPhoto(instrumentId: string, fotoId: string): Promise<AdminInstrument> {
+  const dto = await apiClient.delete<AdminInstrumentoDto>(`/api/admin/instrumentos/${instrumentId}/fotos/${fotoId}`);
+  return mapDto(dto);
 }

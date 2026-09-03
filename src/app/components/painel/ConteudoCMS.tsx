@@ -12,7 +12,10 @@ import { dataCache } from '../../../lib/dataCache';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../../services/coursesServices';
 import { getProfessors } from '../../services/professorsService';
 import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile, uploadFileToSupabase } from '../../services/storageService';
-import { getInstruments, createInstrument, updateInstrument, deleteInstrument } from '../../services/instrumentsServices';
+import {
+  getInstruments, createInstrument, updateInstrument, deleteInstrument,
+  uploadInstrumentImage, addInstrumentPhoto, removeInstrumentPhoto, AdminInstrument,
+} from '../../services/instrumentsServices';
 import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, uploadEventCover, mapEventToDb } from '../../services/eventsService';
 import { resolveMediaUrl } from '../../../lib/apiClient';
 
@@ -90,11 +93,11 @@ export default function ConteudoCMS({
   const [pendingCoursePhotoFile, setPendingCoursePhotoFile] = useState<File | null>(null);
 
   // Instruments state
-  const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [instruments, setInstruments] = useState<AdminInstrument[]>([]);
   const [instrumentsLoading, setInstrumentsLoading] = useState(true);
   const [instrumentSaving, setInstrumentSaving] = useState(false);
   const [instrumentModalOpen, setInstrumentModalOpen] = useState(false);
-  const [activeInstrument, setActiveInstrument] = useState<Partial<Instrument> | null>(null);
+  const [activeInstrument, setActiveInstrument] = useState<Partial<AdminInstrument> | null>(null);
   const [pendingInstrumentImageFile, setPendingInstrumentImageFile] = useState<File | null>(null);
   const [pendingGalleryFile, setPendingGalleryFile] = useState<File | null>(null);
 
@@ -160,7 +163,7 @@ export default function ConteudoCMS({
   // LOAD INSTRUMENTS FROM SUPABASE
   // ==========================================
   useEffect(() => {
-    const cached = dataCache.get<Instrument[]>('instruments');
+    const cached = dataCache.get<AdminInstrument[]>('instruments');
     if (cached) { setInstruments(cached); setInstrumentsLoading(false); return; }
     setInstrumentsLoading(true);
     getInstruments()
@@ -443,7 +446,7 @@ export default function ConteudoCMS({
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
 
-  const handleOpenInstrumentModal = (instrument: Partial<Instrument> | null) => {
+  const handleOpenInstrumentModal = (instrument: Partial<AdminInstrument> | null) => {
     setPendingInstrumentImageFile(null);
     setPendingGalleryFile(null);
     setActiveInstrument(instrument || {
@@ -466,37 +469,47 @@ export default function ConteudoCMS({
 
     setInstrumentSaving(true);
     try {
-      let finalImage = activeInstrument.image;
+      let finalImage = activeInstrument.image!;
       if (pendingInstrumentImageFile) {
-        finalImage = await uploadFileToSupabase(pendingInstrumentImageFile, 'instruments');
-      }
-
-      let finalGallery = activeInstrument.gallery || [];
-      if (pendingGalleryFile) {
-        const galleryUrl = await uploadFileToSupabase(pendingGalleryFile, 'instruments');
-        finalGallery = [...finalGallery, galleryUrl];
+        finalImage = await uploadInstrumentImage(pendingInstrumentImageFile);
       }
 
       const finalSlug = activeInstrument.slug?.trim()
         ? slugify(activeInstrument.slug)
         : slugify(activeInstrument.name || '');
 
-      const payload: Partial<Instrument> = {
-        ...activeInstrument,
-        image: finalImage,
-        gallery: finalGallery,
+      // Sem galeria no payload — fotos são tabela própria (InstrumentoFoto) no
+      // backend, geridas por endpoints dedicados (addInstrumentPhoto/
+      // removeInstrumentPhoto), não mais um array na própria linha do instrumento.
+      const payload = {
         slug: finalSlug,
+        name: activeInstrument.name!,
+        description: activeInstrument.description!,
+        longDescription: activeInstrument.longDescription!,
+        image: finalImage,
+        videoUrl: activeInstrument.videoUrl,
+        color: activeInstrument.color,
       };
 
+      let saved: AdminInstrument;
       if (activeInstrument.id) {
-        const updated = await updateInstrument(activeInstrument.id, payload);
-        setInstruments(prev => prev.map(i => i.id === updated.id ? updated : i));
-        addAuditLog('Alterou Instrumento', 'Conteúdo', `Atualizou ficha do instrumento: ${updated.name}`);
+        saved = await updateInstrument(activeInstrument.id, payload);
+        addAuditLog('Alterou Instrumento', 'Conteúdo', `Atualizou ficha do instrumento: ${saved.name}`);
       } else {
-        const created = await createInstrument(payload);
-        setInstruments(prev => [created, ...prev]);
-        addAuditLog('Cadastrou Instrumento', 'Conteúdo', `Cadastrou novo instrumento: ${created.name}`);
+        saved = await createInstrument(payload);
+        addAuditLog('Cadastrou Instrumento', 'Conteúdo', `Cadastrou novo instrumento: ${saved.name}`);
       }
+
+      // Instrumento novo: se havia uma foto de galeria pendente selecionada
+      // antes de existir um id, ela só pode ser anexada agora que o
+      // instrumento foi criado.
+      if (!activeInstrument.id && pendingGalleryFile) {
+        saved = await addInstrumentPhoto(saved.id, pendingGalleryFile);
+      }
+
+      setInstruments(prev => activeInstrument!.id
+        ? prev.map(i => i.id === saved.id ? saved : i)
+        : [saved, ...prev]);
 
       setInstrumentModalOpen(false);
       setActiveInstrument(null);
@@ -520,11 +533,33 @@ export default function ConteudoCMS({
     }
   };
 
-  const handleRemoveGalleryImage = (url: string) => {
-    setActiveInstrument(prev => prev ? {
-      ...prev,
-      gallery: (prev.gallery || []).filter(g => g !== url)
-    } : prev);
+  // Instrumento já existente: a foto é enviada e anexada na hora, via API —
+  // não fica mais "pendente até salvar o formulário inteiro", porque agora é
+  // uma chamada própria (POST .../fotos), não um campo do instrumento.
+  const handleAddGalleryPhoto = async (file: File) => {
+    if (!activeInstrument?.id) {
+      // Instrumento ainda não existe — fica pendente até o Salvar principal.
+      setPendingGalleryFile(file);
+      return;
+    }
+    try {
+      const updated = await addInstrumentPhoto(activeInstrument.id, file);
+      setActiveInstrument(updated);
+      setInstruments(prev => prev.map(i => i.id === updated.id ? updated : i));
+    } catch (err: any) {
+      alert('Erro ao adicionar foto: ' + err.message);
+    }
+  };
+
+  const handleRemoveGalleryImage = async (fotoId: string) => {
+    if (!activeInstrument?.id) return;
+    try {
+      const updated = await removeInstrumentPhoto(activeInstrument.id, fotoId);
+      setActiveInstrument(updated);
+      setInstruments(prev => prev.map(i => i.id === updated.id ? updated : i));
+    } catch (err: any) {
+      alert('Erro ao remover foto: ' + err.message);
+    }
   };
 
   // ==========================================
@@ -980,7 +1015,7 @@ export default function ConteudoCMS({
               >
                 <div className="relative">
                   <img
-                    src={inst.image}
+                    src={resolveMediaUrl(inst.image)}
                     alt={inst.name}
                     referrerPolicy="no-referrer"
                     className="w-full h-36 object-cover bg-gray-50"
@@ -1448,7 +1483,7 @@ export default function ConteudoCMS({
             <DrawerField label="Imagem principal">
               {activeInstrument.image && (
                 <div className="relative mb-2">
-                  <img src={activeInstrument.image} alt="Preview" referrerPolicy="no-referrer" className="w-full h-28 object-cover rounded-lg border border-gray-200" />
+                  <img src={resolveMediaUrl(activeInstrument.image)} alt="Preview" referrerPolicy="no-referrer" className="w-full h-28 object-cover rounded-lg border border-gray-200" />
                   <button type="button" onClick={() => { setPendingInstrumentImageFile(null); setActiveInstrument(prev => prev ? { ...prev, image: '' } : prev); }} className="absolute -top-2.5 -right-2.5 p-1.5 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-lg border-2 border-white"><X size={14} strokeWidth={2.5} /></button>
                 </div>
               )}
@@ -1458,15 +1493,15 @@ export default function ConteudoCMS({
           <DrawerSection title="Galeria de Fotos">
             {activeInstrument.gallery && activeInstrument.gallery.length > 0 && (
               <div className="grid grid-cols-4 gap-2 mb-3">
-                {activeInstrument.gallery.map(url => (
-                  <div key={url} className="relative">
-                    <img src={url} alt="Galeria" referrerPolicy="no-referrer" className="w-full h-16 object-cover rounded border border-gray-200" />
-                    <button type="button" onClick={() => handleRemoveGalleryImage(url)} className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-md border-2 border-white"><X size={12} strokeWidth={2.5} /></button>
+                {activeInstrument.gallery.map(foto => (
+                  <div key={foto.id} className="relative">
+                    <img src={resolveMediaUrl(foto.url)} alt="Galeria" referrerPolicy="no-referrer" className="w-full h-16 object-cover rounded border border-gray-200" />
+                    <button type="button" onClick={() => handleRemoveGalleryImage(foto.id)} className="absolute -top-2 -right-2 p-1 bg-rose-600 hover:bg-rose-700 rounded-full text-white cursor-pointer shadow-md border-2 border-white"><X size={12} strokeWidth={2.5} /></button>
                   </div>
                 ))}
               </div>
             )}
-            <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={file => setPendingGalleryFile(file)} />
+            <ImageUploader allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={file => handleAddGalleryPhoto(file)} />
             {pendingGalleryFile && <p className="text-[9px] text-emerald-500 font-mono mt-1">Pronta para envio: {pendingGalleryFile.name}</p>}
           </DrawerSection>
         </>)}
