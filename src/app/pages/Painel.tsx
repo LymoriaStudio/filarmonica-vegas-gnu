@@ -90,7 +90,7 @@ export default function Painel() {
   const [values, setValues] = useState<ValueItem[]>(initialValues);
 const [professors, setProfessors] = useState<Professor[]>([]);
 const [students, setStudents] = useState<Student[]>([]);
-  const [organizers, setOrganizers] = useState<Organizer[]>(initialOrganizers);
+  const [organizers, setOrganizers] = useState<Organizer[]>([]);
   const [supporters, setSupporters] = useState<Supporter[]>(initialSupporters);
 
   const [interests, setInterests] = useState<InterestFormResponse[]>(initialInterestForm);

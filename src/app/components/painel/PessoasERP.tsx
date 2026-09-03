@@ -12,6 +12,7 @@ import { uploadFileToSupabase } from '../../services/storageService';
 import { getStudents, createStudent, updateStudent, updateStudentStatus, deleteStudent } from '../../services/studentsService';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
 import { getProfessors, createProfessor, updateProfessor, updateProfessorHighlight, updateProfessorOrder, deleteProfessor } from '../../services/professorsService';
+import { getOrganizers, createOrganizer, updateOrganizer, deleteOrganizer } from '../../services/organizersService';
 import { uploadMedia } from '../../services/mediaService';
 import { resolveMediaUrl } from '../../../lib/apiClient';
 
@@ -98,6 +99,12 @@ export default function PessoasERP({
   getProfessors()
     .then(setProfessors)
     .catch((err) => console.error('Erro ao carregar professores:', err));
+}, []);
+
+useEffect(() => {
+  getOrganizers()
+    .then(setOrganizers)
+    .catch((err) => console.error('Erro ao carregar organizadores:', err));
 }, []);
 
 
@@ -323,24 +330,34 @@ const handleUnarchiveStudent = async (id: string, name: string) => {
     setOrgModalOpen(true);
   };
 
-  const handleSaveOrg = (e: React.FormEvent) => {
+  const handleSaveOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeOrg) return;
 
-    if (activeOrg.id) {
-      setOrganizers(prev => prev.map(o => o.id === activeOrg.id ? (activeOrg as Organizer) : o));
-      addAuditLog('Editou Administrativo', 'Organizadores', `Editou diretoria de: ${activeOrg.name}`);
-    } else {
-      const newOrg = { ...activeOrg, id: `org-${Date.now()}` } as Organizer;
-      setOrganizers(prev => [...prev, newOrg]);
-      addAuditLog('Cadastrou Administrativo', 'Organizadores', `Adicionou organizador: ${newOrg.name}`);
+    try {
+      if (activeOrg.id) {
+        const updated = await updateOrganizer(activeOrg.id, activeOrg);
+        setOrganizers(prev => prev.map(o => o.id === updated.id ? updated : o));
+        addAuditLog('Editou Administrativo', 'Organizadores', `Editou diretoria de: ${updated.name}`);
+      } else {
+        const created = await createOrganizer(activeOrg);
+        setOrganizers(prev => [...prev, created]);
+        addAuditLog('Cadastrou Administrativo', 'Organizadores', `Adicionou organizador: ${created.name}`);
+      }
+      setOrgModalOpen(false);
+    } catch (err: any) {
+      alert('Erro ao salvar organizador: ' + err.message);
     }
-    setOrgModalOpen(false);
   };
 
-  const handleDeleteOrg = (id: string, name: string) => {
-    setOrganizers(prev => prev.filter(o => o.id !== id));
-    addAuditLog('Excluiu Organizador', 'Organizadores', `Removeu administrativo: ${name}`);
+  const handleDeleteOrg = async (id: string, name: string) => {
+    try {
+      await deleteOrganizer(id);
+      setOrganizers(prev => prev.filter(o => o.id !== id));
+      addAuditLog('Excluiu Organizador', 'Organizadores', `Removeu administrativo: ${name}`);
+    } catch (err: any) {
+      alert('Erro ao remover organizador: ' + err.message);
+    }
   };
 
 
