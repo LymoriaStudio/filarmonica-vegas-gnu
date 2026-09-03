@@ -1,134 +1,130 @@
-import { supabase } from '../../lib/supabase';
+import { apiClient } from '../../lib/apiClient';
 
-export interface StudentDb {
-  id?: string;
-  photo?: string | null;
-  name: string;
-  birth_date?: string | null;
-  instrument: string;
-  classroom?: string | null;
-  phone: string;
+interface AdminAlunoDto {
+  id: string;
+  createdAt: string;
+  foto: string | null;
+  nome: string;
+  dataNascimento: string | null;
+  instrumento: string;
+  turma: string | null;
+  telefone: string;
   email: string;
-  guardian?: string | null;
-  address?: string | null;
-  status?: string;
-  zip_code?: string | null;
-  street?: string | null;
-  number?: string | null;
-  complement?: string | null;
-  neighborhood?: string | null;
-  city?: string | null;
-  uf?: string | null;
+  responsavel: string | null;
+  status: string;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
 }
 
-// Status da tabela usa pt-BR; a UI usa en.
-const STATUS_DB_TO_UI: Record<string, string> = {
-  ativo: 'ativo',
-  inativo: 'inativo',
-  formado: 'formado',
-  arquivado: 'arquivado',
+interface ApiPagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+// Status no backend é PascalCase ("Ativo", "Inativo", ...); a UI usa pt-BR minúsculo,
+// com alguns sinônimos em inglês que o código legado ainda dispara em certos botões.
+const STATUS_API_TO_UI: Record<string, string> = {
+  Ativo: 'ativo',
+  Inativo: 'inativo',
+  Formado: 'formado',
+  Arquivado: 'arquivado',
 };
-const STATUS_UI_TO_DB: Record<string, string> = {
-  active: 'ativo',
-  inactive: 'inativo',
-  graduated: 'formado',
-  archived: 'arquivado',
+const STATUS_UI_TO_API: Record<string, string> = {
+  ativo: 'Ativo',
+  active: 'Ativo',
+  inativo: 'Inativo',
+  inactive: 'Inativo',
+  formado: 'Formado',
+  graduated: 'Formado',
+  arquivado: 'Arquivado',
+  archived: 'Arquivado',
 };
 
-export const mapStudentFromDb = (row: any) => ({
-  id: row.id,
-  photo: row.photo ?? '',
-  name: row.name,
-  birthDate: row.birth_date ?? '',
-  instrument: row.instrument,
-  classroom: row.classroom ?? '',
-  phone: row.phone,
-  email: row.email,
-  guardian: row.guardian ?? '',
-  address: row.address ?? '',
-  status: STATUS_DB_TO_UI[row.status] ?? row.status,
-  zipCode: row.zip_code ?? '',
-  street: row.street ?? '',
-  number: row.number ?? '',
-  complement: row.complement ?? '',
-  neighborhood: row.neighborhood ?? '',
-  city: row.city ?? '',
-  uf: row.uf ?? '',
+const mapDtoToStudent = (dto: AdminAlunoDto) => ({
+  id: dto.id,
+  photo: dto.foto ?? '',
+  name: dto.nome,
+  birthDate: dto.dataNascimento ?? '',
+  instrument: dto.instrumento,
+  classroom: dto.turma ?? '',
+  phone: dto.telefone,
+  email: dto.email,
+  guardian: dto.responsavel ?? '',
+  address: dto.logradouro
+    ? [dto.logradouro, dto.numero].filter(Boolean).join(', ') +
+      (dto.bairro ? ` - ${dto.bairro}` : '') +
+      (dto.cidade ? `, ${dto.cidade}` : '') +
+      (dto.uf ? `/${dto.uf}` : '')
+    : '',
+  status: STATUS_API_TO_UI[dto.status] ?? dto.status,
+  zipCode: dto.cep ?? '',
+  street: dto.logradouro ?? '',
+  number: dto.numero ?? '',
+  complement: dto.complemento ?? '',
+  neighborhood: dto.bairro ?? '',
+  city: dto.cidade ?? '',
+  uf: dto.uf ?? '',
+  created_at: dto.createdAt,
 });
 
-export const mapStudentToDb = (s: any): StudentDb => ({
-  photo: s.photo || null,
-  name: s.name,
-  birth_date: s.birthDate || null,
-  instrument: s.instrument,
-  classroom: s.classroom || null,
-  phone: s.phone,
+const toApiPayload = (s: any) => ({
+  foto: s.photo || null,
+  nome: s.name,
+  dataNascimento: s.birthDate || null,
+  instrumento: s.instrument,
+  turma: s.classroom || null,
+  telefone: s.phone,
   email: s.email,
-  guardian: s.guardian || null,
-  address: s.address || null,
-  status:s.status,
-  zip_code: s.zipCode || null,
-  street: s.street || null,
-  number: s.number || null,
-  complement: s.complement || null,
-  neighborhood: s.neighborhood || null,
-  city: s.city || null,
+  responsavel: s.guardian || null,
+  status: STATUS_UI_TO_API[s.status] ?? 'Ativo',
+  cep: s.zipCode || null,
+  logradouro: s.street || null,
+  numero: s.number || null,
+  complemento: s.complement || null,
+  bairro: s.neighborhood || null,
+  cidade: s.city || null,
   uf: s.uf || null,
 });
 
-// GET — lista todos os alunos
+// GET — lista todos os alunos (pageSize alto pra preservar o comportamento
+// "lista completa" que o painel sempre usou; o endpoint é paginado no backend)
 export async function getStudents() {
-  const { data, error } = await supabase
-    .from('students')
-    .select('*')
-    .order('name', { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data || []).map(mapStudentFromDb);
+  const result = await apiClient.get<ApiPagedResult<AdminAlunoDto>>('/api/admin/alunos?pageSize=1000');
+  return result.items.map(mapDtoToStudent);
 }
 
 // GET — só id/created_at, usado para agregações (ex: gráfico de matrículas por mês no dashboard)
 export async function getStudentsMinimal(): Promise<{ id: string; created_at: string }[]> {
-  const { data, error } = await supabase
-    .from('students')
-    .select('id, created_at');
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const result = await apiClient.get<ApiPagedResult<AdminAlunoDto>>('/api/admin/alunos?pageSize=1000');
+  return result.items.map(dto => ({ id: dto.id, created_at: dto.createdAt }));
 }
 
 // POST — cria novo aluno
 export async function createStudent(student: any) {
-  const { data, error } = await supabase
-    .from('students')
-    .insert(mapStudentToDb(student))
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return mapStudentFromDb(data);
+  const dto = await apiClient.post<AdminAlunoDto>('/api/admin/alunos', toApiPayload(student));
+  return mapDtoToStudent(dto);
 }
 
 // PUT — atualiza aluno existente
 export async function updateStudent(id: string, student: any) {
-  const { data, error } = await supabase
-    .from('students')
-    .update(mapStudentToDb(student))
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return mapStudentFromDb(data);
+  const dto = await apiClient.put<AdminAlunoDto>(`/api/admin/alunos/${id}`, toApiPayload(student));
+  return mapDtoToStudent(dto);
 }
 
 // PATCH status — arquivar, ativar etc
 export async function updateStudentStatus(id: string, statusUi: string) {
-  const { error } = await supabase
-    .from('students')
-    .update({ status: STATUS_UI_TO_DB[statusUi] ?? statusUi })
-    .eq('id', id);
-  if (error) throw new Error(error.message);
+  await apiClient.patch(`/api/admin/alunos/${id}/status`, { status: STATUS_UI_TO_API[statusUi] ?? statusUi });
 }
 
 // DELETE — remove permanentemente
 export async function deleteStudent(id: string) {
-  const { error } = await supabase.from('students').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  await apiClient.delete(`/api/admin/alunos/${id}`);
 }

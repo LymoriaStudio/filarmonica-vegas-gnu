@@ -235,7 +235,8 @@ const handleSaveStudent = async (e: React.FormEvent) => {
     // ← entra aqui, antes do if/else
     let finalPhoto = activeStudent.photo;
     if (pendingStudentPhoto) {
-      finalPhoto = await uploadFileToSupabase(pendingStudentPhoto, 'students');
+      const uploaded = await uploadMedia(pendingStudentPhoto, 'students');
+      finalPhoto = uploaded.caminhoRelativo;
     }
 
     if (activeStudent.id) {
@@ -480,7 +481,7 @@ const handleUnarchiveStudent = async (id: string, name: string) => {
                     <tr key={alu.id} className="hover:bg-gray-50 transition-all cursor-pointer" onClick={() => setViewStudent(alu)}>
                       <td className="p-3 pl-4 flex items-center space-x-2.5">
                         <img
-                          src={alu.photo}
+                          src={resolveMediaUrl(alu.photo)}
                           alt={alu.name}
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(alu.name)}&background=0B4DA2&color=fff&size=64`;
@@ -772,7 +773,7 @@ const handleUnarchiveStudent = async (id: string, name: string) => {
             {/* Header */}
             <div className="bg-[#001856] px-6 py-5 flex items-center gap-4">
               <img
-                src={viewStudent.photo}
+                src={resolveMediaUrl(viewStudent.photo)}
                 alt={viewStudent.name}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(viewStudent.name)}&background=0B4DA2&color=fff&size=128`;
