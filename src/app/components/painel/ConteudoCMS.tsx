@@ -18,6 +18,7 @@ import {
 } from '../../services/instrumentsServices';
 import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, uploadEventCover, mapEventToDb } from '../../services/eventsService';
 import { resolveMediaUrl } from '../../../lib/apiClient';
+import { uploadMedia } from '../../services/mediaService';
 
 
 interface ConteudoCMSProps {
@@ -400,7 +401,8 @@ export default function ConteudoCMS({
     try {
       let finalPhoto = activeCourse.photo;
       if (pendingCoursePhotoFile) {
-        finalPhoto = await uploadFileToSupabase(pendingCoursePhotoFile, 'courses');
+        const uploaded = await uploadMedia(pendingCoursePhotoFile, 'courses');
+        finalPhoto = uploaded.caminhoRelativo;
       }
 
       const coursePayload = { ...activeCourse, photo: finalPhoto };
@@ -942,7 +944,7 @@ export default function ConteudoCMS({
               <div key={crs.id} className="p-4 rounded-xl bg-white border border-gray-100 flex gap-4 justify-between items-start">
                 <div className="flex gap-4">
                   <img
-                    src={crs.photo}
+                    src={resolveMediaUrl(crs.photo)}
                     alt={crs.name}
                     referrerPolicy="no-referrer"
                     className="w-20 h-20 object-cover rounded-lg border border-gray-200 shrink-0"
@@ -1436,7 +1438,7 @@ export default function ConteudoCMS({
             </DrawerField>
           </DrawerSection>
           <DrawerSection title="Foto da Oficina">
-            <ImageUploader bg={activeCourse.photo} allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingCoursePhotoFile(file); setActiveCourse(prev => prev ? { ...prev, photo: previewUrl } : prev); }} />
+            <ImageUploader bg={activeCourse.photo ? resolveMediaUrl(activeCourse.photo) : undefined} allowedTypes="Imagens (.jpg, .png, .webp)" onFileSelected={(file, previewUrl) => { setPendingCoursePhotoFile(file); setActiveCourse(prev => prev ? { ...prev, photo: previewUrl } : prev); }} />
           </DrawerSection>
         </>)}
       </Drawer>
