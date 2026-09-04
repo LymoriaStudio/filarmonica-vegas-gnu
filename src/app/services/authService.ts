@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { apiClient, ApiError, setAccessToken, getAccessToken, getStoredRefreshToken, setStoredRefreshToken, subscribeToTokenStorageChanges } from '../../lib/apiClient';
+import { apiClient, ApiError, resolveMediaUrl, setAccessToken, getAccessToken, getStoredRefreshToken, setStoredRefreshToken, subscribeToTokenStorageChanges } from '../../lib/apiClient';
 
 export interface CurrentProfile {
   id: string;
@@ -42,7 +42,7 @@ function mapUsuarioToProfile(u: UsuarioDto): CurrentProfile {
     // O enum do backend serializa capitalizado ("Admin"/"Editor") — o resto do
     // front (Sidebar, ROLE_PERMISSIONS) sempre trabalhou com minúsculo.
     role: u.role.toLowerCase(),
-    avatar_url: u.avatarUrl ?? '',
+    avatar_url: u.avatarUrl ? resolveMediaUrl(u.avatarUrl) : '',
   };
 }
 

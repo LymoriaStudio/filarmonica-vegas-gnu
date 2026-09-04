@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, Camera, Save, KeyRound, Eye, EyeOff, Check, Mail, Shield, User, Calendar, Pencil, X } from 'lucide-react';
-import { uploadFileToSupabase } from '../services/storageService';
-import { getMyProfile, updateMyAvatar, updateMyEmail, updateMyProfile, changeMyPassword } from '../services/profileService';
+import { uploadMedia } from '../services/mediaService';
+import { resolveMediaUrl } from '../../lib/apiClient';
+import { getMyProfile, updateMyProfile, changeMyPassword } from '../services/profileService';
 
 const INPUT = "w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#001856] focus:ring-1 focus:ring-[#001856] transition-all disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed";
 const LABEL = "block text-[11px] font-bold text-gray-400 mb-1.5 uppercase tracking-widest";
@@ -15,7 +16,6 @@ export default function PerfilPage() {
   const [email, setEmail]         = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [role, setRole]           = useState('');
-  const [editRole, setEditRole]   = useState('');
   const [createdAt, setCreatedAt] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarPreview, setAvatarPreview] = useState('');
@@ -52,7 +52,6 @@ export default function PerfilPage() {
       setAvatarUrl(profile.avatarUrl);
       setName(profile.name);
       setRole(profile.role);
-      setEditRole(profile.role);
       setCreatedAt(profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('pt-BR') : '');
       setLoading(false);
     })();
@@ -67,7 +66,6 @@ export default function PerfilPage() {
 
   const handleCancelEdit = () => {
     setEditEmail(email);
-    setEditRole(role);
     setEditMode(false);
     setProfileError('');
   };
@@ -79,20 +77,15 @@ export default function PerfilPage() {
     try {
       let finalAvatarUrl = avatarUrl;
       if (pendingFile) {
-        finalAvatarUrl = await uploadFileToSupabase(pendingFile, `avatars/${userId}`);
-        await updateMyAvatar(finalAvatarUrl);
-        setAvatarUrl(finalAvatarUrl);
-        setPendingFile(null);
+        const uploaded = await uploadMedia(pendingFile, `avatars`);
+        finalAvatarUrl = uploaded.caminhoRelativo;
       }
 
-      if (editEmail !== email) {
-        await updateMyEmail(editEmail);
-        setEmail(editEmail);
-      }
+      await updateMyProfile(name, editEmail, finalAvatarUrl);
 
-      await updateMyProfile(userId, name, editRole);
-
-      setRole(editRole);
+      setAvatarUrl(finalAvatarUrl);
+      setEmail(editEmail);
+      setPendingFile(null);
       setProfileSuccess(true);
       setEditMode(false);
       setTimeout(() => setProfileSuccess(false), 3000);
@@ -118,7 +111,7 @@ export default function PerfilPage() {
 
     setSavingPassword(true);
     try {
-      await changeMyPassword(email, currentPass, newPass);
+      await changeMyPassword(currentPass, newPass);
       setPasswordSuccess(true);
       setTimeout(() => { setPasswordSuccess(false); setPwModalOpen(false); }, 2000);
     } catch (err: any) {
@@ -128,7 +121,7 @@ export default function PerfilPage() {
     }
   };
 
-  const displayAvatar = avatarPreview || avatarUrl;
+  const displayAvatar = avatarPreview || (avatarUrl ? resolveMediaUrl(avatarUrl) : '');
   const initials = name ? name.substring(0, 2).toUpperCase() : '??';
   const roleLabel: Record<string, string> = {
     super_admin: 'Super Administrador', admin: 'Administrador',
@@ -255,12 +248,11 @@ export default function PerfilPage() {
                   className={INPUT} />
               </div>
 
-              {/* Cargo */}
+              {/* Cargo — somente leitura: só admin troca role, via Controle de Usuários */}
               <div>
                 <label className={LABEL}><Shield size={11} className="inline mr-1" />Cargo / Função</label>
-                <input type="text" value={editMode ? editRole : (roleLabel[role] ?? role)}
-                  onChange={e => setEditRole(e.target.value)}
-                  disabled={!editMode}
+                <input type="text" value={roleLabel[role] ?? role}
+                  disabled
                   className={INPUT} />
               </div>
             </div>
