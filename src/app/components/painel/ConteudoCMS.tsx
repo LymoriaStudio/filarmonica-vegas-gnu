@@ -11,14 +11,14 @@ import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, Drawer
 import { dataCache } from '../../../lib/dataCache';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../../services/coursesServices';
 import { getProfessors } from '../../services/professorsService';
-import { listAllMedia, checkMediaUsage, deleteMediaFile, StorageMediaFile, uploadFileToSupabase } from '../../services/storageService';
+import { uploadFileToSupabase } from '../../services/storageService';
 import {
   getInstruments, createInstrument, updateInstrument, deleteInstrument,
   uploadInstrumentImage, addInstrumentPhoto, removeInstrumentPhoto, AdminInstrument,
 } from '../../services/instrumentsServices';
 import { getAllEventsAdmin, createEvent, updateEvent, deleteEvent, updateEventHighlighted, uploadEventCover, mapEventToDb } from '../../services/eventsService';
 import { resolveMediaUrl } from '../../../lib/apiClient';
-import { uploadMedia } from '../../services/mediaService';
+import { uploadMedia, listMedia, checkMediaUsage, deleteMedia, MediaFile } from '../../services/mediaService';
 
 
 interface ConteudoCMSProps {
@@ -83,7 +83,7 @@ export default function ConteudoCMS({
 
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
   const [activePhoto, setActivePhoto] = useState<Partial<GalleryPhoto> | null>(null);
-  const [mediaFiles, setMediaFiles] = useState<StorageMediaFile[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaDeletingPath, setMediaDeletingPath] = useState<string | null>(null);
 
@@ -180,7 +180,7 @@ export default function ConteudoCMS({
   const fetchMediaLibrary = async () => {
     setMediaLoading(true);
     try {
-      const files = await listAllMedia();
+      const files = await listMedia();
       setMediaFiles(files);
     } catch (err) {
       console.error('Erro ao carregar biblioteca de mídia:', err);
@@ -196,10 +196,10 @@ export default function ConteudoCMS({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryMode]);
 
-  const handleDeleteMedia = async (file: StorageMediaFile) => {
+  const handleDeleteMedia = async (file: MediaFile) => {
     setMediaDeletingPath(file.path);
     try {
-      const { inUse, usedBy } = await checkMediaUsage(file.url);
+      const { inUse, usedBy } = await checkMediaUsage(file.id);
 
       if (inUse) {
         alert(
@@ -212,7 +212,7 @@ export default function ConteudoCMS({
         return;
       }
 
-      await deleteMediaFile(file.path);
+      await deleteMedia(file.id);
       setMediaFiles(prev => prev.filter(f => f.path !== file.path));
       addAuditLog('Removeu Arquivo de Mídia', 'Conteúdo', `Removeu arquivo do Storage: ${file.path}`);
     } catch (err: any) {
