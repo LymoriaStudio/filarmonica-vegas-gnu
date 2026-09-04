@@ -170,7 +170,14 @@ export default function FinanceiroERP({
   const handleToggleConfirm = async (d: DoacaoView) => {
     const newStatus = d.status === 'confirmado' ? 'pendente' : 'confirmado';
     try {
-      await updateDoacao(d.id, { status: newStatus });
+      await updateDoacao(d.id, {
+        donor_name: d.donorName,
+        donor_type: d.donorType,
+        donor_cpf: d.donorCpf,
+        donor_email: d.donorEmail,
+        amount: d.amount,
+        status: newStatus,
+      });
       setDoacoes((prev) => prev.map((x) => x.id === d.id ? { ...x, status: newStatus } : x));
       addAuditLog(
         newStatus === 'confirmado' ? 'Confirmou Doação' : 'Reverteu Doação',
