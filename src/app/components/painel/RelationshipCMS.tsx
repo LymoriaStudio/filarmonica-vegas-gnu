@@ -20,7 +20,7 @@ import { getApoiadores, updateApoiadorStatus } from '../../services/useApoiadore
 import { createStudent } from '../../services/studentsService';
 import { SupportFormResponse, ContactMessage, Student, Supporter } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
-import { uploadFileToSupabase } from '../../services/storageService';
+import { uploadMedia } from '../../services/mediaService';
 import { dataCache } from '../../../lib/dataCache';
 
 // ── Tipo local derivado da tabela Supabase ────────────────────────────────────
@@ -246,7 +246,8 @@ export default function RelationshipCMS({
       let finalPhoto = enrollForm.photo;
 
       if (pendingPhotoFile) {
-        finalPhoto = await uploadFileToSupabase(pendingPhotoFile, 'students');
+        const uploaded = await uploadMedia(pendingPhotoFile, 'students');
+        finalPhoto = uploaded.caminhoRelativo;
       }
 
       const newStudent = await createStudent({ ...enrollForm, photo: finalPhoto });

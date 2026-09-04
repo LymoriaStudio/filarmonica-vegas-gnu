@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { Banner, SiteStatistics, ValueItem, TimelineEvent, AuditLog } from '../../validations/types';
 import { ImageUploader } from './MiniWidgets';
-import { uploadFileToSupabase } from '../../services/storageService';
 import { uploadMedia } from '../../services/mediaService';
 import { resolveMediaUrl } from '../../../lib/apiClient';
 import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, DrawerSelect } from './Drawer';
@@ -331,8 +330,8 @@ export default function SiteCMS({
     // Faz o upload da imagem do marco somente ao confirmar/salvar
     if (pendingTimelineFile) {
       try {
-        const url = await uploadFileToSupabase(pendingTimelineFile, 'timeline');
-        setActiveTimeline(prev => prev ? { ...prev, image: url } : prev);
+        const uploaded = await uploadMedia(pendingTimelineFile, 'timeline');
+        setActiveTimeline(prev => prev ? { ...prev, image: uploaded.caminhoRelativo } : prev);
       } catch (err: any) {
         console.error(err);
         alert('Erro ao enviar imagem do marco: ' + err.message);

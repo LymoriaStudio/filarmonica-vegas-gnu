@@ -298,9 +298,6 @@ export default function SistemaConfig({
           {usersError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
               {usersError}
-              {usersError.includes('VITE_SUPABASE_SERVICE_KEY') && (
-                <p className="mt-1 text-xs text-red-400">Adicione <code className="bg-red-100 px-1 rounded">VITE_SUPABASE_SERVICE_KEY=sua_service_role_key</code> ao arquivo <code>.env</code> e reinicie o servidor.</p>
-              )}
             </div>
           )}
 

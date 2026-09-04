@@ -11,7 +11,6 @@ import { Drawer, DrawerSection, DrawerField, DrawerInput, DrawerTextarea, Drawer
 import { dataCache } from '../../../lib/dataCache';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../../services/coursesServices';
 import { getProfessors } from '../../services/professorsService';
-import { uploadFileToSupabase } from '../../services/storageService';
 import {
   getInstruments, createInstrument, updateInstrument, deleteInstrument,
   uploadInstrumentImage, addInstrumentPhoto, removeInstrumentPhoto, AdminInstrument,
