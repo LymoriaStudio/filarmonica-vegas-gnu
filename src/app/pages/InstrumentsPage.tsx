@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Navbar } from "../components/Navbar";
 import { Footer } from "../components/Footer";
 import { getInstruments, type Instrument } from "../services/instrumentsService";
+import { toYouTubeEmbedUrl } from "../../lib/youtube";
 
 export function InstrumentsPage() {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
@@ -223,7 +224,7 @@ export function InstrumentsPage() {
                 <div className="aspect-video rounded-xl overflow-hidden bg-black mb-10">
                   <iframe
                     key={selected.slug}
-                    src={selected.videoUrl}
+                    src={toYouTubeEmbedUrl(selected.videoUrl)}
                     title={`Demonstração de ${selected.name}`}
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
